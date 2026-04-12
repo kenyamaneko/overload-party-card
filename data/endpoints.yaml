@@ -1,0 +1,106 @@
+# ─── API Endpoint Definitions ──────────────────────────
+endpoint_groups:
+  - name: Internal REST
+    base_path: /internal/v1
+    auth: internal
+    endpoints:
+      - method: GET
+        path: /cards
+        summary: 全カード定義を返す（battle / gateway 起動時キャッシュロード用）
+        response_type: "[]CardDefinition"
+        errors:
+          - {status: 500, description: DB 接続エラー}
+
+      - method: GET
+        path: /players/{playerId}/cards
+        summary: プレイヤーの所持カード一覧を返す（PlayerCardWithDef 形式）
+        response_type: "[]PlayerCardWithDef"
+        errors:
+          - {status: 400, description: playerId が空}
+          - {status: 500, description: DB 接続エラー}
+
+      - method: GET
+        path: /players/{playerId}/cards/with-ownership
+        summary: 全カード定義にプレイヤーの所持状態を付与して返す
+        response_type: "[]CardWithOwnership"
+        errors:
+          - {status: 400, description: playerId が空}
+          - {status: 500, description: DB 接続エラー}
+
+      - method: GET
+        path: /players/{playerId}/decks
+        summary: プレイヤーのデッキ一覧を返す
+        response_type: "[]Deck"
+        errors:
+          - {status: 400, description: playerId が空}
+          - {status: 404, description: プレイヤーが存在しない}
+          - {status: 500, description: DB 接続エラー}
+
+      - method: GET
+        path: /players/{playerId}/decks/{deckId}
+        summary: 指定デッキの詳細（カード構成を含む）を返す
+        response_type: DeckDetailResponse
+        errors:
+          - {status: 400, description: deckId が不正}
+          - {status: 404, description: デッキが存在しない}
+          - {status: 500, description: DB 接続エラー}
+
+      - method: POST
+        path: /players/{playerId}/decks
+        summary: 新しいデッキを作成する
+        request_type: DeckCreateRequest
+        response_type: Deck
+        notes: 成功時 201 Created を返す
+        errors:
+          - {status: 400, description: リクエストボディ不正 / デッキバリデーション失敗}
+          - {status: 403, description: 未所持カードを含む}
+          - {status: 500, description: DB 接続エラー}
+
+      - method: PUT
+        path: /players/{playerId}/decks/{deckId}
+        summary: 既存デッキを更新する
+        request_type: DeckUpdateRequest
+        response_type: Deck
+        errors:
+          - {status: 400, description: deckId 不正 / リクエストボディ不正 / デッキバリデーション失敗 / 制限枚数超過}
+          - {status: 403, description: 未所持カードを含む}
+          - {status: 404, description: デッキが存在しない}
+          - {status: 500, description: DB 接続エラー}
+
+      - method: DELETE
+        path: /players/{playerId}/decks/{deckId}
+        summary: デッキを削除する
+        notes: 成功時 204 No Content を返す（レスポンスボディなし）
+        errors:
+          - {status: 400, description: deckId が不正}
+          - {status: 404, description: デッキが存在しない}
+          - {status: 500, description: DB 接続エラー}
+
+      - method: POST
+        path: /players/{playerId}/decks/{deckId}/validate-for-battle
+        summary: デッキがバトル使用可能か検証する（カード所持・制限・枚数チェック）
+        notes: 成功時 200 OK（ボディなし）。バリデーション失敗は 400 で返す
+        errors:
+          - {status: 400, description: deckId 不正 / デッキバリデーション失敗 / 制限枚数超過}
+          - {status: 403, description: 未所持カードを含む}
+          - {status: 404, description: デッキが存在しない}
+          - {status: 500, description: DB 接続エラー}
+
+      - method: POST
+        path: /players/{playerId}/grant-initial-pack
+        summary: 初期ファクション選択時にファクションカード + Neutral カードを各 3 枚付与する
+        request_type: GrantPackRequest
+        response_type: GrantPackResponse
+        notes: 冪等性は呼び出し元（gateway）が player_factions で保証する
+        errors:
+          - {status: 400, description: playerId が空 / リクエストボディ不正 / 無効なファクション}
+          - {status: 500, description: DB 接続エラー}
+
+      - method: POST
+        path: /players/{playerId}/grant-faction-pack
+        summary: ショップ購入時に指定ファクションのカードを各 3 枚付与する（Neutral なし）
+        request_type: GrantPackRequest
+        response_type: GrantPackResponse
+        errors:
+          - {status: 400, description: playerId が空 / リクエストボディ不正 / 無効なファクション}
+          - {status: 500, description: DB 接続エラー}
