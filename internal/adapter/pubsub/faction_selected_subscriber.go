@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"log"
 
-	"cloud.google.com/go/pubsub"
+	"cloud.google.com/go/pubsub/v2"
 
 	pubsubevents "github.com/kenyamaneko/overload-party-common/packages/pubsub-events"
 
@@ -24,8 +24,8 @@ import (
 // FactionSelectedSubscriber は faction-selected-card-sub からイベントを取得し、
 // ファクション獲得時にプレイヤーへカードを配布します。
 type FactionSelectedSubscriber struct {
-	client       *pubsub.Client
-	subscription *pubsub.Subscription
+	client     *pubsub.Client
+	subscriber *pubsub.Subscriber
 	grantService *service.GrantService
 	eventRepo    port.ProcessedEventRepo
 }
@@ -44,19 +44,9 @@ func NewFactionSelectedSubscriber(
 	if err != nil {
 		return nil, fmt.Errorf("faction-selected-card subscriber: new client: %w", err)
 	}
-	sub := client.Subscription(subscriptionID)
-	ok, err := sub.Exists(ctx)
-	if err != nil {
-		_ = client.Close()
-		return nil, fmt.Errorf("faction-selected-card subscriber: exists check: %w", err)
-	}
-	if !ok {
-		_ = client.Close()
-		return nil, fmt.Errorf("faction-selected-card subscriber: subscription %q not found", subscriptionID)
-	}
 	return &FactionSelectedSubscriber{
 		client:       client,
-		subscription: sub,
+		subscriber:   client.Subscriber(subscriptionID),
 		grantService: grantService,
 		eventRepo:    eventRepo,
 	}, nil
@@ -64,8 +54,8 @@ func NewFactionSelectedSubscriber(
 
 // Start は ctx がキャンセルされるか Receive がエラーを返すまでブロックします。
 func (s *FactionSelectedSubscriber) Start(ctx context.Context) error {
-	log.Printf("faction-selected-card subscriber: pulling from %s", s.subscription.ID())
-	return s.subscription.Receive(ctx, s.handle)
+	log.Printf("faction-selected-card subscriber: pulling from %s", s.subscriber.ID())
+	return s.subscriber.Receive(ctx, s.handle)
 }
 
 // Close は Pub/Sub クライアントを閉じます。
