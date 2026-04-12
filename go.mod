@@ -15,7 +15,6 @@ require (
 // api-card lives inside this repo; publish/tag happens via CI (no manual tag).
 replace github.com/kenyamaneko/overload-party-card/packages/api-card => ./packages/api-card
 
-replace github.com/kenyamaneko/overload-party-common/packages/pubsub-events => ../overload-party-common/packages/pubsub-events
 
 require (
 	cloud.google.com/go v0.121.6 // indirect
