@@ -24,6 +24,12 @@ type PlayerCardRepo interface {
 	AddCards(ctx context.Context, playerID string, cardIDs []string, countPerCard int) (int, error)
 }
 
+// GameConfigRepo はゲーム設定値の読み取りを抽象化するインターフェースです。
+// キーが存在しない場合は ErrNotFound を返す（fail-fast）。
+type GameConfigRepo interface {
+	GetInt64(ctx context.Context, key string) (int64, error)
+}
+
 // ProcessedEventRepo は処理済み Pub/Sub イベントを追跡するインターフェースです。
 type ProcessedEventRepo interface {
 	// Insert は新規行が挿入された場合 true を返します（冪等性ガード）。

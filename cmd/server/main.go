@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
@@ -41,10 +42,20 @@ func run() error {
 	}
 	defer pool.Close()
 
+	fsClient, err := firestore.NewClient(ctx, cfg.FirestoreProjectID)
+	if err != nil {
+		return fmt.Errorf("firestore new client: %w", err)
+	}
+	defer func() { _ = fsClient.Close() }()
+
 	cardRepo := repository.NewPgCardRepository(pool)
 	playerCardRepo := repository.NewPgPlayerCardRepository(pool)
 	deckRepo := repository.NewPgDeckRepository(pool)
 	eventRepo := repository.NewPgProcessedEventRepository(pool)
+
+	// game_config は現在 card の runtime パスから参照していない。
+	// クライアント到達性は起動時に検証するため、repo を生成だけしておく。
+	_ = repository.NewFirestoreGameConfigRepository(fsClient)
 
 	cardCache := cache.NewCardCache()
 	if err := cardCache.Load(ctx, cardRepo); err != nil {

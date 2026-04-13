@@ -12,8 +12,17 @@
 
 CREATE SCHEMA IF NOT EXISTS card;
 
--- updated_at 自動更新トリガー関数は shared スキーマに存在する前提。
--- 単体で DDL を流す場合は shared.update_updated_at() を先に作成しておくこと。
+-- =============================================================================
+-- Schema-local helpers
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION card.update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
 -- =============================================================================
 -- Card Master (schema: card)
@@ -40,7 +49,7 @@ CREATE TABLE card.card_definitions (
 
 CREATE INDEX idx_cards_faction ON card.card_definitions(faction, card_type);
 CREATE INDEX idx_cards_type ON card.card_definitions(card_type);
-CREATE TRIGGER trg_card_definitions_updated_at BEFORE UPDATE ON card.card_definitions FOR EACH ROW EXECUTE FUNCTION shared.update_updated_at();
+CREATE TRIGGER trg_card_definitions_updated_at BEFORE UPDATE ON card.card_definitions FOR EACH ROW EXECUTE FUNCTION card.update_updated_at();
 
 -- =============================================================================
 -- Card & Deck Management (schema: card, children of players)
@@ -66,7 +75,7 @@ CREATE TABLE card.decks (
 );
 
 CREATE INDEX idx_decks_player ON card.decks(player_id, updated_at DESC);
-CREATE TRIGGER trg_decks_updated_at BEFORE UPDATE ON card.decks FOR EACH ROW EXECUTE FUNCTION shared.update_updated_at();
+CREATE TRIGGER trg_decks_updated_at BEFORE UPDATE ON card.decks FOR EACH ROW EXECUTE FUNCTION card.update_updated_at();
 
 CREATE TABLE card.deck_cards (
   player_id  UUID NOT NULL,                          -- ルート親参照
