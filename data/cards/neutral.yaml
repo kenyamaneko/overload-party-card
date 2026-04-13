@@ -648,6 +648,7 @@ cards:
     resource_label: "On-premises"
     const_name: NeutralOnpremLinux
     card_type: Compute
+    subtype: VM
     deploy_turns: 1
     resizable: false
     elastic: false
@@ -668,7 +669,8 @@ cards:
     card_name: "エレファントDB"
     resource_label: "On-premises"
     const_name: NeutralOnpremElephantDB
-    card_type: Database
+    card_type: Data
+    subtype: Database
     deploy_turns: 1
     resizable: false
     elastic: false
@@ -688,6 +690,7 @@ cards:
     resource_label: "On-premises"
     const_name: NeutralOnpremTenki
     card_type: Compute
+    subtype: VM
     deploy_turns: 1
     resizable: false
     elastic: false
@@ -714,7 +717,8 @@ cards:
     card_name: "調律部 DB"
     resource_label: "On-premises"
     const_name: NeutralOnpremTunersDB
-    card_type: Database
+    card_type: Data
+    subtype: Database
     deploy_turns: 1
     resizable: false
     elastic: false

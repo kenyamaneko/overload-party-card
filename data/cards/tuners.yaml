@@ -12,6 +12,7 @@ cards:
     resource_label: "Compute"
     const_name: TunersComputeKantata
     card_type: Compute
+    subtype: VM
     deploy_turns: 1
     resizable: true
     elastic: false
@@ -31,6 +32,7 @@ cards:
     resource_label: "Bare Metal"
     const_name: TunersBareMetal
     card_type: Compute
+    subtype: VM
     deploy_turns: 1
     resizable: true
     elastic: false
@@ -55,7 +57,8 @@ cards:
     card_name: "テナ"
     resource_label: "Container"
     const_name: TunersContainerTena
-    card_type: Container
+    card_type: Compute
+    subtype: Container
     deploy_turns: 0
     resizable: false
     elastic: true
@@ -79,7 +82,8 @@ cards:
     card_name: "コンダクティス"
     resource_label: "Orchestrator"
     const_name: TunersOrchestratorConductis
-    card_type: Orchestrator
+    card_type: Compute
+    subtype: Orchestrator
     deploy_turns: 2
     resizable: true
     elastic: true
@@ -115,7 +119,8 @@ cards:
     card_name: "ファンファーレクション"
     resource_label: "Functions"
     const_name: TunersFunctionsFanfare
-    card_type: Serverless
+    card_type: Compute
+    subtype: Serverless
     deploy_turns: 0
     resizable: false
     elastic: true
@@ -137,7 +142,8 @@ cards:
     card_name: "アピエッタ"
     resource_label: "Low-Code"
     const_name: TunersLowCodeApietta
-    card_type: Serverless
+    card_type: Compute
+    subtype: Serverless
     deploy_turns: 0
     resizable: false
     elastic: true
@@ -174,7 +180,8 @@ cards:
     card_name: "音の魔術師〈マジシャン・オブ・ミュージック〉"
     resource_label: "DB"
     const_name: TunersDBOtonmajutsushi
-    card_type: Database
+    card_type: Data
+    subtype: Database
     deploy_turns: 1
     resizable: false
     elastic: true
@@ -196,7 +203,8 @@ cards:
     card_name: "エクサノーツ"
     resource_label: "DB"
     const_name: TunersDBExanotes
-    card_type: Database
+    card_type: Data
+    subtype: Database
     deploy_turns: 1
     resizable: true
     elastic: false
@@ -217,7 +225,8 @@ cards:
     card_name: "スコアージ"
     resource_label: "Storage"
     const_name: TunersStorageScourge
-    card_type: ObjectStorage
+    card_type: Data
+    subtype: ObjectStorage
     deploy_turns: 0
     resizable: false
     elastic: false
@@ -238,7 +247,8 @@ cards:
     card_name: "カプリッシュ"
     resource_label: "Cache"
     const_name: TunersCacheCaprish
-    card_type: CacheDB
+    card_type: Data
+    subtype: CacheDB
     deploy_turns: 0
     resizable: true
     elastic: false

@@ -31,25 +31,19 @@ STARTER_DECKS_YAML = ROOT / "data" / "mock" / "starter_decks.yaml"
 STARTER_DECKS_JSON_OUT = ROOT / "data" / "cache" / "starter_decks_gen.json"
 
 # ─── Constants ──────────────────────────────────────────
-COMPUTE_TYPES = {"Compute", "Container", "Orchestrator", "Serverless", "AI/ML"}
-DATA_TYPES = {"Database", "ObjectStorage", "CacheDB"}
-SUPPORT_TYPES = {"Platform", "Attachment", "Strategy", "Reactive", "Incident"}
-LOG_TYPES = {"Log"}
-ALL_CARD_TYPES = COMPUTE_TYPES | DATA_TYPES | SUPPORT_TYPES | LOG_TYPES
-
-# 3階層分類（Zone / CardType / Subtype）への段階移行用 Subtype 導出マップ。
-# 現行 card_type 値から Subtype を派生させる。"Compute" (個別) は "VM" にリネームされる。
-# Subtype を持たない CardType（Platform/Attachment/Strategy/Reactive/Incident/Log）は None。
+# 3階層分類（Zone / CardType / Subtype）。Phase 2b で導入。
 # 参考: overload-party-battle/memory/project_card_taxonomy.md
-SUBTYPE_FROM_CARD_TYPE = {
-    "Compute": "VM",
-    "Container": "Container",
-    "Orchestrator": "Orchestrator",
-    "Serverless": "Serverless",
-    "AI/ML": "AI/ML",
-    "Database": "Database",
-    "ObjectStorage": "ObjectStorage",
-    "CacheDB": "CacheDB",
+CARD_TYPE_COMPUTE = "Compute"
+CARD_TYPE_DATA = "Data"
+CARD_TYPE_LOG = "Log"
+RESOURCE_CARD_TYPES = {CARD_TYPE_COMPUTE, CARD_TYPE_DATA}
+SUPPORT_CARD_TYPES = {"Platform", "Attachment", "Strategy", "Reactive", "Incident"}
+ALL_CARD_TYPES = RESOURCE_CARD_TYPES | SUPPORT_CARD_TYPES | {CARD_TYPE_LOG}
+
+# Subtype を持つ CardType と、その許容 Subtype 集合。
+SUBTYPES_BY_CARD_TYPE = {
+    CARD_TYPE_COMPUTE: {"VM", "Container", "Orchestrator", "Serverless", "AI/ML"},
+    CARD_TYPE_DATA:    {"Database", "ObjectStorage", "CacheDB"},
 }
 
 VALID_RESTRICTION = {"unlimited", "limited", "semi_limited", "forbidden"}
@@ -61,17 +55,19 @@ DATA_STAT_KEYS = {"yield", "availability", "maintenance_cost", "sla_penalty"}
 FACTION_ORDER = ["SHE", "Tenki", "Sugar", "Tuners", "Neutral"]
 FACTION_FILE_MAP = {"SHE": "sd"}
 
+# 各表示カテゴリのフィルタ条件: (by_field, allowed_values, table_kind)
+# table_kind: "compute" | "data" | "support" — Markdown 表のフォーマットを決める
 CATEGORY_ORDER = [
-    ("コンピュート系リソース", {"Compute", "Container", "Orchestrator", "Serverless"}),
-    ("AI/ML系リソース", {"AI/ML"}),
-    ("DB系リソース", {"Database", "CacheDB"}),
-    ("オブジェクトストレージ", {"ObjectStorage"}),
-    ("プラットフォーム", {"Platform"}),
-    ("アタッチメント", {"Attachment"}),
-    ("ストラテジー", {"Strategy"}),
-    ("インシデント", {"Incident"}),
-    ("リアクティブ", {"Reactive"}),
-    ("ログ", {"Log"}),
+    ("コンピュート系リソース", "subtype",   {"VM", "Container", "Orchestrator", "Serverless"}, "compute"),
+    ("AI/ML系リソース",        "subtype",   {"AI/ML"},                                          "compute"),
+    ("DB系リソース",           "subtype",   {"Database", "CacheDB"},                            "data"),
+    ("オブジェクトストレージ",  "subtype",   {"ObjectStorage"},                                  "data"),
+    ("プラットフォーム",        "card_type", {"Platform"},                                       "support"),
+    ("アタッチメント",          "card_type", {"Attachment"},                                     "support"),
+    ("ストラテジー",            "card_type", {"Strategy"},                                       "support"),
+    ("インシデント",            "card_type", {"Incident"},                                       "support"),
+    ("リアクティブ",            "card_type", {"Reactive"},                                       "support"),
+    ("ログ",                   "card_type", {"Log"},                                            "support"),
 ]
 
 
@@ -110,7 +106,7 @@ def load_all_cards():
 
 # ─── Validate ──────────────────────────────────────────
 def _validate_required_fields(card, label, errors):
-    is_log = card.get("card_type") in LOG_TYPES
+    is_log = card.get("card_type") == CARD_TYPE_LOG
     if is_log:
         required = ["card_no", "card_id", "card_name", "const_name", "card_type", "restriction", "is_active"]
     else:
@@ -118,6 +114,13 @@ def _validate_required_fields(card, label, errors):
     for field in required:
         if field not in card:
             errors.append(f"{label}: missing required field '{field}'")
+    # subtype は Compute/Data カテゴリで必須、それ以外は禁止
+    card_type = card.get("card_type")
+    has_subtype = "subtype" in card
+    if card_type in SUBTYPES_BY_CARD_TYPE and not has_subtype:
+        errors.append(f"{label}: card_type '{card_type}' requires 'subtype' field")
+    if card_type not in SUBTYPES_BY_CARD_TYPE and has_subtype:
+        errors.append(f"{label}: card_type '{card_type}' must not have 'subtype' field")
 
 
 def _validate_uniqueness(card, label, seen_nos, seen_consts, seen_card_ids, errors):
@@ -152,6 +155,11 @@ def _validate_types_and_values(card, label, errors):
     card_type = card.get("card_type", "")
     if card_type and card_type not in ALL_CARD_TYPES:
         errors.append(f"{label}: invalid card_type '{card_type}'")
+    subtype = card.get("subtype")
+    if subtype is not None:
+        allowed = SUBTYPES_BY_CARD_TYPE.get(card_type, set())
+        if subtype not in allowed:
+            errors.append(f"{label}: invalid subtype '{subtype}' for card_type '{card_type}'")
 
     for bf in ("resizable", "elastic"):
         val = card.get(bf)
@@ -187,11 +195,11 @@ def _validate_stats(card, label, errors):
     if not (card_type and stats):
         return
 
-    if card_type in COMPUTE_TYPES:
+    if card_type == CARD_TYPE_COMPUTE:
         missing = COMPUTE_STAT_KEYS - set(stats.keys())
         if missing:
             errors.append(f"{label}: compute card missing stats: {missing}")
-    elif card_type in DATA_TYPES:
+    elif card_type == CARD_TYPE_DATA:
         missing = DATA_STAT_KEYS - set(stats.keys())
         if missing:
             errors.append(f"{label}: data card missing stats: {missing}")
@@ -264,9 +272,8 @@ def generate_json(cards, *, out_path):
             "restriction": card["restriction"],
             "is_active": card["is_active"],
         }
-        subtype = SUBTYPE_FROM_CARD_TYPE.get(card["card_type"])
-        if subtype is not None:
-            entry["subtype"] = subtype
+        if card.get("subtype") is not None:
+            entry["subtype"] = card["subtype"]
         if card.get("effect_text"):
             entry["effect_text"] = card["effect_text"]
         if card.get("effects"):
@@ -309,8 +316,7 @@ def generate_seed_sql(cards, *, out_path):
         resource_label = _sql_escape(card.get("resource_label", ""))
         faction = _sql_escape(card["faction"])
         card_type = _sql_escape(card["card_type"])
-        subtype_value = SUBTYPE_FROM_CARD_TYPE.get(card["card_type"])
-        subtype = _sql_escape(subtype_value) if subtype_value is not None else "NULL"
+        subtype = _sql_escape(card["subtype"]) if card.get("subtype") is not None else "NULL"
         resizable = "true" if card.get("resizable", False) else "false"
         elastic = "true" if card.get("elastic", False) else "false"
 
@@ -362,8 +368,9 @@ def generate_seed_sql(cards, *, out_path):
 
 # ─── Generate CARDS.md ─────────────────────────────────
 def _scalability_display(card):
-    ct = card["card_type"]
-    display_type = {"ObjectStorage": "Object Storage", "CacheDB": "Cache DB"}.get(ct, ct)
+    # Subtype がある場合（Compute/Data 配下）は subtype を、なければ card_type を表示
+    label = card.get("subtype") or card["card_type"]
+    display_type = {"ObjectStorage": "Object Storage", "CacheDB": "Cache DB"}.get(label, label)
     r = card.get("resizable", False)
     e = card.get("elastic", False)
     if r and e:
@@ -462,9 +469,9 @@ def _md_faction_sections(faction_data, lines):
 
         summary[faction] = {}
 
-        for cat_name, cat_types in CATEGORY_ORDER:
+        for cat_name, by_field, allowed_values, table_kind in CATEGORY_ORDER:
             cat_cards = sorted(
-                [c for c in faction_cards if c["card_type"] in cat_types],
+                [c for c in faction_cards if c.get(by_field) in allowed_values],
                 key=lambda c: c["card_id"]
             )
             summary[faction][cat_name] = len(cat_cards)
@@ -474,9 +481,9 @@ def _md_faction_sections(faction_data, lines):
             lines.append(f"### {cat_name}（{len(cat_cards)}枚）")
             lines.append("")
 
-            if cat_types & COMPUTE_TYPES:
+            if table_kind == "compute":
                 lines.extend(_md_resource_table(cat_cards, "スループット", "throughput"))
-            elif cat_types & DATA_TYPES:
+            elif table_kind == "data":
                 lines.extend(_md_resource_table(cat_cards, "Yield", "yield"))
             else:
                 lines.extend(_md_support_table(cat_cards))
@@ -498,7 +505,7 @@ def _md_summary_table(faction_data, summary, lines):
     lines.append("|---------|" + "|".join(["------" for _ in FACTION_ORDER]) + "|------|")
 
     grand_total = {f: 0 for f in FACTION_ORDER}
-    for cat_name, _ in CATEGORY_ORDER:
+    for cat_name, *_ in CATEGORY_ORDER:
         row = f"| {cat_name} "
         cat_total = 0
         for faction in FACTION_ORDER:

@@ -13,6 +13,7 @@ cards:
     # const_name は旧 card_name 由来。変更は全消費リポで破壊的変更となるため据え置き
     const_name: SugarComputeConfettiito
     card_type: Compute
+    subtype: VM
     deploy_turns: 1
     resizable: true
     elastic: false
@@ -32,6 +33,7 @@ cards:
     resource_label: "Spot"
     const_name: SugarSpotSponjit
     card_type: Compute
+    subtype: VM
     deploy_turns: 1
     resizable: true
     elastic: false
@@ -56,7 +58,8 @@ cards:
     card_name: "クラン"
     resource_label: "Container"
     const_name: SugarContainerClan
-    card_type: Container
+    card_type: Compute
+    subtype: Container
     deploy_turns: 0
     resizable: false
     elastic: true
@@ -85,7 +88,8 @@ cards:
     card_name: "クーヘンバウムティス"
     resource_label: "Orchestrator"
     const_name: SugarOrchestratorKuchen
-    card_type: Orchestrator
+    card_type: Compute
+    subtype: Orchestrator
     deploy_turns: 2
     resizable: true
     elastic: true
@@ -118,7 +122,8 @@ cards:
     card_name: "クラン"
     resource_label: "Functions"
     const_name: SugarFunctionsClan
-    card_type: Serverless
+    card_type: Compute
+    subtype: Serverless
     deploy_turns: 0
     resizable: false
     elastic: true
@@ -142,7 +147,8 @@ cards:
     card_name: "バター君"
     resource_label: "AI"
     const_name: SugarAIButterKun
-    card_type: AI/ML
+    card_type: Compute
+    subtype: AI/ML
     deploy_turns: 2
     resizable: true
     elastic: false
@@ -165,7 +171,8 @@ cards:
     card_name: "Dr. テンソルベ"
     resource_label: "AI"
     const_name: SugarAIDrTensorbe
-    card_type: AI/ML
+    card_type: Compute
+    subtype: AI/ML
     deploy_turns: 2
     resizable: true
     elastic: false
@@ -196,7 +203,8 @@ cards:
     card_name: "エクレアーエル"
     resource_label: "RDB"
     const_name: SugarRDBEclairL
-    card_type: Database
+    card_type: Data
+    subtype: Database
     deploy_turns: 1
     resizable: true
     elastic: false
@@ -215,7 +223,8 @@ cards:
     card_name: "スーパーバナナ"
     resource_label: "DistributedDB"
     const_name: SugarDistributedDBPinapo
-    card_type: Database
+    card_type: Data
+    subtype: Database
     deploy_turns: 1
     resizable: false
     elastic: true
@@ -245,7 +254,8 @@ cards:
     card_name: "トーストア"
     resource_label: "NoSQL"
     const_name: SugarDBToastoa
-    card_type: Database
+    card_type: Data
+    subtype: Database
     deploy_turns: 0
     resizable: false
     elastic: true
@@ -271,7 +281,8 @@ cards:
     card_name: "アイスクエリム"
     resource_label: "Datawarehouse"
     const_name: SugarDWIcecream
-    card_type: Database
+    card_type: Data
+    subtype: Database
     deploy_turns: 1
     resizable: false
     elastic: false
@@ -295,7 +306,8 @@ cards:
     card_name: "メレンゲスト"
     resource_label: "Cache"
     const_name: SugarCacheMeringue
-    card_type: CacheDB
+    card_type: Data
+    subtype: CacheDB
     deploy_turns: 0
     resizable: true
     elastic: false
@@ -327,7 +339,8 @@ cards:
     card_name: "シュトレーンジ"
     resource_label: "Storage"
     const_name: SugarStorageSchtrenge
-    card_type: ObjectStorage
+    card_type: Data
+    subtype: ObjectStorage
     deploy_turns: 0
     resizable: false
     elastic: false

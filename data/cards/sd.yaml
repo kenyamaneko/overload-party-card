@@ -10,6 +10,7 @@ cards:
     resource_label: "Compute"
     const_name: SHEComputeEkubo
     card_type: Compute
+    subtype: VM
     deploy_turns: 1
     resizable: true
     elastic: false
@@ -28,7 +29,8 @@ cards:
     card_name: "アリゲーテナ"
     resource_label: "Container"
     const_name: SHEContainerAlligator
-    card_type: Container
+    card_type: Compute
+    subtype: Container
     deploy_turns: 0
     resizable: false
     elastic: true
@@ -50,7 +52,8 @@ cards:
     card_name: "クジラの統率者<クジランティス>"
     resource_label: "Orchestrator"
     const_name: SHEOrchestratorKujirantis
-    card_type: Orchestrator
+    card_type: Compute
+    subtype: Orchestrator
     deploy_turns: 2
     resizable: true
     elastic: true
@@ -72,7 +75,8 @@ cards:
     card_name: "ラフメイカー"
     resource_label: "ML"
     const_name: SHEMLRoughmaker
-    card_type: AI/ML
+    card_type: Compute
+    subtype: AI/ML
     deploy_turns: 2
     resizable: true
     elastic: false
@@ -91,7 +95,8 @@ cards:
     card_name: "むらた"
     resource_label: "Serverless"
     const_name: SHEServerlessRamune
-    card_type: Serverless
+    card_type: Compute
+    subtype: Serverless
     deploy_turns: 0
     resizable: false
     elastic: true
@@ -125,7 +130,8 @@ cards:
     card_name: "アデリース"
     resource_label: "RDB"
     const_name: SHERDBAdeliece
-    card_type: Database
+    card_type: Data
+    subtype: Database
     deploy_turns: 1
     resizable: true
     elastic: false
@@ -155,7 +161,8 @@ cards:
     card_name: "オオロバ"
     resource_label: "DistributedDB"
     const_name: SHEDistributedDBOoroba
-    card_type: Database
+    card_type: Data
+    subtype: Database
     deploy_turns: 1
     resizable: true
     elastic: false
@@ -186,7 +193,8 @@ cards:
     card_name: "えりり"
     resource_label: "Storage"
     const_name: SHEStorageEris
-    card_type: ObjectStorage
+    card_type: Data
+    subtype: ObjectStorage
     deploy_turns: 0
     resizable: false
     elastic: false
@@ -214,7 +222,8 @@ cards:
     card_name: "ダイノ"
     resource_label: "NoSQL"
     const_name: SHEDBDinosaur
-    card_type: Database
+    card_type: Data
+    subtype: Database
     deploy_turns: 0
     resizable: false
     elastic: true
@@ -248,7 +257,8 @@ cards:
     card_name: "メリーモ"
     resource_label: "Cache"
     const_name: SHECacheMerry
-    card_type: CacheDB
+    card_type: Data
+    subtype: CacheDB
     deploy_turns: 0
     resizable: true
     elastic: false
@@ -560,7 +570,8 @@ cards:
     card_name: "だっくん"
     resource_label: "Cache"
     const_name: SHECacheDakkun
-    card_type: CacheDB
+    card_type: Data
+    subtype: CacheDB
     deploy_turns: 0
     resizable: true
     elastic: false

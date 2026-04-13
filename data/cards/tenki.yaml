@@ -12,6 +12,7 @@ cards:
     resource_label: "VM"
     const_name: TenkiVMSora
     card_type: Compute
+    subtype: VM
     deploy_turns: 1
     resizable: true
     elastic: false
@@ -31,6 +32,7 @@ cards:
     resource_label: "PaaS"
     const_name: TenkiPaaSAsagiri
     card_type: Compute
+    subtype: VM
     deploy_turns: 1
     resizable: true
     elastic: false
@@ -61,7 +63,8 @@ cards:
     card_name: "コウテン"
     resource_label: "Container"
     const_name: TenkiContainerKouten
-    card_type: Container
+    card_type: Compute
+    subtype: Container
     deploy_turns: 0
     resizable: false
     elastic: true
@@ -83,7 +86,8 @@ cards:
     card_name: "空即蒼色"
     resource_label: "Orchestrator"
     const_name: TenkiOrchestratorKusoku
-    card_type: Orchestrator
+    card_type: Compute
+    subtype: Orchestrator
     deploy_turns: 2
     resizable: true
     elastic: true
@@ -105,7 +109,8 @@ cards:
     card_name: "智の解放者<オープナー>"
     resource_label: "AI"
     const_name: TenkiAIOpener
-    card_type: "AI/ML"
+    card_type: Compute
+    subtype: "AI/ML"
     deploy_turns: 2
     resizable: true
     elastic: false
@@ -127,7 +132,7 @@ cards:
               amount:
                 base: 0
                 per:
-                  count: { owner: self, zone: backend, faction: Tenki, card_type: data }
+                  count: { owner: self, zone: backend, faction: Tenki, card_type: Data }
                   value: 200
               duration: this_turn
 
@@ -136,7 +141,8 @@ cards:
     card_name: "ライ"
     resource_label: "Functions"
     const_name: TenkiFunctionsRai
-    card_type: Serverless
+    card_type: Compute
+    subtype: Serverless
     deploy_turns: 0
     resizable: false
     elastic: true
@@ -163,7 +169,8 @@ cards:
     card_name: "シグレ"
     resource_label: "RDB"
     const_name: TenkiRDBShigure
-    card_type: Database
+    card_type: Data
+    subtype: Database
     deploy_turns: 1
     resizable: true
     elastic: false
@@ -182,7 +189,8 @@ cards:
     card_name: "ハヤテ"
     resource_label: "DB"
     const_name: TenkiDBHayate
-    card_type: Database
+    card_type: Data
+    subtype: Database
     deploy_turns: 1
     resizable: true
     elastic: false
@@ -201,7 +209,7 @@ cards:
           - match:
               selector: target
               faction: Tenki
-              card_type: data
+              card_type: Data
           - not_same: { a: source, b: target }
         ops:
           - apply_buff:
@@ -215,7 +223,8 @@ cards:
     card_name: "フブキ"
     resource_label: "Storage"
     const_name: TenkiStorageFubuki
-    card_type: ObjectStorage
+    card_type: Data
+    subtype: ObjectStorage
     deploy_turns: 0
     resizable: false
     elastic: false
@@ -234,7 +243,8 @@ cards:
     card_name: "百花の天穹<コスモ>"
     resource_label: "NoSQL"
     const_name: TenkiDBCosmo
-    card_type: Database
+    card_type: Data
+    subtype: Database
     deploy_turns: 0
     resizable: false
     elastic: true
@@ -269,7 +279,8 @@ cards:
     card_name: "シュウウ"
     resource_label: "Cache"
     const_name: TenkiCacheReiu
-    card_type: CacheDB
+    card_type: Data
+    subtype: CacheDB
     deploy_turns: 0
     resizable: true
     elastic: false

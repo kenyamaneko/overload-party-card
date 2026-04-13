@@ -9,11 +9,7 @@ import (
 )
 
 func isResourceType(cardType string) bool {
-	switch cardType {
-	case "Compute", "Container", "Orchestrator", "Serverless", "AI/ML", "Database", "CacheDB", "ObjectStorage":
-		return true
-	}
-	return false
+	return cardType == "Compute" || cardType == "Data"
 }
 
 func loadTestCache(t *testing.T) *CardCache {
