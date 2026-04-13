@@ -13,6 +13,7 @@ type CardDefinition struct {
 	ResourceLabel     string             `json:"resource_label"`
 	Faction           string             `json:"faction"`
 	CardType          string             `json:"card_type"`
+	Subtype           *string            `json:"subtype,omitempty"`
 	DeployTurns       int64              `json:"deploy_turns"`
 	Resizable         bool               `json:"resizable"`
 	Elastic           bool               `json:"elastic"`

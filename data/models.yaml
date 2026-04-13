@@ -22,6 +22,7 @@ files:
           - {name: ResourceLabel, type: string, json: "resource_label"}
           - {name: Faction, type: string, json: "faction"}
           - {name: CardType, type: string, json: "card_type"}
+          - {name: Subtype, type: "*string", json: "subtype,omitempty"}
           - {name: DeployTurns, type: int64, json: "deploy_turns"}
           - {name: Resizable, type: bool, json: "resizable"}
           - {name: Elastic, type: bool, json: "elastic"}
@@ -122,6 +123,7 @@ files:
           - {name: ResourceLabel, type: string, json: "resource_label", doc: "リソースラベル（AWS/Azure/GCP/Oracle のサービス名）"}
           - {name: Faction, type: string, json: "faction", doc: "ファクション（`SHE` / `Tenki` / `Sugar` / `Tuners` / `Neutral`）"}
           - {name: CardType, type: string, json: "card_type", doc: "カード種別"}
+          - {name: Subtype, type: "*string", json: "subtype,omitempty", doc: "サブタイプ（Compute/Data 配下のみ: VM/Container/Database 等）"}
           - {name: DeployTurns, type: int64, json: "deploy_turns", doc: "デプロイターン数（0=即時）"}
           - {name: Resizable, type: bool, json: "resizable", doc: "手動スケール可能か"}
           - {name: Elastic, type: bool, json: "elastic", doc: "自動スケール対応か"}
@@ -211,6 +213,7 @@ files:
           - {name: ResourceLabel, type: string, json: "resource_label", doc: "リソースラベル"}
           - {name: Faction, type: string, json: "faction", doc: "ファクション"}
           - {name: CardType, type: string, json: "card_type", doc: "カード種別"}
+          - {name: Subtype, type: "*string", json: "subtype,omitempty", doc: "サブタイプ（Compute/Data 配下のみ: VM/Container/Database 等）"}
           - {name: DeployTurns, type: int64, json: "deploy_turns", doc: "デプロイターン数"}
           - {name: Resizable, type: bool, json: "resizable", doc: "手動スケール可能か"}
           - {name: Elastic, type: bool, json: "elastic", doc: "自動スケール対応か"}

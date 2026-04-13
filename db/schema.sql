@@ -25,6 +25,7 @@ CREATE TABLE card.card_definitions (
   resource_label VARCHAR(30) NOT NULL DEFAULT '',     -- リソースラベル
   faction        VARCHAR(20) NOT NULL CHECK (faction IN ('SHE', 'Tenki', 'Sugar', 'Tuners', 'Neutral')), -- 陣営（SHE / Tenki / Sugar / Tuners / Neutral）
   card_type      VARCHAR(30) NOT NULL,               -- カードタイプ（Resource / Support）
+  subtype        VARCHAR(30),                        -- サブタイプ（Compute/Data カテゴリのみ設定: VM/Container/Database 等）
   resizable      BOOLEAN NOT NULL DEFAULT false,     -- Resizable 属性
   elastic        BOOLEAN NOT NULL DEFAULT false,     -- Elastic 属性
   stats          JSONB NOT NULL,                     -- ステータス定義

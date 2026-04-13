@@ -28,7 +28,7 @@ func NewPgCardRepository(pool *pgxpool.Pool) *PgCardRepository {
 // FindAll は有効な全カード定義を返します。
 func (r *PgCardRepository) FindAll(ctx context.Context) ([]*apicard.CardDefinition, error) {
 	rows, err := r.pool.Query(ctx,
-		`SELECT card_id, card_name, resource_label, faction, card_type, resizable, elastic, stats, effect_text, effects, restriction, is_active, created_at, updated_at
+		`SELECT card_id, card_name, resource_label, faction, card_type, subtype, resizable, elastic, stats, effect_text, effects, restriction, is_active, created_at, updated_at
 		 FROM card_definitions WHERE is_active = true ORDER BY card_id`,
 	)
 	if err != nil {
@@ -83,7 +83,7 @@ func (r *PgCardRepository) FindCardIDsByFactions(ctx context.Context, factions [
 // FindByCardID は指定 cardID のカード定義を返します。
 func (r *PgCardRepository) FindByCardID(ctx context.Context, cardID string) (*apicard.CardDefinition, error) {
 	row := r.pool.QueryRow(ctx,
-		`SELECT card_id, card_name, resource_label, faction, card_type, resizable, elastic, stats, effect_text, effects, restriction, is_active, created_at, updated_at
+		`SELECT card_id, card_name, resource_label, faction, card_type, subtype, resizable, elastic, stats, effect_text, effects, restriction, is_active, created_at, updated_at
 		 FROM card_definitions WHERE card_id = $1`,
 		cardID,
 	)
@@ -111,6 +111,7 @@ func scanCardDefinition(row pgxScannable) (*apicard.CardDefinition, error) {
 		&c.ResourceLabel,
 		&c.Faction,
 		&c.CardType,
+		&c.Subtype,
 		&c.Resizable,
 		&c.Elastic,
 		&stats,
