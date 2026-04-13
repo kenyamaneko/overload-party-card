@@ -5,5 +5,3 @@ import (
 )
 
 const DeckSize = gamedesign.DeckSize
-
-var RestrictionCopyCount = gamedesign.RestrictionCopyCount
