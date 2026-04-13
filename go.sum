@@ -97,8 +97,8 @@ github.com/jackc/puddle/v2 v2.2.2 h1:PR8nw+E/1w0GLuRFSmiioY6UooMp6KJv0/61nB7icHo
 github.com/jackc/puddle/v2 v2.2.2/go.mod h1:vriiEXHvEE654aYKXXjOvZM39qJ0q+azkZFrfEOc3H4=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
-github.com/kenyamaneko/overload-party-common/packages/game-design-constants v0.1.0 h1:1+9zGE1CWh+XkiQ0FYnNBIOXHyS9N+OjzVVvWIJRaXo=
-github.com/kenyamaneko/overload-party-common/packages/game-design-constants v0.1.0/go.mod h1:4z5Ry1Y8LZQM4OKqLivo/OhVefKloLZP2vUDQ1Yo0UI=
+github.com/kenyamaneko/overload-party-common/packages/game-design-constants v0.1.1 h1:hezyQ+hU1m42k5CCYlkoUyCcvdQW1Jnmvzc/2HneTKg=
+github.com/kenyamaneko/overload-party-common/packages/game-design-constants v0.1.1/go.mod h1:4z5Ry1Y8LZQM4OKqLivo/OhVefKloLZP2vUDQ1Yo0UI=
 github.com/kenyamaneko/overload-party-common/packages/pubsub-events v0.1.0 h1:Du4JlWpUCNH4FTSdOkrldEy4Ht85hICI3IgkrjiC4rU=
 github.com/kenyamaneko/overload-party-common/packages/pubsub-events v0.1.0/go.mod h1:oDm7RoYDIXdaTLNvcN/g1ApMxNQb9DxUuh0czs5lrvM=
 github.com/klauspost/cpuid/v2 v2.3.0 h1:S4CRMLnYUhGeDFDqkGriYKdfoFlDnMtqTiI/sFzhA9Y=

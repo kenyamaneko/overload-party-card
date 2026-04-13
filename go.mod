@@ -7,7 +7,7 @@ require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/kenyamaneko/overload-party-card/packages/api-card v0.0.0
-	github.com/kenyamaneko/overload-party-common/packages/game-design-constants v0.1.0
+	github.com/kenyamaneko/overload-party-common/packages/game-design-constants v0.1.1
 	github.com/kenyamaneko/overload-party-common/packages/pubsub-events v0.1.0
 	github.com/stretchr/testify v1.11.1
 )
