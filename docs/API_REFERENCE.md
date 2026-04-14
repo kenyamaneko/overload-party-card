@@ -22,6 +22,7 @@
 | `ResourceLabel` | `string` | `resource_label` |  |
 | `Faction` | `string` | `faction` |  |
 | `CardType` | `string` | `card_type` |  |
+| `Subtype` | `*string` | `subtype` |  |
 | `DeployTurns` | `int64` | `deploy_turns` |  |
 | `Resizable` | `bool` | `resizable` |  |
 | `Elastic` | `bool` | `elastic` |  |
@@ -61,9 +62,10 @@
 | `ArtNo` | `int64` | `art_no` | アート番号 |
 | `Count` | `int` | `count` | 所持枚数 |
 | `CardName` | `string` | `card_name` | カード名 |
-| `ResourceLabel` | `string` | `resource_label` | リソースラベル（AWS/Azure/GCP/Oracle のサービス名） |
+| `ResourceLabel` | `string` | `resource_label` | リソースラベル（AWS/Azure/Google Cloud/Oracle のサービス名） |
 | `Faction` | `string` | `faction` | ファクション（`SHE` / `Tenki` / `Sugar` / `Tuners` / `Neutral`） |
 | `CardType` | `string` | `card_type` | カード種別 |
+| `Subtype` | `*string` | `subtype` | サブタイプ（Compute/Data 配下のみ: VM/Container/Database 等） |
 | `DeployTurns` | `int64` | `deploy_turns` | デプロイターン数（0=即時） |
 | `Resizable` | `bool` | `resizable` | 手動スケール可能か |
 | `Elastic` | `bool` | `elastic` | 自動スケール対応か |
@@ -95,6 +97,7 @@
 | `ResourceLabel` | `string` | `resource_label` | リソースラベル |
 | `Faction` | `string` | `faction` | ファクション |
 | `CardType` | `string` | `card_type` | カード種別 |
+| `Subtype` | `*string` | `subtype` | サブタイプ（Compute/Data 配下のみ: VM/Container/Database 等） |
 | `DeployTurns` | `int64` | `deploy_turns` | デプロイターン数 |
 | `Resizable` | `bool` | `resizable` | 手動スケール可能か |
 | `Elastic` | `bool` | `elastic` | 自動スケール対応か |

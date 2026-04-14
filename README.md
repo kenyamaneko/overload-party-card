@@ -41,7 +41,7 @@ Battle (:9002)
 | `PORT` | `9003` | リッスンポート |
 | `ENV` | `dev` | 動作環境 (`dev` / `stg` / `prod`) |
 | `DATABASE_URL` | *(必須)* | PostgreSQL 接続文字列 (`card` スキーマ) |
-| `PUBSUB_PROJECT_ID` | *(必須)* | GCP プロジェクト ID |
+| `PUBSUB_PROJECT_ID` | *(必須)* | Google Cloud プロジェクト ID |
 
 **ConfigMap (Pub/Sub):**
 
