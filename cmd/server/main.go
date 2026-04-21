@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"cloud.google.com/go/firestore"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
@@ -47,12 +46,6 @@ func run() error {
 		return fmt.Errorf("pgxpool new: %w", err)
 	}
 	defer pool.Close()
-
-	fsClient, err := firestore.NewClient(ctx, cfg.FirestoreProjectID)
-	if err != nil {
-		return fmt.Errorf("firestore new client: %w", err)
-	}
-	defer func() { _ = fsClient.Close() }()
 
 	cardRepo := repository.NewPgCardRepository(pool)
 	playerCardRepo := repository.NewPgPlayerCardRepository(pool)

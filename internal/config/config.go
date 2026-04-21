@@ -28,10 +28,6 @@ type Config struct {
 
 	PubsubProjectID             string
 	FactionSelectedSubscription string
-
-	// FirestoreProjectID は game_config の読み取り先プロジェクト ID。
-	// ローカル/CI では FIRESTORE_EMULATOR_HOST を別途設定することでエミュレーターに接続。
-	FirestoreProjectID string
 }
 
 // FromEnv は環境変数から Config を構築します。
@@ -42,7 +38,6 @@ func FromEnv() (*Config, error) {
 		DatabaseURL:                 os.Getenv("DATABASE_URL"),
 		PubsubProjectID:             os.Getenv("PUBSUB_PROJECT_ID"),
 		FactionSelectedSubscription: getEnv("FACTION_SELECTED_SUBSCRIPTION", pubsubevents.SubFactionSelectedCard),
-		FirestoreProjectID:          os.Getenv("FIRESTORE_PROJECT_ID"),
 	}
 
 	if raw := os.Getenv("PORT"); raw != "" {
@@ -69,9 +64,6 @@ func FromEnv() (*Config, error) {
 	}
 	if cfg.PubsubProjectID == "" {
 		return nil, fmt.Errorf("config: PUBSUB_PROJECT_ID is required (card subscribes to faction-selected events)")
-	}
-	if cfg.FirestoreProjectID == "" {
-		return nil, fmt.Errorf("config: FIRESTORE_PROJECT_ID is required (game_config)")
 	}
 	return cfg, nil
 }

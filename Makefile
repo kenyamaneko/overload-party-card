@@ -18,7 +18,7 @@ tidy: ## Tidy dependencies
 fmt: ## Format code
 	gofmt -s -w .
 
-run: ## Run card server locally (ENV=dev inline; DATABASE_URL / PUBSUB_PROJECT_ID / FIRESTORE_PROJECT_ID must be exported)
+run: ## Run card server locally (ENV=dev inline; DATABASE_URL / PUBSUB_PROJECT_ID must be exported)
 	ENV=dev go run ./cmd/server
 
 help: ## Show this help

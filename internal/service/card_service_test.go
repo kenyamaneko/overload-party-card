@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"sync"
 	"testing"
@@ -12,7 +11,6 @@ import (
 
 	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 	"github.com/kenyamaneko/overload-party-card/internal/model"
-	"github.com/kenyamaneko/overload-party-card/internal/port"
 )
 
 type mockCardRepo struct {
@@ -30,14 +28,6 @@ func (r *mockCardRepo) FindAll(_ context.Context) ([]*apicard.CardDefinition, er
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].CardID < result[j].CardID })
 	return result, nil
-}
-
-func (r *mockCardRepo) FindByCardID(_ context.Context, cardID string) (*apicard.CardDefinition, error) {
-	c, ok := r.cards[cardID]
-	if !ok {
-		return nil, fmt.Errorf("card %s: %w", cardID, port.ErrNotFound)
-	}
-	return c, nil
 }
 
 func (r *mockCardRepo) FindCardIDsByFactions(_ context.Context, factions []string) ([]string, error) {

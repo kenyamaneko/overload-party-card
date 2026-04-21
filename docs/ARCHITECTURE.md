@@ -106,14 +106,6 @@ REST で直接呼ばれるケースでの冪等性は gateway のオーケスト
 
 「配布 API 自体を冪等にする」方向に倒すと、「本当に 2 回目の配布がほしい」ケース（シーズン報酬・補填等）の実装が歪む。責務を呼び出し側に寄せるのは意図的な設計。
 
-## game_config の Firestore 化
-
-カードマスター以外の「ゲーム設計値」（配布コピー数・デッキサイズ上限等、頻繁に調整したいパラメータ）は Cloud Firestore から読み取る（`FIRESTORE_PROJECT_ID`）。card リポジトリのコードを触らずに ops 側から値変更ができるようにするため。
-
-ローカル・CI では `FIRESTORE_EMULATOR_HOST` でエミュレーターに接続する（`validate.yaml` / `ci.yaml` が emulator を起動）。
-
-カードマスター（`card_definitions`）は従来通り YAML + PostgreSQL seed のままで、Firestore には載せない。カード定義は PR レビュー対象とし、game_config は運用時パラメータとして分けている。
-
 ## 運用
 
 ### 環境変数
@@ -125,7 +117,6 @@ REST で直接呼ばれるケースでの冪等性は gateway のオーケスト
 - **`ENV`**: `dev` / `stg` / `prod` のいずれか。未設定で起動不可。`prod` / `stg` は Cloud Logging 互換の JSON slog、`dev` はテキスト slog にルーティングする
 - **`DATABASE_URL`**: card スキーマへの接続文字列。未設定で起動不可
 - **`PUBSUB_PROJECT_ID`**: card は `faction-selected` subscriber を持つため必須
-- **`FIRESTORE_PROJECT_ID`**: game_config 読み取り先。未設定で起動不可
 - **`FACTION_SELECTED_SUBSCRIPTION`**: 未設定時は `pubsubevents.SubFactionSelectedCard` 定数 (`faction-selected-card-sub`) を使用。本番以外で別名を使う場合に上書き
 
 ### カードデータ変更時

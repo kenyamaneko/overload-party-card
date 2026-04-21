@@ -3,14 +3,13 @@ package port
 import (
 	"context"
 
-	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 	"github.com/kenyamaneko/overload-party-card/internal/model"
+	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 )
 
 // CardRepo はカード定義の永続化を抽象化するインターフェースです。
 type CardRepo interface {
 	FindAll(ctx context.Context) ([]*apicard.CardDefinition, error)
-	FindByCardID(ctx context.Context, cardID string) (*apicard.CardDefinition, error)
 	// FindCardIDsByFactions は指定ファクション群に属する有効カードの card_id を返します。
 	// 配布対象カードをハードコードではなく card_definitions に委ねるためのメソッドです。
 	FindCardIDsByFactions(ctx context.Context, factions []string) ([]string, error)
@@ -22,12 +21,6 @@ type PlayerCardRepo interface {
 	// AddCards は UPSERT-with-add セマンティクスで所持カードを追加します。
 	// 戻り値は追加されたコピー総数（= len(cardIDs) * countPerCard）です。
 	AddCards(ctx context.Context, playerID string, cardIDs []string, countPerCard int) (int, error)
-}
-
-// GameConfigRepo はゲーム設定値の読み取りを抽象化するインターフェースです。
-// キーが存在しない場合は ErrNotFound を返す（fail-fast）。
-type GameConfigRepo interface {
-	GetInt64(ctx context.Context, key string) (int64, error)
 }
 
 // ProcessedEventRepo は処理済み Pub/Sub イベントを追跡するインターフェースです。

@@ -3,14 +3,13 @@ package repository
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 	"github.com/kenyamaneko/overload-party-card/internal/port"
+	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 )
 
 var _ port.CardRepo = (*PgCardRepository)(nil)
@@ -80,32 +79,10 @@ func (r *PgCardRepository) FindCardIDsByFactions(ctx context.Context, factions [
 	return ids, nil
 }
 
-// FindByCardID は指定 cardID のカード定義を返します。
-func (r *PgCardRepository) FindByCardID(ctx context.Context, cardID string) (*apicard.CardDefinition, error) {
-	row := r.pool.QueryRow(ctx,
-		`SELECT card_id, card_name, resource_label, faction, card_type, subtype, resizable, elastic, stats, effect_text, effects, restriction, is_active, created_at, updated_at
-		 FROM card_definitions WHERE card_id = $1`,
-		cardID,
-	)
-
-	c, err := scanCardDefinition(row)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("card %s: %w", cardID, port.ErrNotFound)
-		}
-		return nil, fmt.Errorf("find card by card_id: %w", err)
-	}
-	return c, nil
-}
-
-type pgxScannable interface {
-	Scan(dest ...any) error
-}
-
-func scanCardDefinition(row pgxScannable) (*apicard.CardDefinition, error) {
+func scanCardDefinition(rows pgx.Rows) (*apicard.CardDefinition, error) {
 	var c apicard.CardDefinition
 	var stats, effects json.RawMessage
-	err := row.Scan(
+	err := rows.Scan(
 		&c.CardID,
 		&c.CardName,
 		&c.ResourceLabel,
