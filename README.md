@@ -1,60 +1,52 @@
 # overload-party-card
 
-カードマスターデータ + デッキ CRUD + デッキバリデーション + カードデータ SSoT。Gateway と Battle から内部 REST で呼ばれる。Pub/Sub で faction-selected イベントを受信し、カードパック配布を行う。
+カードマスターデータ（SSoT）・所持カード・デッキ CRUD・デッキバリデーション・カードパック配布を担う内部マイクロサービス。ポート 9003 で起動する。
 
-## サービス間連携
+詳細は [機能仕様書](docs/FEATURE_SPEC.md) / [サービス設計書](docs/ARCHITECTURE.md) / [API 仕様書](docs/API_REFERENCE.md) / [データ設計書](docs/DATA_DESIGN.md) / [カードデータ仕様](docs/game_design/CARDS.md) / [ブランチ運用](docs/BRANCHING.md) を参照。
+
+## アーキテクチャ概要
 
 ```
-Gateway (:9001)
-  ├─ GET  /internal/v1/cards                           ← カード全件 (forward)
-  ├─ GET  /internal/v1/players/:id/cards               ← 所持カード
-  ├─ GET  /internal/v1/players/:id/cards/with-ownership ← 全カード+所持フラグ
-  ├─ CRUD /internal/v1/players/:id/decks/*             ← デッキ CRUD
-  ├─ POST /internal/v1/players/:id/decks/:id/validate-for-battle
-  ├─ POST /internal/v1/players/:id/grant-initial-pack  ← 初回ファクション選択
-  └─ POST /internal/v1/players/:id/grant-faction-pack  ← ショップ購入
-              │
-              ▼
-Card (このサービス, :9003)
-  ├─ PostgreSQL  card スキーマ (card_definitions / player_cards /
-  │                             decks / deck_cards / processed_events)
-  └─ Cloud Pub/Sub subscriber
-        └─ faction-selected-card-sub  ← faction_selected
-              │
+Gateway
+  └─ Card (:9003)
+       ├─ PostgreSQL (card スキーマ)
+       ├─ Cloud Firestore (game_config)
+       └─ Pub/Sub
+            └─ faction-selected-card-sub  ← scenario / shop が発行
+
 Battle (:9002)
-  └─ GET  /internal/v1/cards  ← 起動時 1 回のカードロード
+  └─ GET /internal/v1/cards  ← 起動時 1 回のカードマスターロード
 ```
 
-- Gateway と Battle が呼び出し元。card 自身は他サービスを REST で呼び出さない
-- `faction-selected` の Pub/Sub subscriber を持ち、カード配布をイベント駆動で実行
+- gateway と battle が REST の呼び出し元。card 自身は他サービスを REST で呼び出さない
+- カードマスター (`card_definitions`) の SSoT は本サービス。他サービスには複製しない
+- `faction-selected` を購読し、パック配布をイベント駆動で実行する
 
-エンドポイント一覧は [docs/API_REFERENCE.md](docs/API_REFERENCE.md) を参照。
+## ローカル開発
 
-## 環境変数
+```bash
+make run   # card server を起動（DATABASE_URL 等の env 必須）
+make test  # go test -race
+make vet   # go vet
+make fmt   # gofmt -s -w
+```
 
-全て必須。未設定なら起動時に即 fail する。
-
-**Deployment env (インフラ層):**
-
-| 変数名 | デフォルト | 説明 |
-|---|---|---|
-| `PORT` | `9003` | リッスンポート |
-| `ENV` | `dev` | 動作環境 (`dev` / `stg` / `prod`) |
-| `DATABASE_URL` | *(必須)* | PostgreSQL 接続文字列 (`card` スキーマ) |
-| `PUBSUB_PROJECT_ID` | *(必須)* | Google Cloud プロジェクト ID |
-
-**ConfigMap (Pub/Sub):**
-
-| 変数名 | デフォルト | 説明 |
-|---|---|---|
-| `FACTION_SELECTED_SUBSCRIPTION` | `faction-selected-card-sub` | faction-selected Pub/Sub サブスクリプション名 |
+`DATABASE_URL` / `PUBSUB_PROJECT_ID` / `FIRESTORE_PROJECT_ID` は未設定なら起動時に fail する。ローカル開発では Firestore エミュレーターを `FIRESTORE_EMULATOR_HOST=localhost:9041` 経由で使う。
 
 ## 公開パッケージ
 
-| パッケージ | 言語 | 説明 |
-|---|---|---|
-| `packages/api-card/` | Go | gateway が import する REST 型 |
+[packages/api-card/](packages/api-card/) に gateway が import する REST 契約型を公開している。[data/models.yaml](data/models.yaml) を編集後に以下で再生成する。
 
-SSoT: `data/models.yaml` → `python3 scripts/generate_types.py` で再生成。`*_gen.go` は自動生成 — 直接編集しない。
+```bash
+python3 scripts/generate_types.py
+```
 
-クライアント向け TypeScript 型は `@kenyamaneko/overload-party-api-gateway` に統合済み。
+`*_gen.go` は自動生成 — 直接編集しない。クライアント向け TypeScript 型は `@kenyamaneko/overload-party-api-gateway` に統合済み。
+
+## カードマスター変更
+
+```bash
+python3 scripts/generate_cards.py  # data/cards/*.yaml → db/seed/cards_seed.sql
+```
+
+詳細は [ARCHITECTURE.md#カードデータ-ssot-フロー](docs/ARCHITECTURE.md#カードデータ-ssot-フロー) を参照。
