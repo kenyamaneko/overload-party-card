@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 
 	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
@@ -48,7 +48,7 @@ func (c *CardCache) Load(ctx context.Context, repo port.CardRepo) error {
 		c.cards[card.CardID] = card
 	}
 
-	log.Printf("card cache loaded: %d cards", len(c.cards))
+	slog.Info("card cache loaded", "cards", len(c.cards))
 	return nil
 }
 

@@ -3,8 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -23,13 +24,18 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		log.Fatalf("card: %v", err)
+		slog.Error("card fatal", "error", err)
+		os.Exit(1)
 	}
 }
 
 func run() error {
 	cfg, err := config.FromEnv()
 	if err != nil {
+		return err
+	}
+
+	if err := setupLogger(cfg.Env); err != nil {
 		return err
 	}
 
@@ -53,10 +59,6 @@ func run() error {
 	deckRepo := repository.NewPgDeckRepository(pool)
 	eventRepo := repository.NewPgProcessedEventRepository(pool)
 
-	// game_config は現在 card の runtime パスから参照していない。
-	// クライアント到達性は起動時に検証するため、repo を生成だけしておく。
-	_ = repository.NewFirestoreGameConfigRepository(fsClient)
-
 	cardCache := cache.NewCardCache()
 	if err := cardCache.Load(ctx, cardRepo); err != nil {
 		return fmt.Errorf("load card cache: %w", err)
@@ -64,11 +66,12 @@ func run() error {
 
 	cardSvc := service.NewCardService(cardRepo, playerCardRepo)
 	deckSvc := service.NewDeckService(deckRepo, playerCardRepo, cardCache)
+	playerCardSvc := service.NewPlayerCardService(playerCardRepo, cardCache)
 	grantSvc := service.NewGrantService(cardRepo, playerCardRepo)
 
 	cardH := rest.NewCardHandler(cardSvc)
 	deckH := rest.NewDeckHandler(deckSvc)
-	playerCardH := rest.NewPlayerCardHandler(deckSvc)
+	playerCardH := rest.NewPlayerCardHandler(playerCardSvc)
 	grantH := rest.NewGrantHandler(grantSvc)
 
 	r := router.New(cardH, deckH, playerCardH, grantH)
@@ -84,7 +87,8 @@ func run() error {
 
 	go func() {
 		if err := factionSub.Start(ctx); err != nil && ctx.Err() == nil {
-			log.Fatalf("faction-selected subscriber error: %v", err)
+			slog.Error("faction-selected subscriber terminated", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -96,8 +100,11 @@ func run() error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		log.Printf("card: listening on %s (cache=%d cards, pubsub project=%s)",
-			srv.Addr, cardCache.Count(), cfg.PubsubProjectID)
+		slog.Info("card listening",
+			"addr", srv.Addr,
+			"card_cache_size", cardCache.Count(),
+			"pubsub_project", cfg.PubsubProjectID,
+		)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			errCh <- err
 		}
@@ -105,7 +112,7 @@ func run() error {
 
 	select {
 	case <-ctx.Done():
-		log.Printf("card: shutdown requested")
+		slog.Info("card shutdown requested")
 	case err := <-errCh:
 		return err
 	}
@@ -116,4 +123,47 @@ func run() error {
 		return fmt.Errorf("http shutdown: %w", err)
 	}
 	return nil
+}
+
+// setupLogger は ENV に応じてグローバル slog ロガーを初期化する。
+// prod/stg は Cloud Logging 互換 JSON、dev は人間可読なテキストで出力する。
+func setupLogger(env config.Env) error {
+	switch env {
+	case config.EnvProd, config.EnvStg:
+		slog.SetDefault(slog.New(newCloudLoggingHandler()).With("service", "card"))
+	case config.EnvDev:
+		h := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})
+		slog.SetDefault(slog.New(h).With("service", "card"))
+	default:
+		return fmt.Errorf("unexpected ENV: %s", env)
+	}
+	return nil
+}
+
+// newCloudLoggingHandler は Cloud Logging 互換の JSON ハンドラを返す。
+// slog のデフォルトフィールド名・値では Cloud Logging が認識しないため変換する。
+func newCloudLoggingHandler() slog.Handler {
+	return slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.LevelKey {
+				a.Key = "severity"
+				if level, ok := a.Value.Any().(slog.Level); ok {
+					switch {
+					case level >= slog.LevelError:
+						a.Value = slog.StringValue("ERROR")
+					case level >= slog.LevelWarn:
+						a.Value = slog.StringValue("WARNING")
+					case level >= slog.LevelInfo:
+						a.Value = slog.StringValue("INFO")
+					default:
+						a.Value = slog.StringValue("DEBUG")
+					}
+				}
+			}
+			if a.Key == slog.MessageKey {
+				a.Key = "message"
+			}
+			return a
+		},
+	})
 }

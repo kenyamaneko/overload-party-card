@@ -12,6 +12,7 @@ type MockGameConfigRepository struct {
 	values map[string]int64
 }
 
+// NewMockGameConfigRepository はテスト用のインメモリ GameConfigRepo を生成します。
 func NewMockGameConfigRepository() *MockGameConfigRepository {
 	return &MockGameConfigRepository{
 		values: map[string]int64{
@@ -34,6 +35,7 @@ func (m *MockGameConfigRepository) GetInt64(_ context.Context, key string) (int6
 	return 0, fmt.Errorf("game config %q: %w", key, port.ErrNotFound)
 }
 
+// SetForTest はテストからキー値を上書きするためのヘルパです。
 func (m *MockGameConfigRepository) SetForTest(key string, value int64) {
 	m.values[key] = value
 }

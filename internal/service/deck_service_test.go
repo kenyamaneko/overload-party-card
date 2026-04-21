@@ -451,18 +451,24 @@ func TestValidateDeckForBattle_PartialDeck(t *testing.T) {
 
 func TestRestrictionCopyCount(t *testing.T) {
 	tests := []struct {
+		name        string
 		restriction string
 		want        int
+		wantErr     bool
 	}{
-		{"unlimited", 3},
-		{"semi_limited", 2},
-		{"limited", 1},
-		{"", 3},
+		{"unlimited", "unlimited", 3, false},
+		{"semi_limited", "semi_limited", 2, false},
+		{"limited", "limited", 1, false},
+		{"forbidden", "forbidden", 0, false},
+		{"empty string is rejected", "", 0, true},
+		{"unknown value is rejected", "weirdly_limited", 0, true},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.restriction, func(t *testing.T) {
-			assert.Equal(t, tt.want, constants.RestrictionCopyCount(tt.restriction))
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := constants.RestrictionCopyCount(tt.restriction)
+			assert.Equal(t, tt.wantErr, err != nil, "err=%v", err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

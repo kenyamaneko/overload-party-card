@@ -206,36 +206,6 @@ func (s *DeckService) populateDeckCards(ctx context.Context, deck *apicard.Deck)
 	return nil
 }
 
-// GetPlayerCards はプレイヤーの所持カードにカード定義を付与して返します。
-func (s *DeckService) GetPlayerCards(ctx context.Context, playerID string) ([]*apicard.PlayerCardWithDef, error) {
-	pcs, err := s.playerCardRepo.GetPlayerCards(ctx, playerID)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]*apicard.PlayerCardWithDef, 0, len(pcs))
-	for _, pc := range pcs {
-		cd := s.cardCache.Get(pc.CardID)
-		if cd == nil {
-			return nil, fmt.Errorf("player %s owns card %s but it is missing from the card cache; refresh cache or investigate inconsistent state", playerID, pc.CardID)
-		}
-		result = append(result, &apicard.PlayerCardWithDef{
-			CardID:      pc.CardID,
-			ArtNo:       pc.ArtNo,
-			Count:       pc.Count,
-			CardName:    cd.CardName,
-			Faction:     cd.Faction,
-			CardType:    cd.CardType,
-			Resizable:   cd.Resizable,
-			Elastic:     cd.Elastic,
-			Stats:       cd.Stats,
-			EffectText:  cd.EffectText,
-			Restriction: cd.Restriction,
-		})
-	}
-	return result, nil
-}
-
 type ownedKey struct {
 	cardID  string
 	variant int64
@@ -275,7 +245,10 @@ func (s *DeckService) validateDeckCards(entries []apicard.DeckCardEntry, ownedCa
 		if card == nil {
 			return fmt.Errorf("%w: card %s not found in card definitions", port.ErrInvalidDeck, cardID)
 		}
-		limit := constants.RestrictionCopyCount(card.Restriction)
+		limit, err := constants.RestrictionCopyCount(card.Restriction)
+		if err != nil {
+			return fmt.Errorf("card %s: %w", cardID, err)
+		}
 		if total > limit {
 			return fmt.Errorf("%w: card %s (%s): exceeds restriction limit (%d/%d)",
 				port.ErrRestrictionExceeded, cardID, card.Restriction, total, limit)

@@ -8,16 +8,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var resourceCardTypes = map[string]bool{"Compute": true, "Data": true}
+
 func isResourceType(cardType string) bool {
-	return cardType == "Compute" || cardType == "Data"
+	return resourceCardTypes[cardType]
 }
 
 func loadTestCache(t *testing.T) *CardCache {
 	t.Helper()
 	cc := NewCardCache()
-	if err := cc.LoadFromBytes(gencache.CardsJSON); err != nil {
-		t.Fatalf("LoadFromBytes: %v", err)
-	}
+	err := cc.LoadFromBytes(gencache.CardsJSON)
+	require.NoError(t, err, "LoadFromBytes failed")
 	return cc
 }
 
@@ -26,24 +27,17 @@ func TestLoadFromBytes_CardCount(t *testing.T) {
 	require.NotZero(t, cc.Count(), "no cards loaded")
 }
 
-func TestResourceLabel_ResourceCardsHaveLabel(t *testing.T) {
+// TestResourceLabel_PresenceMatchesType は、resource_label の有無が
+// CardType の resource/support 区分と一致することを確認します。
+// 1 枚ごとに「リソース種別なら label あり／それ以外なら label なし」を
+// 等式で検証することで、if による分岐フィルタを不要にしています。
+func TestResourceLabel_PresenceMatchesType(t *testing.T) {
 	cc := loadTestCache(t)
 	for cardID, card := range cc.All() {
-		if isResourceType(card.CardType) {
-			assert.NotEmptyf(t, card.ResourceLabel,
-				"resource card %s (%s, type=%s) has empty resource_label",
-				cardID, card.CardName, card.CardType)
-		}
-	}
-}
-
-func TestResourceLabel_SupportCardsHaveNoLabel(t *testing.T) {
-	cc := loadTestCache(t)
-	for cardID, card := range cc.All() {
-		if !isResourceType(card.CardType) {
-			assert.Emptyf(t, card.ResourceLabel,
-				"support card %s (%s, type=%s) should have empty resource_label, got %q",
-				cardID, card.CardName, card.CardType, card.ResourceLabel)
-		}
+		isResource := isResourceType(card.CardType)
+		hasLabel := card.ResourceLabel != ""
+		assert.Equalf(t, isResource, hasLabel,
+			"card %s (type=%s, label=%q): resource types must have resource_label, support types must not",
+			cardID, card.CardType, card.ResourceLabel)
 	}
 }

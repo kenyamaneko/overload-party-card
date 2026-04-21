@@ -156,15 +156,15 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 ### 6.1 処理フロー
 
 1. JSON デシリアライズ → 失敗は `Nack`
-2. `event_type == "faction_selected"` チェック。異なれば ack（捨てる）
+2. `event_type == "faction_selected"` チェック。異なれば `Nack`（publisher バグなので DLQ 行き）
 3. `processed_events` に `event_id` を INSERT
-   - 既存行があれば `inserted = false` で ack（重複適用しない）
+   - 既存行があれば `inserted = false` で `Ack`（重複適用しない）
    - INSERT 自体が失敗したら `Nack`
 4. `source` で分岐:
    - `scenario_initial` → `GrantInitialPack`（faction + Neutral）
    - `shop_purchase` → `GrantFactionPack`（faction のみ）
-   - 未知の source: ack（捨てる）
-5. 配布成功 → ack、配布失敗 → `Nack`（Pub/Sub がリトライ）
+   - 未知の source: `Nack`（publisher 拡張時の取りこぼしなので DLQ 行き）
+5. 配布成功 → `Ack`、配布失敗 → `Nack`（Pub/Sub がリトライ）
 
 ### 6.2 冪等性の契約
 
@@ -175,7 +175,7 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 
 ### 6.3 未知 event_type / 未知 source の扱い
 
-両方とも `ack` して捨てる。Pub/Sub のリトライで無限ループしないことを優先する（このサービスが処理対象外のイベントに対しては責任を持たない契約）。
+両方とも `Nack` を返す。リトライしても結果は変わらないが、subscriber 側で握りつぶさず DLQ (`faction-selected-dlq`) に回収してオペレーション側で検出するポリシー。publisher の契約違反やイベントスキーマ拡張時の取りこぼしを早期に気付けるようにする意図。
 
 ---
 

@@ -31,7 +31,7 @@ make vet   # go vet
 make fmt   # gofmt -s -w
 ```
 
-`DATABASE_URL` / `PUBSUB_PROJECT_ID` / `FIRESTORE_PROJECT_ID` は未設定なら起動時に fail する。ローカル開発では Firestore エミュレーターを `FIRESTORE_EMULATOR_HOST=localhost:9041` 経由で使う。
+`ENV` (`dev` / `stg` / `prod`) / `DATABASE_URL` / `PUBSUB_PROJECT_ID` / `FIRESTORE_PROJECT_ID` は未設定なら起動時に fail する（デフォルトへの暗黙 fallback を行わない）。`make run` は `ENV=dev` をインラインで設定するので、その他 3 つを export すればよい。ローカル開発では Firestore エミュレーターを `FIRESTORE_EMULATOR_HOST=localhost:9041` 経由で使う。
 
 ## 公開パッケージ
 

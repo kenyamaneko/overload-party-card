@@ -20,6 +20,7 @@ type FirestoreGameConfigRepository struct {
 	client *firestore.Client
 }
 
+// NewFirestoreGameConfigRepository は FirestoreGameConfigRepository を生成します。
 func NewFirestoreGameConfigRepository(client *firestore.Client) *FirestoreGameConfigRepository {
 	return &FirestoreGameConfigRepository{client: client}
 }

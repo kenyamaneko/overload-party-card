@@ -18,8 +18,8 @@ tidy: ## Tidy dependencies
 fmt: ## Format code
 	gofmt -s -w .
 
-run: ## Run card server locally (requires DATABASE_URL)
-	go run ./cmd/server
+run: ## Run card server locally (ENV=dev inline; DATABASE_URL / PUBSUB_PROJECT_ID / FIRESTORE_PROJECT_ID must be exported)
+	ENV=dev go run ./cmd/server
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \

@@ -24,7 +24,7 @@ func newMockCardRepo(cards map[string]*apicard.CardDefinition) *mockCardRepo {
 }
 
 func (r *mockCardRepo) FindAll(_ context.Context) ([]*apicard.CardDefinition, error) {
-	var result []*apicard.CardDefinition
+	result := make([]*apicard.CardDefinition, 0, len(r.cards))
 	for _, c := range r.cards {
 		result = append(result, c)
 	}
@@ -45,9 +45,10 @@ func (r *mockCardRepo) FindCardIDsByFactions(_ context.Context, factions []strin
 	for _, f := range factions {
 		set[f] = struct{}{}
 	}
-	var ids []string
+	ids := make([]string, 0, len(r.cards))
 	for _, c := range r.cards {
-		if _, ok := set[c.Faction]; ok && c.IsActive {
+		_, ok := set[c.Faction]
+		if ok && c.IsActive {
 			ids = append(ids, c.CardID)
 		}
 	}
@@ -97,56 +98,69 @@ func (r *mockPlayerCardRepoShared) Seed(playerID string, cards []*model.PlayerCa
 	r.playerCards[playerID] = append(r.playerCards[playerID], cards...)
 }
 
-func TestGetAllCards_WithOwnership(t *testing.T) {
-	cards := map[string]*apicard.CardDefinition{
-		"C-001": {CardID: "C-001", CardName: "Fireball"},
-		"C-002": {CardID: "C-002", CardName: "Shield"},
-		"C-003": {CardID: "C-003", CardName: "Heal"},
-	}
-	cardRepo := newMockCardRepo(cards)
-	pcRepo := newMockPlayerCardRepoShared()
-	pcRepo.Seed("player1", []*model.PlayerCard{
-		{PlayerID: "player1", CardID: "C-001", ArtNo: 1, Count: 1},
-		{PlayerID: "player1", CardID: "C-003", ArtNo: 1, Count: 2},
-	})
-
-	svc := NewCardService(cardRepo, pcRepo)
-
-	result, err := svc.GetAllCards(context.Background(), "player1")
-	require.NoError(t, err)
-	require.Len(t, result, 3)
-
-	assert.Equal(t, "C-001", result[0].CardID)
-	assert.True(t, result[0].IsOwned)
-
-	assert.Equal(t, "C-002", result[1].CardID)
-	assert.False(t, result[1].IsOwned)
-
-	assert.Equal(t, "C-003", result[2].CardID)
-	assert.True(t, result[2].IsOwned)
+type ownershipExpectation struct {
+	cardID  string
+	isOwned bool
 }
 
-func TestGetAllCards_NoCards(t *testing.T) {
-	svc := NewCardService(newMockCardRepo(map[string]*apicard.CardDefinition{}), newMockPlayerCardRepoShared())
-
-	result, err := svc.GetAllCards(context.Background(), "player1")
-	require.NoError(t, err)
-	assert.Empty(t, result)
-}
-
-func TestGetAllCards_NoOwnedCards(t *testing.T) {
-	cards := map[string]*apicard.CardDefinition{
-		"C-001": {CardID: "C-001", CardName: "Fireball"},
-		"C-002": {CardID: "C-002", CardName: "Shield"},
+func TestGetAllCards(t *testing.T) {
+	tests := []struct {
+		name  string
+		cards map[string]*apicard.CardDefinition
+		seed  []*model.PlayerCard
+		want  []ownershipExpectation
+	}{
+		{
+			name: "some cards owned",
+			cards: map[string]*apicard.CardDefinition{
+				"C-001": {CardID: "C-001", CardName: "Fireball"},
+				"C-002": {CardID: "C-002", CardName: "Shield"},
+				"C-003": {CardID: "C-003", CardName: "Heal"},
+			},
+			seed: []*model.PlayerCard{
+				{PlayerID: "p1", CardID: "C-001", ArtNo: 1, Count: 1},
+				{PlayerID: "p1", CardID: "C-003", ArtNo: 1, Count: 2},
+			},
+			want: []ownershipExpectation{
+				{"C-001", true},
+				{"C-002", false},
+				{"C-003", true},
+			},
+		},
+		{
+			name:  "no cards in master",
+			cards: map[string]*apicard.CardDefinition{},
+			seed:  nil,
+			want:  nil,
+		},
+		{
+			name: "no owned cards",
+			cards: map[string]*apicard.CardDefinition{
+				"C-001": {CardID: "C-001", CardName: "Fireball"},
+				"C-002": {CardID: "C-002", CardName: "Shield"},
+			},
+			seed: nil,
+			want: []ownershipExpectation{
+				{"C-001", false},
+				{"C-002", false},
+			},
+		},
 	}
-	svc := NewCardService(newMockCardRepo(cards), newMockPlayerCardRepoShared())
 
-	result, err := svc.GetAllCards(context.Background(), "player1")
-	require.NoError(t, err)
-	require.Len(t, result, 2)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pcRepo := newMockPlayerCardRepoShared()
+			pcRepo.Seed("p1", tt.seed)
+			svc := NewCardService(newMockCardRepo(tt.cards), pcRepo)
 
-	for _, c := range result {
-		assert.False(t, c.IsOwned, "card %s should not be owned", c.CardID)
+			got, err := svc.GetAllCards(context.Background(), "p1")
+			require.NoError(t, err)
+			require.Len(t, got, len(tt.want))
+			for i, w := range tt.want {
+				assert.Equal(t, w.cardID, got[i].CardID)
+				assert.Equal(t, w.isOwned, got[i].IsOwned)
+			}
+		})
 	}
 }
 

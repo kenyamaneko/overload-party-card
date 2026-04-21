@@ -10,12 +10,12 @@ import (
 
 // PlayerCardHandler はプレイヤー所持カードの REST エンドポイントを処理します。
 type PlayerCardHandler struct {
-	deckService *service.DeckService
+	playerCardService *service.PlayerCardService
 }
 
 // NewPlayerCardHandler は PlayerCardHandler を生成します。
-func NewPlayerCardHandler(deckService *service.DeckService) *PlayerCardHandler {
-	return &PlayerCardHandler{deckService: deckService}
+func NewPlayerCardHandler(playerCardService *service.PlayerCardService) *PlayerCardHandler {
+	return &PlayerCardHandler{playerCardService: playerCardService}
 }
 
 // GetPlayerCards はプレイヤーの所持カード一覧を返します。
@@ -25,7 +25,7 @@ func (h *PlayerCardHandler) GetPlayerCards(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "playerId is required"})
 		return
 	}
-	cards, err := h.deckService.GetPlayerCards(c.Request.Context(), playerID)
+	cards, err := h.playerCardService.GetPlayerCards(c.Request.Context(), playerID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
