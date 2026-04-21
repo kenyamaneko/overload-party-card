@@ -3,7 +3,7 @@
 
 Outputs:
   - data/cache/cards_gen.json                     (Go embedded via data/cache/embed.go)
-  - docs/game_design/CARDS.md                     (human-readable card list)
+  - docs/CARDS.md                                 (human-readable card list)
   - db/seed/cards_seed.sql                        (PostgreSQL UPSERT seed)
 
 Usage:
@@ -24,7 +24,7 @@ except ImportError:
 # ─── Paths ──────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parent.parent
 YAML_DIR = ROOT / "data" / "cards"
-MD_OUT = ROOT / "docs" / "game_design" / "CARDS.md"
+MD_OUT = ROOT / "docs" / "CARDS.md"
 SEED_OUT = ROOT / "db" / "seed" / "cards_seed.sql"
 GO_JSON_OUT = ROOT / "data" / "cache" / "cards_gen.json"
 STARTER_DECKS_YAML = ROOT / "data" / "mock" / "starter_decks.yaml"

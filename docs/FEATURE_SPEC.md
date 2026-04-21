@@ -6,7 +6,7 @@
 - 内部動作・配線・運用設定: [ARCHITECTURE.md](ARCHITECTURE.md)
 - HTTP エンドポイント契約: [API_REFERENCE.md](API_REFERENCE.md)
 - DB スキーマ: [DATA_DESIGN.md](DATA_DESIGN.md)
-- カードデータ仕様: [game_design/CARDS.md](game_design/CARDS.md)
+- カードデータ仕様: [CARDS.md](CARDS.md)
 
 ---
 
@@ -37,7 +37,7 @@ card は **card スキーマの DB 行とカード定義 YAML (SSoT) を唯一�
 - `card_definitions` テーブルは ops の `db-migrate` (psqldef) 経由でスキーマが適用され、seed が投入される
 - 他サービスはカードマスターを複製しない（契約）
 
-カードデータの意味定義は [game_design/CARDS.md](game_design/CARDS.md) を参照。
+カードデータの意味定義は [CARDS.md](CARDS.md) を参照。
 
 ### 2.2 読み取り契約
 

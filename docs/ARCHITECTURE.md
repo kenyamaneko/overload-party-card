@@ -36,7 +36,7 @@ cache.CardCache (起動時に全件ロード) → サービス内メモリ
 - `cards_seed.sql` / `cards_gen.json` は生成物。直接編集禁止
 - schema migration は ops リポジトリ側の `db-migrate` が担当する（card からは走らない）
 
-カードの意味定義（faction / card_type / subtype / stats JSON の構造等）は [game_design/CARDS.md](game_design/CARDS.md) を参照。
+カードの意味定義（faction / card_type / subtype / stats JSON の構造等）は [CARDS.md](CARDS.md) を参照。
 
 ## インメモリ CardCache の fail-fast 判断
 
