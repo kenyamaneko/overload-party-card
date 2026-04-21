@@ -6,7 +6,7 @@ MODULE := github.com/kenyamaneko/$(APP)
 build: ## Build Docker image
 	docker build -t $(APP) .
 
-test: ## Run unit tests
+test: ## Run all tests (Testcontainers で Postgres を起動するので Docker 必須)
 	go test ./... -count=1 -race
 
 vet: ## Run go vet

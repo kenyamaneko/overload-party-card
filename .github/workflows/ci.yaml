@@ -39,6 +39,8 @@ jobs:
           GOPRIVATE: github.com/kenyamaneko/*
 
   test:
+    # ubuntu-latest には Docker がプリインストールされており、Testcontainers が
+    # postgres:16-alpine を起動してリポジトリ層テストを実行する。
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,7 +53,7 @@ jobs:
         env:
           GOPRIVATE: github.com/kenyamaneko/*
           GONOSUMDB: github.com/kenyamaneko/*
-      - name: Run unit tests
+      - name: Run tests (includes Testcontainers-based repository tests)
         run: go test -race -count=1 ./...
         env:
           GOPRIVATE: github.com/kenyamaneko/*

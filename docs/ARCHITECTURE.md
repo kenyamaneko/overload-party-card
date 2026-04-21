@@ -106,6 +106,18 @@ REST で直接呼ばれるケースでの冪等性は gateway のオーケスト
 
 「配布 API 自体を冪等にする」方向に倒すと、「本当に 2 回目の配布がほしい」ケース（シーズン報酬・補填等）の実装が歪む。責務を呼び出し側に寄せるのは意図的な設計。
 
+## テスト戦略
+
+service 層は in-memory mock で仕様ベースに単体テストする。repository 層は **Testcontainers で postgres:16-alpine を起動して実 PostgreSQL に対して検証する**。理由:
+
+- `pgxpool.Pool.Query` はコンパイル時のカラム名チェックがなく、SQL 誤りは実 DB でしか検出できない
+- `deck_cards` の `ON DELETE CASCADE`、`player_cards` の UPSERT (`ON CONFLICT ... DO UPDATE`)、`processed_events` の冪等性ガードなど、SQL レイヤーの仕様は実 DB でしか検証できない
+- `db/schema.sql` の drift (production とテストでスキーマが乖離) を起動時に fail-fast で検出できる
+
+helper は [internal/repository/postgrestest/postgres.go](../internal/repository/postgrestest/postgres.go)。`TestMain` でコンテナを 1 回起動し、各テストは `sharedPg.Truncate(t)` で状態をリセットする。`information_schema` を走査して BASE TABLE を動的に TRUNCATE するため、テーブル追加時に helper 側を更新する必要はない。
+
+`search_path TO card, public` を `pgxpool.AfterConnect` で設定し、`FROM card_definitions` のような未修飾参照がスキーマ配下で解決されるようにしている（`processed_events` だけ `card.` 修飾で書かれているコード側の不整合をテスト側で吸収する形）。
+
 ## 運用
 
 ### 環境変数

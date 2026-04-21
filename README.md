@@ -25,7 +25,7 @@ Battle (:9002)
 
 ```bash
 make run   # card server を起動（DATABASE_URL 等の env 必須）
-make test  # go test -race
+make test  # go test -race（Testcontainers で Postgres を立てるので Docker 必須）
 make vet   # go vet
 make fmt   # gofmt -s -w
 ```
