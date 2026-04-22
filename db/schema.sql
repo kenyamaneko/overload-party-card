@@ -93,6 +93,6 @@ CREATE TABLE card.deck_cards (
 
 CREATE TABLE card.processed_events (
   event_id     UUID PRIMARY KEY,                     -- Pub/Sub EventID (publisher 生成の UUIDv4)
-  event_type   TEXT NOT NULL,                        -- イベント種別 (faction_selected)
+  event_type   TEXT NOT NULL,                        -- イベント種別 (faction_purchased / player_onboarded) - ADR-022
   processed_at TIMESTAMPTZ NOT NULL DEFAULT now()    -- 処理日時
 );

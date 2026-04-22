@@ -25,21 +25,21 @@ func TestPgProcessedEventRepository_Insert(t *testing.T) {
 			name:         "新規 event_id は inserted=true",
 			preInsert:    nil,
 			eventID:      "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-			eventType:    "faction_selected",
+			eventType:    "faction_purchased",
 			wantInserted: true,
 		},
 		{
 			name:         "既存 event_id は inserted=false (重複適用抑止)",
 			preInsert:    []string{"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"},
 			eventID:      "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-			eventType:    "faction_selected",
+			eventType:    "faction_purchased",
 			wantInserted: false,
 		},
 		{
 			name:         "他の event_id が存在しても新規は inserted=true",
 			preInsert:    []string{"cccccccc-cccc-cccc-cccc-cccccccccccc"},
 			eventID:      "dddddddd-dddd-dddd-dddd-dddddddddddd",
-			eventType:    "faction_selected",
+			eventType:    "player_onboarded",
 			wantInserted: true,
 		},
 	}
@@ -51,7 +51,7 @@ func TestPgProcessedEventRepository_Insert(t *testing.T) {
 			ctx := context.Background()
 
 			for _, id := range tt.preInsert {
-				_, err := repo.Insert(ctx, id, "faction_selected")
+				_, err := repo.Insert(ctx, id, "faction_purchased")
 				require.NoError(t, err)
 			}
 
