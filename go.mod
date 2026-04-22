@@ -1,6 +1,6 @@
 module github.com/kenyamaneko/overload-party-card
 
-go 1.25.1
+go 1.25.9
 
 require (
 	cloud.google.com/go/pubsub/v2 v2.0.0
@@ -8,12 +8,12 @@ require (
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/kenyamaneko/overload-party-card/packages/api-card v0.0.0
 	github.com/kenyamaneko/overload-party-common/packages/game-design-constants v0.1.1
-	github.com/kenyamaneko/overload-party-scenario/packages/api-scenario v0.1.1
+	github.com/kenyamaneko/overload-party-scenario/packages/api-scenario v0.1.2
 	github.com/kenyamaneko/overload-party-shop/packages/api-shop v0.1.5
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/sync v0.19.0
 	github.com/testcontainers/testcontainers-go v0.42.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.42.0
+	golang.org/x/sync v0.19.0
 )
 
 // api-card lives inside this repo; publish/tag happens via CI (no manual tag).
@@ -119,8 +119,3 @@ require (
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-// Local dev replace (上流タグ発行前の暫定。go.mod の require バージョンは
-// タグ push を前提に記載しており、タグ発行後に本 replace を削除する)。
-replace github.com/kenyamaneko/overload-party-scenario/packages/api-scenario => ../overload-party-scenario/packages/api-scenario
-replace github.com/kenyamaneko/overload-party-shop/packages/api-shop => ../overload-party-shop/packages/api-shop
