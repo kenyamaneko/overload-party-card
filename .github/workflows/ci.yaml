@@ -38,9 +38,7 @@ jobs:
         env:
           GOPRIVATE: github.com/kenyamaneko/*
 
-  test:
-    # ubuntu-latest には Docker がプリインストールされており、Testcontainers が
-    # postgres:16-alpine を起動してリポジトリ層テストを実行する。
+  test-unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,13 +51,36 @@ jobs:
         env:
           GOPRIVATE: github.com/kenyamaneko/*
           GONOSUMDB: github.com/kenyamaneko/*
-      - name: Run tests (includes Testcontainers-based repository tests)
+      - name: Run unit tests
         run: go test -race -count=1 ./...
         env:
           GOPRIVATE: github.com/kenyamaneko/*
 
+  test-integration:
+    # ubuntu-latest には Docker がプリインストールされており、Testcontainers が
+    # postgres:16-alpine を起動してリポジトリ層テストを実行する。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      # Testcontainers はテスト中に自動 pull するが、時間がかかりタイムアウトの原因になるため事前に取得する
+      - name: Pre-pull postgres image (Testcontainers)
+        run: docker pull postgres:16-alpine
+      - name: Configure Go private modules
+        run: |
+          git config --global url."https://x-access-token:${{ secrets.COMMON_GO_MODULES_FETCH }}@github.com/kenyamaneko/overload-party-common".insteadOf "https://github.com/kenyamaneko/overload-party-common"
+        env:
+          GOPRIVATE: github.com/kenyamaneko/*
+          GONOSUMDB: github.com/kenyamaneko/*
+      - name: Run integration tests
+        run: go test -race -count=1 -tags=integration ./...
+        env:
+          GOPRIVATE: github.com/kenyamaneko/*
+
   build-and-push:
-    needs: [lint, test]
+    needs: [lint, test-unit, test-integration]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
