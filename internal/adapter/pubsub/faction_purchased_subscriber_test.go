@@ -123,7 +123,7 @@ func TestFactionPurchasedSubscriber_Consumes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			broker := apishopfake.NewBroker()
 			pub := apishopfake.NewPublisher(broker)
-			stream := newApishopfakeStream(apishopfake.NewSubscriber(broker), apishop.TopicFactionPurchased)
+			stream := apishopfake.NewStream(apishopfake.NewSubscriber(broker), apishop.TopicFactionPurchased)
 
 			granter := &fakeFactionGranter{err: tt.granterErr}
 			repo := &fakeProcessedEventRepo{
