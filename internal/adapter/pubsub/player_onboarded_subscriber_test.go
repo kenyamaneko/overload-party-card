@@ -2,14 +2,13 @@ package pubsub
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"time"
 
 	apiscenario "github.com/kenyamaneko/overload-party-scenario/packages/api-scenario"
+	"github.com/kenyamaneko/overload-party-scenario/packages/api-scenario/apiscenariofake"
+	"github.com/stretchr/testify/assert"
 )
 
 // fakeInitialGranter は initialPackGranter のテスト用スタブです。
@@ -30,117 +29,126 @@ func (f *fakeInitialGranter) GrantInitialPack(_ context.Context, playerID, facti
 	return 6, nil
 }
 
-func TestPlayerOnboardedSubscriber_Process(t *testing.T) {
-	validEvent := apiscenario.PlayerOnboardedEvent{
-		EventType:        apiscenario.EventTypePlayerOnboarded,
-		EventID:          "evt-1",
-		PlayerID:         "player-1",
-		DisplayName:      "Alice",
-		InitialFactionID: "SHE",
+// TestPlayerOnboardedSubscriber_Consumes は「オンボーディング完了時に初期パック
+// (initial_faction_id + Neutral) を 1 イベント単位で冪等に配布する」仕様を
+// Start() → stream.Consume → process の経路で固定する。
+//
+// 契約検証は apiscenariofake 経由で scenario 側の publish 型をそのまま使う
+// (scenario が schema を変えたら card のテストが compile / 実行で破綻するように
+// 設計し、乖離を CI で検知する)。
+func TestPlayerOnboardedSubscriber_Consumes(t *testing.T) {
+	publishValid := func(ctx context.Context, pub *apiscenariofake.Publisher, _ *apiscenariofake.Broker) {
+		_ = apiscenariofake.PublishPlayerOnboarded(ctx, pub, apiscenario.PlayerOnboardedEvent{
+			PlayerID:         "player-1",
+			DisplayName:      "Alice",
+			InitialFactionID: "Tuners",
+		})
 	}
-	validPayload, err := json.Marshal(validEvent)
-	require.NoError(t, err)
-
-	unknownEvent := struct {
-		EventType string `json:"event_type"`
-		EventID   string `json:"event_id"`
-	}{EventType: "unknown", EventID: "evt-2"}
-	unknownPayload, err := json.Marshal(unknownEvent)
-	require.NoError(t, err)
 
 	tests := []struct {
 		name             string
-		payload          []byte
+		publish          func(ctx context.Context, pub *apiscenariofake.Publisher, broker *apiscenariofake.Broker)
 		repoInsertResult bool
 		repoInsertErr    error
 		granterErr       error
 		wantAck          bool
-		wantGrantCalls   int
+		assertGranter    func(t *testing.T, g *fakeInitialGranter)
 	}{
 		{
-			name:             "新規イベントは初期パック (faction + Neutral) を配布して Ack する",
-			payload:          validPayload,
+			name:             "新規イベントは初期パックを配布して Ack する",
+			publish:          publishValid,
 			repoInsertResult: true,
 			wantAck:          true,
-			wantGrantCalls:   1,
+			assertGranter: func(t *testing.T, g *fakeInitialGranter) {
+				assert.Equal(t, 1, g.calls)
+				assert.Equal(t, "player-1", g.lastPlayerID)
+				assert.Equal(t, "Tuners", g.lastFaction, "initial_faction_id がそのまま GrantInitialPack に渡る")
+			},
 		},
 		{
-			name:             "重複イベント (processed_events 既存) は配布せず Ack する",
-			payload:          validPayload,
+			name:             "重複イベント (processed_events 既存): 配布せず Ack",
+			publish:          publishValid,
 			repoInsertResult: false,
 			wantAck:          true,
-			wantGrantCalls:   0,
+			assertGranter: func(t *testing.T, g *fakeInitialGranter) {
+				assert.Equal(t, 0, g.calls, "冪等ガードにより granter 未呼び出し")
+			},
 		},
 		{
-			name:          "processed_events insert 失敗は Nack する",
-			payload:       validPayload,
+			name:          "processed_events insert 失敗: Nack でリトライ",
+			publish:       publishValid,
 			repoInsertErr: errors.New("db down"),
 			wantAck:       false,
+			assertGranter: func(t *testing.T, g *fakeInitialGranter) {
+				assert.Equal(t, 0, g.calls, "dedup 失敗時は granter まで到達しない")
+			},
 		},
 		{
-			name:             "GrantInitialPack 失敗は Nack する",
-			payload:          validPayload,
+			name:             "GrantInitialPack 失敗: Nack でリトライ",
+			publish:          publishValid,
 			repoInsertResult: true,
 			granterErr:       errors.New("grant failed"),
 			wantAck:          false,
-			wantGrantCalls:   1,
+			assertGranter: func(t *testing.T, g *fakeInitialGranter) {
+				assert.Equal(t, 1, g.calls)
+			},
 		},
 		{
-			name:    "malformed JSON は Nack する",
-			payload: []byte("not-json"),
+			name: "malformed JSON: Nack して DLQ 送り",
+			publish: func(_ context.Context, _ *apiscenariofake.Publisher, broker *apiscenariofake.Broker) {
+				broker.Publish(apiscenario.TopicPlayerOnboarded, []byte("not-json"))
+			},
 			wantAck: false,
+			assertGranter: func(t *testing.T, g *fakeInitialGranter) {
+				assert.Equal(t, 0, g.calls)
+			},
 		},
 		{
-			name:    "未知の event_type は Nack する (publisher バグを DLQ で検出)",
-			payload: unknownPayload,
+			name: "未知 event_type: Nack して DLQ で publisher バグ検出",
+			publish: func(_ context.Context, _ *apiscenariofake.Publisher, broker *apiscenariofake.Broker) {
+				broker.Publish(apiscenario.TopicPlayerOnboarded, mustMarshal(t, apiscenario.PlayerOnboardedEvent{
+					EventType:        "unknown",
+					EventID:          "evt-2",
+					PlayerID:         "player-1",
+					InitialFactionID: "SHE",
+				}))
+			},
 			wantAck: false,
+			assertGranter: func(t *testing.T, g *fakeInitialGranter) {
+				assert.Equal(t, 0, g.calls, "event_type フィルタで granter に到達しない")
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			broker := apiscenariofake.NewBroker()
+			pub := apiscenariofake.NewPublisher(broker)
+			stream := newApiscenariofakeStream(apiscenariofake.NewSubscriber(broker), apiscenario.TopicPlayerOnboarded)
+
 			granter := &fakeInitialGranter{err: tt.granterErr}
 			repo := &fakeProcessedEventRepo{
 				insertResult: tt.repoInsertResult,
 				insertErr:    tt.repoInsertErr,
 			}
-			sub := &PlayerOnboardedSubscriber{
-				grantService: granter,
-				eventRepo:    repo,
-			}
+			sub := NewPlayerOnboardedSubscriber(stream, granter, repo)
 
-			gotAck := sub.process(context.Background(), tt.payload)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-			assert.Equal(t, tt.wantAck, gotAck)
-			assert.Equal(t, tt.wantGrantCalls, granter.calls)
+			started := make(chan struct{})
+			go func() {
+				close(started)
+				_ = sub.Start(ctx)
+			}()
+			<-started
+
+			tt.publish(ctx, pub, broker)
+
+			handlerErr := stream.ExpectHandled(t, time.Second)
+			assert.Equal(t, tt.wantAck, handlerErr == nil, "ack 判定 (nil=ack, err=%v)", handlerErr)
+
+			tt.assertGranter(t, granter)
 		})
 	}
-}
-
-func TestPlayerOnboardedSubscriber_Process_GrantsInitialFaction(t *testing.T) {
-	// ADR-022: player-onboarded subscriber は initial_faction_id のカードと
-	// Neutral カードを配る (GrantInitialPack)。initial_faction_id が
-	// GrantInitialPack へそのまま渡ることを確認する。
-	ev := apiscenario.PlayerOnboardedEvent{
-		EventType:        apiscenario.EventTypePlayerOnboarded,
-		EventID:          "evt-1",
-		PlayerID:         "player-1",
-		DisplayName:      "Bob",
-		InitialFactionID: "Tuners",
-	}
-	payload, err := json.Marshal(ev)
-	require.NoError(t, err)
-
-	granter := &fakeInitialGranter{}
-	repo := &fakeProcessedEventRepo{insertResult: true}
-	sub := &PlayerOnboardedSubscriber{
-		grantService: granter,
-		eventRepo:    repo,
-	}
-
-	require.True(t, sub.process(context.Background(), payload))
-
-	assert.Equal(t, 1, granter.calls)
-	assert.Equal(t, "player-1", granter.lastPlayerID)
-	assert.Equal(t, "Tuners", granter.lastFaction)
 }

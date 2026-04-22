@@ -2,14 +2,13 @@ package pubsub
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"time"
 
 	apishop "github.com/kenyamaneko/overload-party-shop/packages/api-shop"
+	"github.com/kenyamaneko/overload-party-shop/packages/api-shop/apishopfake"
+	"github.com/stretchr/testify/assert"
 )
 
 // fakeFactionGranter は factionPackGranter のテスト用スタブです。
@@ -30,130 +29,125 @@ func (f *fakeFactionGranter) GrantFactionPack(_ context.Context, playerID, facti
 	return 3, nil
 }
 
-// fakeProcessedEventRepo は port.ProcessedEventRepo のテスト用スタブです。
-type fakeProcessedEventRepo struct {
-	insertResult bool
-	insertErr    error
-	calls        int
-}
-
-func (r *fakeProcessedEventRepo) Insert(_ context.Context, _, _ string) (bool, error) {
-	r.calls++
-	if r.insertErr != nil {
-		return false, r.insertErr
+// TestFactionPurchasedSubscriber_Consumes は「shop 購入起因の faction パック配布
+// (Neutral 含まず) を 1 イベント単位で冪等に処理する」仕様を Start() →
+// stream.Consume → process の経路で固定する。
+//
+// 契約検証は apishopfake 経由で shop 側の publish 型をそのまま使う
+// (shop が schema を変えたら card のテストが compile / 実行で破綻するように
+// 設計し、乖離を CI で検知する)。
+func TestFactionPurchasedSubscriber_Consumes(t *testing.T) {
+	publishValid := func(ctx context.Context, pub *apishopfake.Publisher, _ *apishopfake.Broker) {
+		_ = apishopfake.PublishFactionPurchased(ctx, pub, apishop.FactionPurchasedEvent{
+			PlayerID: "player-1",
+			Faction:  "Tenki",
+		})
 	}
-	return r.insertResult, nil
-}
-
-func TestFactionPurchasedSubscriber_Process(t *testing.T) {
-	validEvent := apishop.FactionPurchasedEvent{
-		EventType: apishop.EventTypeFactionPurchased,
-		EventID:   "evt-1",
-		PlayerID:  "player-1",
-		Faction:   "SHE",
-	}
-	validPayload, err := json.Marshal(validEvent)
-	require.NoError(t, err)
-
-	unknownEvent := struct {
-		EventType string `json:"event_type"`
-		EventID   string `json:"event_id"`
-	}{EventType: "unknown", EventID: "evt-2"}
-	unknownPayload, err := json.Marshal(unknownEvent)
-	require.NoError(t, err)
 
 	tests := []struct {
 		name             string
-		payload          []byte
+		publish          func(ctx context.Context, pub *apishopfake.Publisher, broker *apishopfake.Broker)
 		repoInsertResult bool
 		repoInsertErr    error
 		granterErr       error
 		wantAck          bool
-		wantGrantCalls   int
+		assertGranter    func(t *testing.T, g *fakeFactionGranter)
 	}{
 		{
 			name:             "新規イベントは faction のみ配布して Ack する",
-			payload:          validPayload,
+			publish:          publishValid,
 			repoInsertResult: true,
 			wantAck:          true,
-			wantGrantCalls:   1,
+			assertGranter: func(t *testing.T, g *fakeFactionGranter) {
+				assert.Equal(t, 1, g.calls)
+				assert.Equal(t, "player-1", g.lastPlayerID)
+				assert.Equal(t, "Tenki", g.lastFaction)
+			},
 		},
 		{
-			name:             "重複イベント (processed_events 既存) は配布せず Ack する",
-			payload:          validPayload,
+			name:             "重複イベント (processed_events 既存): 配布せず Ack",
+			publish:          publishValid,
 			repoInsertResult: false,
 			wantAck:          true,
-			wantGrantCalls:   0,
+			assertGranter: func(t *testing.T, g *fakeFactionGranter) {
+				assert.Equal(t, 0, g.calls, "冪等ガードにより granter 未呼び出し")
+			},
 		},
 		{
-			name:          "processed_events insert 失敗は Nack する",
-			payload:       validPayload,
+			name:          "processed_events insert 失敗: Nack でリトライ",
+			publish:       publishValid,
 			repoInsertErr: errors.New("db down"),
 			wantAck:       false,
+			assertGranter: func(t *testing.T, g *fakeFactionGranter) {
+				assert.Equal(t, 0, g.calls, "dedup 失敗時は granter まで到達しない")
+			},
 		},
 		{
-			name:             "GrantFactionPack 失敗は Nack する",
-			payload:          validPayload,
+			name:             "GrantFactionPack 失敗: Nack でリトライ",
+			publish:          publishValid,
 			repoInsertResult: true,
 			granterErr:       errors.New("grant failed"),
 			wantAck:          false,
-			wantGrantCalls:   1,
+			assertGranter: func(t *testing.T, g *fakeFactionGranter) {
+				assert.Equal(t, 1, g.calls)
+			},
 		},
 		{
-			name:    "malformed JSON は Nack する",
-			payload: []byte("not-json"),
+			name: "malformed JSON: Nack して DLQ 送り",
+			publish: func(_ context.Context, _ *apishopfake.Publisher, broker *apishopfake.Broker) {
+				broker.Publish(apishop.TopicFactionPurchased, []byte("not-json"))
+			},
 			wantAck: false,
+			assertGranter: func(t *testing.T, g *fakeFactionGranter) {
+				assert.Equal(t, 0, g.calls)
+			},
 		},
 		{
-			name:    "未知の event_type は Nack する (publisher バグを DLQ で検出)",
-			payload: unknownPayload,
+			name: "未知 event_type: Nack して DLQ で publisher バグ検出",
+			publish: func(_ context.Context, _ *apishopfake.Publisher, broker *apishopfake.Broker) {
+				broker.Publish(apishop.TopicFactionPurchased, mustMarshal(t, apishop.FactionPurchasedEvent{
+					EventType: "unknown",
+					EventID:   "evt-2",
+					PlayerID:  "player-1",
+					Faction:   "SHE",
+				}))
+			},
 			wantAck: false,
+			assertGranter: func(t *testing.T, g *fakeFactionGranter) {
+				assert.Equal(t, 0, g.calls, "event_type フィルタで granter に到達しない")
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			broker := apishopfake.NewBroker()
+			pub := apishopfake.NewPublisher(broker)
+			stream := newApishopfakeStream(apishopfake.NewSubscriber(broker), apishop.TopicFactionPurchased)
+
 			granter := &fakeFactionGranter{err: tt.granterErr}
 			repo := &fakeProcessedEventRepo{
 				insertResult: tt.repoInsertResult,
 				insertErr:    tt.repoInsertErr,
 			}
-			sub := &FactionPurchasedSubscriber{
-				grantService: granter,
-				eventRepo:    repo,
-			}
+			sub := NewFactionPurchasedSubscriber(stream, granter, repo)
 
-			gotAck := sub.process(context.Background(), tt.payload)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-			assert.Equal(t, tt.wantAck, gotAck)
-			assert.Equal(t, tt.wantGrantCalls, granter.calls)
+			started := make(chan struct{})
+			go func() {
+				close(started)
+				_ = sub.Start(ctx)
+			}()
+			<-started
+
+			tt.publish(ctx, pub, broker)
+
+			handlerErr := stream.ExpectHandled(t, time.Second)
+			assert.Equal(t, tt.wantAck, handlerErr == nil, "ack 判定 (nil=ack, err=%v)", handlerErr)
+
+			tt.assertGranter(t, granter)
 		})
 	}
-}
-
-func TestFactionPurchasedSubscriber_Process_GrantsFactionOnly(t *testing.T) {
-	// ADR-022: faction-purchased subscriber は Neutral を配らず faction のみ配る。
-	// GrantFactionPack が faction 引数のみで呼ばれること (GrantInitialPack ではないこと)
-	// を確認する。
-	ev := apishop.FactionPurchasedEvent{
-		EventType: apishop.EventTypeFactionPurchased,
-		EventID:   "evt-1",
-		PlayerID:  "player-1",
-		Faction:   "Tenki",
-	}
-	payload, err := json.Marshal(ev)
-	require.NoError(t, err)
-
-	granter := &fakeFactionGranter{}
-	repo := &fakeProcessedEventRepo{insertResult: true}
-	sub := &FactionPurchasedSubscriber{
-		grantService: granter,
-		eventRepo:    repo,
-	}
-
-	require.True(t, sub.process(context.Background(), payload))
-
-	assert.Equal(t, 1, granter.calls)
-	assert.Equal(t, "player-1", granter.lastPlayerID)
-	assert.Equal(t, "Tenki", granter.lastFaction)
 }
