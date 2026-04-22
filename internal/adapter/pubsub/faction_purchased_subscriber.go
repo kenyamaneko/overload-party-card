@@ -2,8 +2,7 @@
 //
 // faction-purchased-card-sub を購読し、shop でのファクション購入時に
 // 対象 faction のカードのみ (Neutral 無し) を GrantService 経由で配布します。
-// 初期パック (faction + Neutral) の配布は player-onboarded-card-sub が担当します
-// (ADR-022)。
+// 初期パック (faction + Neutral) の配布は player-onboarded-card-sub が担当します。
 //
 // 冪等性は event_id ベースの processed_events で担保します。
 // 未知の event_type / malformed payload は Ack ではなく Nack します。
@@ -14,11 +13,8 @@ package pubsub
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
-
-	"cloud.google.com/go/pubsub/v2"
 
 	apishop "github.com/kenyamaneko/overload-party-shop/packages/api-shop"
 
@@ -31,68 +27,50 @@ type factionPackGranter interface {
 	GrantFactionPack(ctx context.Context, playerID, faction string) (int, error)
 }
 
-// FactionPurchasedSubscriber は faction-purchased-card-sub からイベントを取得し、
+// FactionPurchasedSubscriber は faction-purchased subscription からイベントを取得し、
 // shop で購入された faction のカードをプレイヤーへ配布します。
 type FactionPurchasedSubscriber struct {
-	client       *pubsub.Client
-	subscriber   *pubsub.Subscriber
+	stream       port.MessageStream
 	grantService factionPackGranter
 	eventRepo    port.ProcessedEventRepo
 }
 
 // NewFactionPurchasedSubscriber は FactionPurchasedSubscriber を生成します。
+// subscription 接続は stream に委ねるため、本コンストラクタでは GCP SDK に
+// 触れない (クリーンアーキテクチャの依存方向遵守)。
 func NewFactionPurchasedSubscriber(
-	ctx context.Context,
-	projectID, subscriptionID string,
+	stream port.MessageStream,
 	grantService factionPackGranter,
 	eventRepo port.ProcessedEventRepo,
-) (*FactionPurchasedSubscriber, error) {
-	if projectID == "" || subscriptionID == "" {
-		return nil, errors.New("faction-purchased-card subscriber: projectID and subscriptionID are required")
-	}
-	client, err := pubsub.NewClient(ctx, projectID)
-	if err != nil {
-		return nil, fmt.Errorf("faction-purchased-card subscriber: new client: %w", err)
-	}
+) *FactionPurchasedSubscriber {
 	return &FactionPurchasedSubscriber{
-		client:       client,
-		subscriber:   client.Subscriber(subscriptionID),
+		stream:       stream,
 		grantService: grantService,
 		eventRepo:    eventRepo,
-	}, nil
-}
-
-// Start は ctx がキャンセルされるか Receive がエラーを返すまでブロックします。
-func (s *FactionPurchasedSubscriber) Start(ctx context.Context) error {
-	slog.Info("faction-purchased-card subscriber starting", "subscription", s.subscriber.ID())
-	return s.subscriber.Receive(ctx, s.handle)
-}
-
-// Close は Pub/Sub クライアントを閉じます。
-func (s *FactionPurchasedSubscriber) Close() error { return s.client.Close() }
-
-func (s *FactionPurchasedSubscriber) handle(ctx context.Context, msg *pubsub.Message) {
-	if s.process(ctx, msg.Data) {
-		msg.Ack()
-		return
 	}
-	msg.Nack()
 }
 
-// process は payload を読み取り、副作用を実行した結果 Ack してよいか (true) を返します。
-// msg.Ack / msg.Nack から分離することで、subscriber 層の仕様をテーブル駆動でテストできます。
-func (s *FactionPurchasedSubscriber) process(ctx context.Context, data []byte) bool {
+// Start は ctx がキャンセルされるか stream がエラーを返すまでブロックします。
+func (s *FactionPurchasedSubscriber) Start(ctx context.Context) error {
+	slog.Info("faction-purchased-card subscriber: consuming")
+	return s.stream.Consume(ctx, s.process)
+}
+
+// process は 1 イベントを処理する。戻り値 nil = ack、非 nil = nack。
+//
+// bad payload / unknown event_type / handler 失敗はすべて nack で DLQ に寄せる
+// (publisher バグ / スキーマ拡張時の取りこぼしを握りつぶさず人間が気付ける
+// 形に残す方針)。
+func (s *FactionPurchasedSubscriber) process(ctx context.Context, data []byte) error {
 	var ev apishop.FactionPurchasedEvent
 	if err := json.Unmarshal(data, &ev); err != nil {
 		slog.Error("faction-purchased-card bad payload", "error", err)
-		return false
+		return fmt.Errorf("faction-purchased-card: bad payload: %w", err)
 	}
 	if ev.EventType != apishop.EventTypeFactionPurchased {
-		// 期待しない event_type はパブリッシャーのバグ。Nack → DLQ で回収し、
-		// 握りつぶさずに人間が気付ける形に残す。
 		slog.Warn("faction-purchased-card unexpected event_type",
 			"event_id", ev.EventID, "event_type", ev.EventType)
-		return false
+		return fmt.Errorf("faction-purchased-card: unexpected event_type %q", ev.EventType)
 	}
 
 	// GrantService は独自の UPSERT を使うため同一 tx に含められない。
@@ -101,10 +79,10 @@ func (s *FactionPurchasedSubscriber) process(ctx context.Context, data []byte) b
 	if err != nil {
 		slog.Error("faction-purchased-card processed_events insert failed",
 			"event_id", ev.EventID, "error", err)
-		return false
+		return fmt.Errorf("faction-purchased-card: insert processed_events: %w", err)
 	}
 	if !inserted {
-		return true
+		return nil
 	}
 
 	granted, err := s.grantService.GrantFactionPack(ctx, ev.PlayerID, ev.Faction)
@@ -115,7 +93,7 @@ func (s *FactionPurchasedSubscriber) process(ctx context.Context, data []byte) b
 			"faction", ev.Faction,
 			"error", err,
 		)
-		return false
+		return fmt.Errorf("faction-purchased-card: grant: %w", err)
 	}
 
 	slog.Info("faction-purchased-card granted",
@@ -124,5 +102,5 @@ func (s *FactionPurchasedSubscriber) process(ctx context.Context, data []byte) b
 		"faction", ev.Faction,
 		"copies", granted,
 	)
-	return true
+	return nil
 }

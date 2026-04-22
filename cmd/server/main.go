@@ -70,31 +70,28 @@ func run() error {
 
 	r := router.New(cardH, deckH, playerCardH, grantH)
 
-	factionSub, err := pubsubadapter.NewFactionPurchasedSubscriber(
-		ctx, cfg.PubsubProjectID, cfg.FactionPurchasedSubscription,
-		grantSvc, eventRepo,
-	)
+	factionStream, err := pubsubadapter.NewGCPMessageStream(ctx, cfg.PubsubProjectID, cfg.FactionPurchasedSubscription)
 	if err != nil {
-		return fmt.Errorf("faction-purchased subscriber: %w", err)
+		return fmt.Errorf("faction-purchased stream: %w", err)
 	}
 	defer func() {
-		if cerr := factionSub.Close(); cerr != nil {
-			slog.Warn("faction-purchased subscriber close", "error", cerr)
+		if cerr := factionStream.Close(); cerr != nil {
+			slog.Warn("faction-purchased stream close", "error", cerr)
 		}
 	}()
 
-	onboardedSub, err := pubsubadapter.NewPlayerOnboardedSubscriber(
-		ctx, cfg.PubsubProjectID, cfg.PlayerOnboardedSubscription,
-		grantSvc, eventRepo,
-	)
+	onboardedStream, err := pubsubadapter.NewGCPMessageStream(ctx, cfg.PubsubProjectID, cfg.PlayerOnboardedSubscription)
 	if err != nil {
-		return fmt.Errorf("player-onboarded subscriber: %w", err)
+		return fmt.Errorf("player-onboarded stream: %w", err)
 	}
 	defer func() {
-		if cerr := onboardedSub.Close(); cerr != nil {
-			slog.Warn("player-onboarded subscriber close", "error", cerr)
+		if cerr := onboardedStream.Close(); cerr != nil {
+			slog.Warn("player-onboarded stream close", "error", cerr)
 		}
 	}()
+
+	factionSub := pubsubadapter.NewFactionPurchasedSubscriber(factionStream, grantSvc, eventRepo)
+	onboardedSub := pubsubadapter.NewPlayerOnboardedSubscriber(onboardedStream, grantSvc, eventRepo)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),

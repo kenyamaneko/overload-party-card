@@ -3,11 +3,8 @@ package pubsub
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
-
-	"cloud.google.com/go/pubsub/v2"
 
 	apiscenario "github.com/kenyamaneko/overload-party-scenario/packages/api-scenario"
 
@@ -20,72 +17,49 @@ type initialPackGranter interface {
 	GrantInitialPack(ctx context.Context, playerID, faction string) (int, error)
 }
 
-// PlayerOnboardedSubscriber は player-onboarded-card-sub からイベントを取得し、
+// PlayerOnboardedSubscriber は player-onboarded subscription からイベントを取得し、
 // オンボーディング完了プレイヤーへ初期カードパック
-// (initial_faction_id のカード + Neutral カード) を配布します (ADR-022)。
+// (initial_faction_id のカード + Neutral カード) を配布します。
 //
 // 冪等性は event_id ベースの processed_events で担保します。
 // 未知の event_type / malformed payload は Ack ではなく Nack して DLQ
 // (player-onboarded-dlq) に寄せます。
 type PlayerOnboardedSubscriber struct {
-	client       *pubsub.Client
-	subscriber   *pubsub.Subscriber
+	stream       port.MessageStream
 	grantService initialPackGranter
 	eventRepo    port.ProcessedEventRepo
 }
 
 // NewPlayerOnboardedSubscriber は PlayerOnboardedSubscriber を生成します。
 func NewPlayerOnboardedSubscriber(
-	ctx context.Context,
-	projectID, subscriptionID string,
+	stream port.MessageStream,
 	grantService initialPackGranter,
 	eventRepo port.ProcessedEventRepo,
-) (*PlayerOnboardedSubscriber, error) {
-	if projectID == "" || subscriptionID == "" {
-		return nil, errors.New("player-onboarded-card subscriber: projectID and subscriptionID are required")
-	}
-	client, err := pubsub.NewClient(ctx, projectID)
-	if err != nil {
-		return nil, fmt.Errorf("player-onboarded-card subscriber: new client: %w", err)
-	}
+) *PlayerOnboardedSubscriber {
 	return &PlayerOnboardedSubscriber{
-		client:       client,
-		subscriber:   client.Subscriber(subscriptionID),
+		stream:       stream,
 		grantService: grantService,
 		eventRepo:    eventRepo,
-	}, nil
-}
-
-// Start は ctx がキャンセルされるか Receive がエラーを返すまでブロックします。
-func (s *PlayerOnboardedSubscriber) Start(ctx context.Context) error {
-	slog.Info("player-onboarded-card subscriber starting", "subscription", s.subscriber.ID())
-	return s.subscriber.Receive(ctx, s.handle)
-}
-
-// Close は Pub/Sub クライアントを閉じます。
-func (s *PlayerOnboardedSubscriber) Close() error { return s.client.Close() }
-
-func (s *PlayerOnboardedSubscriber) handle(ctx context.Context, msg *pubsub.Message) {
-	if s.process(ctx, msg.Data) {
-		msg.Ack()
-		return
 	}
-	msg.Nack()
 }
 
-// process は payload を読み取り、副作用を実行した結果 Ack してよいか (true) を返します。
-// msg.Ack / msg.Nack から分離することで、subscriber 層の仕様をテーブル駆動でテストできます。
-func (s *PlayerOnboardedSubscriber) process(ctx context.Context, data []byte) bool {
+// Start は ctx がキャンセルされるか stream がエラーを返すまでブロックします。
+func (s *PlayerOnboardedSubscriber) Start(ctx context.Context) error {
+	slog.Info("player-onboarded-card subscriber: consuming")
+	return s.stream.Consume(ctx, s.process)
+}
+
+// process は 1 イベントを処理する。戻り値 nil = ack、非 nil = nack。
+func (s *PlayerOnboardedSubscriber) process(ctx context.Context, data []byte) error {
 	var ev apiscenario.PlayerOnboardedEvent
 	if err := json.Unmarshal(data, &ev); err != nil {
 		slog.Error("player-onboarded-card bad payload", "error", err)
-		return false
+		return fmt.Errorf("player-onboarded-card: bad payload: %w", err)
 	}
 	if ev.EventType != apiscenario.EventTypePlayerOnboarded {
-		// publisher バグ・スキーマ拡張時の取りこぼしは握りつぶさず DLQ に寄せる。
 		slog.Warn("player-onboarded-card unexpected event_type",
 			"event_id", ev.EventID, "event_type", ev.EventType)
-		return false
+		return fmt.Errorf("player-onboarded-card: unexpected event_type %q", ev.EventType)
 	}
 
 	// GrantService は独自の UPSERT を使うため同一 tx に含められない。
@@ -94,10 +68,10 @@ func (s *PlayerOnboardedSubscriber) process(ctx context.Context, data []byte) bo
 	if err != nil {
 		slog.Error("player-onboarded-card processed_events insert failed",
 			"event_id", ev.EventID, "error", err)
-		return false
+		return fmt.Errorf("player-onboarded-card: insert processed_events: %w", err)
 	}
 	if !inserted {
-		return true
+		return nil
 	}
 
 	granted, err := s.grantService.GrantInitialPack(ctx, ev.PlayerID, ev.InitialFactionID)
@@ -108,7 +82,7 @@ func (s *PlayerOnboardedSubscriber) process(ctx context.Context, data []byte) bo
 			"faction", ev.InitialFactionID,
 			"error", err,
 		)
-		return false
+		return fmt.Errorf("player-onboarded-card: grant: %w", err)
 	}
 
 	slog.Info("player-onboarded-card granted",
@@ -117,5 +91,5 @@ func (s *PlayerOnboardedSubscriber) process(ctx context.Context, data []byte) bo
 		"faction", ev.InitialFactionID,
 		"copies", granted,
 	)
-	return true
+	return nil
 }
