@@ -11,14 +11,15 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/sync/errgroup"
 
+	pubsubadapter "github.com/kenyamaneko/overload-party-card/internal/adapter/pubsub"
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
 	"github.com/kenyamaneko/overload-party-card/internal/config"
 	"github.com/kenyamaneko/overload-party-card/internal/handler/rest"
 	"github.com/kenyamaneko/overload-party-card/internal/repository"
 	"github.com/kenyamaneko/overload-party-card/internal/router"
 	"github.com/kenyamaneko/overload-party-card/internal/service"
-	pubsubadapter "github.com/kenyamaneko/overload-party-card/internal/adapter/pubsub"
 )
 
 func main() {
@@ -69,19 +70,29 @@ func run() error {
 
 	r := router.New(cardH, deckH, playerCardH, grantH)
 
-	factionSub, err := pubsubadapter.NewFactionSelectedSubscriber(
-		ctx, cfg.PubsubProjectID, cfg.FactionSelectedSubscription,
+	factionSub, err := pubsubadapter.NewFactionPurchasedSubscriber(
+		ctx, cfg.PubsubProjectID, cfg.FactionPurchasedSubscription,
 		grantSvc, eventRepo,
 	)
 	if err != nil {
-		return fmt.Errorf("faction-selected subscriber: %w", err)
+		return fmt.Errorf("faction-purchased subscriber: %w", err)
 	}
-	defer func() { _ = factionSub.Close() }()
+	defer func() {
+		if cerr := factionSub.Close(); cerr != nil {
+			slog.Warn("faction-purchased subscriber close", "error", cerr)
+		}
+	}()
 
-	go func() {
-		if err := factionSub.Start(ctx); err != nil && ctx.Err() == nil {
-			slog.Error("faction-selected subscriber terminated", "error", err)
-			os.Exit(1)
+	onboardedSub, err := pubsubadapter.NewPlayerOnboardedSubscriber(
+		ctx, cfg.PubsubProjectID, cfg.PlayerOnboardedSubscription,
+		grantSvc, eventRepo,
+	)
+	if err != nil {
+		return fmt.Errorf("player-onboarded subscriber: %w", err)
+	}
+	defer func() {
+		if cerr := onboardedSub.Close(); cerr != nil {
+			slog.Warn("player-onboarded subscriber close", "error", cerr)
 		}
 	}()
 
@@ -91,31 +102,58 @@ func run() error {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	errCh := make(chan error, 1)
-	go func() {
-		slog.Info("card listening",
-			"addr", srv.Addr,
-			"card_cache_size", cardCache.Count(),
-			"pubsub_project", cfg.PubsubProjectID,
-		)
+	slog.Info("card starting",
+		"addr", srv.Addr,
+		"card_cache_size", cardCache.Count(),
+		"pubsub_project", cfg.PubsubProjectID,
+	)
+
+	return runHTTPAndSubscribers(ctx, srv, factionSub, onboardedSub)
+}
+
+// runHTTPAndSubscribers は HTTP server と Pub/Sub subscriber 群を並行起動し、
+// どれかの失敗・シグナル到来で全体を graceful に停止する。
+func runHTTPAndSubscribers(ctx context.Context, srv *http.Server, factionSub, onboardedSub subscriber) error {
+	g, gCtx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			errCh <- err
+			return fmt.Errorf("http server: %w", err)
 		}
-	}()
+		return nil
+	})
 
-	select {
-	case <-ctx.Done():
+	g.Go(func() error {
+		if err := factionSub.Start(gCtx); err != nil && gCtx.Err() == nil {
+			return fmt.Errorf("faction-purchased subscriber: %w", err)
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		if err := onboardedSub.Start(gCtx); err != nil && gCtx.Err() == nil {
+			return fmt.Errorf("player-onboarded subscriber: %w", err)
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		<-gCtx.Done()
 		slog.Info("card shutdown requested")
-	case err := <-errCh:
-		return err
-	}
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer shutdownCancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("http shutdown: %w", err)
+		}
+		return nil
+	})
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer shutdownCancel()
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		return fmt.Errorf("http shutdown: %w", err)
-	}
-	return nil
+	return g.Wait()
+}
+
+// subscriber は Pub/Sub subscriber の起動インターフェース。
+type subscriber interface {
+	Start(ctx context.Context) error
 }
 
 // setupLogger は ENV に応じてグローバル slog ロガーを初期化する。

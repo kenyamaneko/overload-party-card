@@ -22,7 +22,7 @@ card は以下の機能ドメインを所有する。
 | デッキバリデーション | 枚数・所持・制限ルールの検証（都度算出） |
 | バトル前検証 | `validate-for-battle` でバトル開始前のゲートキーパー |
 | カードパック配布 | 初回ファクション選択時・ショップ購入時のカード付与 |
-| Pub/Sub 消費 | `faction-selected` を購読しパック配布をイベント駆動で実行 |
+| Pub/Sub 消費 | `faction-purchased` / `player-onboarded` を購読しパック配布をイベント駆動で実行 (ADR-022) |
 
 card は **card スキーマの DB 行とカード定義 YAML (SSoT) を唯一の真実とし**、他サービスへカードマスターを複製しない。他サービスは `GET /internal/v1/cards` で起動時に読み取る read model を各自で持つ。
 
@@ -122,8 +122,8 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 
 | API | 配布対象 | 呼び出し契機 |
 |---|---|---|
-| `POST .../grant-initial-pack` | 選択 faction + Neutral の全カード種類 × 3 枚 | 初回ファクション選択（scenario 経由） |
-| `POST .../grant-faction-pack` | 選択 faction の全カード種類 × 3 枚（Neutral なし） | ショップでの faction_set 購入 |
+| `POST .../grant-initial-pack` | 選択 faction + Neutral の全カード種類 × 3 枚 | onboarding 完了 (`player-onboarded` subscriber 経由) |
+| `POST .../grant-faction-pack` | 選択 faction の全カード種類 × 3 枚（Neutral なし） | ショップでの faction_set 購入 (`faction-purchased` subscriber 経由) |
 
 配布対象の faction は `card_definitions.faction` カラムで動的にフィルタする（ハードコードしない）。
 
@@ -149,22 +149,23 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 
 ---
 
-## 6. Pub/Sub subscriber (`faction-selected`)
+## 6. Pub/Sub subscriber (`faction-purchased` / `player-onboarded`)
 
-ファクション選択をイベント駆動でパック配布に変換する。`card.processed_events` を使って at-least-once 配信を実質的に一度だけ適用する。
+ファクション取得・オンボーディング完了をイベント駆動でパック配布に変換する (ADR-022)。`card.processed_events` を使って at-least-once 配信を実質的に一度だけ適用する。
 
-### 6.1 処理フロー
+### 6.1 処理フロー (共通)
 
 1. JSON デシリアライズ → 失敗は `Nack`
-2. `event_type == "faction_selected"` チェック。異なれば `Nack`（publisher バグなので DLQ 行き）
+2. `event_type` チェック。異なれば `Nack`（publisher バグなので DLQ 行き）
 3. `processed_events` に `event_id` を INSERT
    - 既存行があれば `inserted = false` で `Ack`（重複適用しない）
    - INSERT 自体が失敗したら `Nack`
-4. `source` で分岐:
-   - `scenario_initial` → `GrantInitialPack`（faction + Neutral）
-   - `shop_purchase` → `GrantFactionPack`（faction のみ）
-   - 未知の source: `Nack`（publisher 拡張時の取りこぼしなので DLQ 行き）
+4. subscriber 固有の配布を実行:
+   - `faction-purchased-card-sub` → `GrantFactionPack`（faction のみ）
+   - `player-onboarded-card-sub` → `GrantInitialPack`（faction + Neutral）
 5. 配布成功 → `Ack`、配布失敗 → `Nack`（Pub/Sub がリトライ）
+
+ADR-022 で業務事実単位に topic を分解したため、旧 `source` フィールド分岐は撤廃された。各 subscriber は自身の topic に紐づく副作用だけを実行する。
 
 ### 6.2 冪等性の契約
 
@@ -173,9 +174,9 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 - **fast-path 位置付け**: §5 の GrantService は独自 UPSERT を持ち `processed_events` と同一 tx に含められないため、processed_events dedup は「再試行抑止用の前段ガード」として機能する。稀に同一イベントで 2 回加算される可能性は完全には排除していないが、publisher 側のリトライ窓が短いため実用上問題にならない
 - **decode 失敗**: `Nack` して Pub/Sub DLQ に送る（自動廃棄しない。運用側で調査）
 
-### 6.3 未知 event_type / 未知 source の扱い
+### 6.3 未知 event_type の扱い
 
-両方とも `Nack` を返す。リトライしても結果は変わらないが、subscriber 側で握りつぶさず DLQ (`faction-selected-dlq`) に回収してオペレーション側で検出するポリシー。publisher の契約違反やイベントスキーマ拡張時の取りこぼしを早期に気付けるようにする意図。
+`Nack` を返す。リトライしても結果は変わらないが、subscriber 側で握りつぶさず DLQ (`faction-purchased-dlq` / `player-onboarded-dlq`) に回収してオペレーション側で検出するポリシー。publisher の契約違反やイベントスキーマ拡張時の取りこぼしを早期に気付けるようにする意図。
 
 ---
 
@@ -204,6 +205,7 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 
 | トピック | 購読名 | 発行元 | 契機 |
 |---|---|---|---|
-| `faction-selected` | `faction-selected-card-sub` | scenario / shop | プレイヤーがファクションを獲得した時 |
+| `faction-purchased` | `faction-purchased-card-sub` | shop | プレイヤーが shop で faction を購入した時 |
+| `player-onboarded` | `player-onboarded-card-sub` | scenario | プレイヤーがオンボーディングを完了した時 |
 
-card は **イベントを発行しない**。発行元サービス（scenario / shop）が source フィールドを立てて区別する。
+card は **イベントを発行しない**。ADR-022 で業務事実単位に topic を分離したため、subscriber は source 分岐なしで自 topic 固有の副作用だけを処理する。

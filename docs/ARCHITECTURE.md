@@ -66,9 +66,9 @@ CardCache は読み取り専用。マスター改定時は Pod 再起動で inva
 
 算出はデッキ単位で O(|deck_cards| + |player_cards|) の map lookup。デッキ一覧取得でも実測でボトルネックにならないため、正確性を優先して常時再計算している。
 
-## `faction-selected` subscriber の冪等性
+## Pub/Sub subscriber の冪等性
 
-card は `faction-selected-card-sub` を購読してパック配布をイベント駆動で実行する。冪等性は `card.processed_events` テーブルに `event_id` を INSERT することで前段ガードとして機能させる。
+card は `faction-purchased-card-sub` と `player-onboarded-card-sub` を購読してパック配布をイベント駆動で実行する (ADR-022)。冪等性は `card.processed_events` テーブルに `event_id` を INSERT することで前段ガードとして機能させる。
 
 ただし **完全な idempotency 保証ではない**:
 
@@ -78,12 +78,23 @@ card は `faction-selected-card-sub` を購読してパック配布をイベン�
 
 at-least-once を at-most-once 相当に近づけるための前段ガードであり、strict exactly-once を謳っていない点に注意。将来 GrantService を processed_events と同一 tx に組み込む設計変更で完全 idempotent にできる（現状は実用上の優先度が低い）。
 
+### subscriber の責務分離 (ADR-022)
+
+ADR-022 で `FactionSelectedEvent` を業務事実単位に分解した結果、card は 2 subscriber を持つ:
+
+| subscriber | 副作用 |
+|---|---|
+| `faction-purchased-card-sub` | shop 購入時に **faction のカードのみ** (Neutral 無し) を配布 |
+| `player-onboarded-card-sub` | onboarding 完了時に **初期パック (faction + Neutral)** を配布 |
+
+旧 `faction-selected-card-sub` が持っていた `source` フィールド分岐は不要になった。業務事実と topic が 1 対 1 に対応するため、subscriber は自身の topic に紐づく副作用だけを実行する。
+
 ### 握りつぶし禁止: 不明イベントも Nack
 
-`event_type` / `source` が未知の場合、従来は Ack して捨てていたが、現在は **Nack して DLQ (`faction-selected-dlq`) に回収する**方針に変えた。理由:
+`event_type` が未知の場合、従来は Ack して捨てていたが、現在は **Nack して DLQ に回収する**方針に変えた。理由:
 
 - CLAUDE.md「エラーは握りつぶさず根本解決する」との整合
-- Ack で捨てると publisher 側のバグ（例: 新 source を追加したが card subscriber を更新し忘れた）に気付けない
+- Ack で捨てると publisher 側のバグに気付けない
 - DLQ は無限リトライを起こさないうえ、監視側でアラートを張れる
 
 復旧不能な malformed payload も同じく Nack で DLQ に寄せる。at-least-once の契約は DLQ 配送後に自動で満たされる（DLQ から人間が invest → 必要なら再投入）。
@@ -128,8 +139,9 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 
 - **`ENV`**: `dev` / `stg` / `prod` のいずれか。未設定で起動不可。`prod` / `stg` は Cloud Logging 互換の JSON slog、`dev` はテキスト slog にルーティングする
 - **`DATABASE_URL`**: card スキーマへの接続文字列。未設定で起動不可
-- **`PUBSUB_PROJECT_ID`**: card は `faction-selected` subscriber を持つため必須
-- **`FACTION_SELECTED_SUBSCRIPTION`**: 未設定時は `pubsubevents.SubFactionSelectedCard` 定数 (`faction-selected-card-sub`) を使用。本番以外で別名を使う場合に上書き
+- **`PUBSUB_PROJECT_ID`**: card は `faction-purchased` / `player-onboarded` subscriber を持つため必須
+- **`FACTION_PURCHASED_SUBSCRIPTION`**: 未設定時は `"faction-purchased-card-sub"` を使用。本番以外で別名を使う場合に上書き
+- **`PLAYER_ONBOARDED_SUBSCRIPTION`**: 未設定時は `"player-onboarded-card-sub"` を使用。本番以外で別名を使う場合に上書き
 
 ### カードデータ変更時
 
@@ -149,6 +161,7 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 
 | トピック | 購読名 | publisher |
 |---|---|---|
-| `faction-selected` | `faction-selected-card-sub` | scenario / shop |
+| `faction-purchased` | `faction-purchased-card-sub` | shop |
+| `player-onboarded` | `player-onboarded-card-sub` | scenario |
 
 publisher 列はこのリポジトリからは導けないので、変更時は各サービスの発行状況も確認すること。

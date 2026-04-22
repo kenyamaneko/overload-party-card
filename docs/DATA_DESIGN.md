@@ -133,12 +133,12 @@ Pub/Sub subscriber の冪等性を保証するテーブル。
 | カラム名 | 型 | Nullable | 説明 |
 |---|---|---|---|
 | `event_id` | UUID | No | Pub/Sub EventID (publisher 生成の UUIDv4) |
-| `event_type` | TEXT | No | イベント種別 (faction_selected) |
+| `event_type` | TEXT | No | イベント種別 (faction_purchased / player_onboarded) |
 | `processed_at` | TIMESTAMPTZ | No | 処理日時 |
 <!-- END GENERATED: processed_events -->
 
 **設計判断:**
-- card は `faction-selected` イベントを subscribe し、新陣営購入時にスターターデッキのカードを `player_cards` に付与する
+- card は `faction-purchased` / `player-onboarded` イベントを subscribe し、ファクション購入時・オンボーディング完了時にカードを `player_cards` に付与する (ADR-022)
 
 ---
 

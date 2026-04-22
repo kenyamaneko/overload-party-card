@@ -11,7 +11,8 @@ Gateway
   └─ Card (:9003)
        ├─ PostgreSQL (card スキーマ)
        └─ Pub/Sub
-            └─ faction-selected-card-sub  ← scenario / shop が発行
+            ├─ faction-purchased-card-sub  ← shop が発行 (ADR-022)
+            └─ player-onboarded-card-sub   ← scenario が発行 (ADR-022)
 
 Battle (:9002)
   └─ GET /internal/v1/cards  ← 起動時 1 回のカードマスターロード
@@ -19,7 +20,7 @@ Battle (:9002)
 
 - gateway と battle が REST の呼び出し元。card 自身は他サービスを REST で呼び出さない
 - カードマスター (`card_definitions`) の SSoT は本サービス。他サービスには複製しない
-- `faction-selected` を購読し、パック配布をイベント駆動で実行する
+- `faction-purchased` / `player-onboarded` を購読し、パック配布をイベント駆動で実行する
 
 ## ローカル開発
 

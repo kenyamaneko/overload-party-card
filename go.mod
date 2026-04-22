@@ -8,8 +8,10 @@ require (
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/kenyamaneko/overload-party-card/packages/api-card v0.0.0
 	github.com/kenyamaneko/overload-party-common/packages/game-design-constants v0.1.1
-	github.com/kenyamaneko/overload-party-common/packages/pubsub-events v0.1.0
+	github.com/kenyamaneko/overload-party-scenario/packages/api-scenario v0.1.1
+	github.com/kenyamaneko/overload-party-shop/packages/api-shop v0.1.5
 	github.com/stretchr/testify v1.11.1
+	golang.org/x/sync v0.19.0
 	github.com/testcontainers/testcontainers-go v0.42.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.42.0
 )
@@ -105,7 +107,6 @@ require (
 	golang.org/x/mod v0.32.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/oauth2 v0.33.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
@@ -118,3 +119,8 @@ require (
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+// Local dev replace (ADR-022 で上流タグがまだ push されていない期間の暫定。
+// CI / タグ発行後に削除する)
+replace github.com/kenyamaneko/overload-party-scenario/packages/api-scenario => ../overload-party-scenario/packages/api-scenario
+replace github.com/kenyamaneko/overload-party-shop/packages/api-shop => ../overload-party-shop/packages/api-shop
