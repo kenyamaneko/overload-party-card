@@ -70,7 +70,7 @@ func run() error {
 
 	r := router.New(cardH, deckH, playerCardH, grantH)
 
-	factionStream, err := pubsubadapter.NewGCPMessageStream(ctx, cfg.PubsubProjectID, cfg.FactionPurchasedSubscription)
+	factionStream, err := pubsubadapter.NewStream(ctx, cfg.PubsubProjectID, cfg.FactionPurchasedSubscription)
 	if err != nil {
 		return fmt.Errorf("faction-purchased stream: %w", err)
 	}
@@ -80,7 +80,7 @@ func run() error {
 		}
 	}()
 
-	onboardedStream, err := pubsubadapter.NewGCPMessageStream(ctx, cfg.PubsubProjectID, cfg.PlayerOnboardedSubscription)
+	onboardedStream, err := pubsubadapter.NewStream(ctx, cfg.PubsubProjectID, cfg.PlayerOnboardedSubscription)
 	if err != nil {
 		return fmt.Errorf("player-onboarded stream: %w", err)
 	}
