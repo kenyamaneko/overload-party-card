@@ -22,7 +22,7 @@ const (
 type Config struct {
 	Port        int
 	Env         Env
-	DatabaseURL string
+	DatabaseConn string
 
 	PubsubProjectID              string
 	FactionPurchasedSubscription string
@@ -34,7 +34,7 @@ type Config struct {
 func FromEnv() (*Config, error) {
 	cfg := &Config{
 		Port:                         9003,
-		DatabaseURL:                  os.Getenv("DATABASE_URL"),
+		DatabaseConn:                 os.Getenv("DATABASE_CONN"),
 		PubsubProjectID:              os.Getenv("PUBSUB_PROJECT_ID"),
 		FactionPurchasedSubscription: getEnv("FACTION_PURCHASED_SUBSCRIPTION", "faction-purchased-card-sub"),
 		PlayerOnboardedSubscription:  getEnv("PLAYER_ONBOARDED_SUBSCRIPTION", "player-onboarded-card-sub"),
@@ -59,8 +59,8 @@ func FromEnv() (*Config, error) {
 		return nil, fmt.Errorf("config: ENV must be %q, %q, or %q, got %q", EnvDev, EnvStg, EnvProd, envRaw)
 	}
 
-	if cfg.DatabaseURL == "" {
-		return nil, fmt.Errorf("config: DATABASE_URL is required")
+	if cfg.DatabaseConn == "" {
+		return nil, fmt.Errorf("config: DATABASE_CONN is required")
 	}
 	if cfg.PubsubProjectID == "" {
 		return nil, fmt.Errorf("config: PUBSUB_PROJECT_ID is required (card subscribes to faction-purchased / player-onboarded events)")
