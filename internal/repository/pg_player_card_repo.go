@@ -3,10 +3,11 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/kenyamaneko/overload-party-card/internal/model"
+	"github.com/kenyamaneko/overload-party-card/internal/domain"
 	"github.com/kenyamaneko/overload-party-card/internal/port"
 )
 
@@ -23,7 +24,7 @@ func NewPgPlayerCardRepository(pool *pgxpool.Pool) *PgPlayerCardRepository {
 }
 
 // GetPlayerCards は指定プレイヤーの所持カード一覧を返します。
-func (r *PgPlayerCardRepository) GetPlayerCards(ctx context.Context, playerID string) ([]*model.PlayerCard, error) {
+func (r *PgPlayerCardRepository) GetPlayerCards(ctx context.Context, playerID string) ([]*domain.PlayerCard, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT player_id, card_id, art_no, count
 		 FROM player_cards WHERE player_id = $1 ORDER BY card_id, art_no`,
@@ -34,9 +35,9 @@ func (r *PgPlayerCardRepository) GetPlayerCards(ctx context.Context, playerID st
 	}
 	defer rows.Close()
 
-	cards := make([]*model.PlayerCard, 0, 32)
+	cards := make([]*domain.PlayerCard, 0, 32)
 	for rows.Next() {
-		var pc model.PlayerCard
+		var pc domain.PlayerCard
 		if err := rows.Scan(&pc.PlayerID, &pc.CardID, &pc.ArtNo, &pc.Count); err != nil {
 			return nil, fmt.Errorf("scan player card: %w", err)
 		}
@@ -49,34 +50,24 @@ func (r *PgPlayerCardRepository) GetPlayerCards(ctx context.Context, playerID st
 }
 
 // AddCards は player_cards を UPSERT し、conflict 時は count を加算します。
-// 単一トランザクションで実行し、追加されたコピー総数を返します。
+// 単一文の bulk UPSERT で実行し、追加されたコピー総数を返します。
 func (r *PgPlayerCardRepository) AddCards(ctx context.Context, playerID string, cardIDs []string, countPerCard int) (int, error) {
-	if countPerCard <= 0 {
-		return 0, fmt.Errorf("countPerCard must be positive, got %d", countPerCard)
-	}
-	if len(cardIDs) == 0 {
-		return 0, nil
-	}
+	var sb strings.Builder
+	sb.WriteString(`INSERT INTO player_cards (player_id, card_id, art_no, count) VALUES `)
 
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	const q = `
-		INSERT INTO player_cards (player_id, card_id, art_no, count)
-		VALUES ($1, $2, 0, $3)
-		ON CONFLICT (player_id, card_id, art_no)
-		DO UPDATE SET count = player_cards.count + EXCLUDED.count
-	`
-	for _, cid := range cardIDs {
-		if _, err := tx.Exec(ctx, q, playerID, cid, countPerCard); err != nil {
-			return 0, fmt.Errorf("upsert player_card %s: %w", cid, err)
+	args := make([]any, 0, len(cardIDs)*4)
+	for i, cid := range cardIDs {
+		if i > 0 {
+			sb.WriteString(",")
 		}
+		base := i*4 + 1
+		fmt.Fprintf(&sb, "($%d,$%d,$%d,$%d)", base, base+1, base+2, base+3)
+		args = append(args, playerID, cid, 0, countPerCard)
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return 0, fmt.Errorf("commit tx: %w", err)
+	sb.WriteString(` ON CONFLICT (player_id, card_id, art_no) DO UPDATE SET count = player_cards.count + EXCLUDED.count`)
+
+	if _, err := r.pool.Exec(ctx, sb.String(), args...); err != nil {
+		return 0, fmt.Errorf("bulk upsert player_cards: %w", err)
 	}
 	return len(cardIDs) * countPerCard, nil
 }

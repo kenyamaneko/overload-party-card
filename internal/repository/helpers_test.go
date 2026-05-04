@@ -5,6 +5,7 @@ package repository_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -26,8 +27,8 @@ func seedCard(t *testing.T, s cardSeed) {
 	t.Helper()
 	_, err := sharedPg.Pool.Exec(context.Background(),
 		`INSERT INTO card.card_definitions
-		   (card_id, card_name, resource_label, faction, card_type, stats, restriction, is_active)
-		 VALUES ($1, $2, '', $3, $4, $5, $6, $7)`,
+		   (card_id, card_name, resource_label, faction, card_type, resizable, elastic, stats, restriction, is_active)
+		 VALUES ($1, $2, '', $3, $4, false, false, $5, $6, $7)`,
 		s.CardID, s.CardName, s.Faction, s.CardType, json.RawMessage(`{}`), s.Restriction, s.IsActive)
 	require.NoError(t, err)
 }
@@ -117,3 +118,17 @@ const (
 	playerA = "11111111-1111-1111-1111-111111111111"
 	playerB = "22222222-2222-2222-2222-222222222222"
 )
+
+// bulkScale は AddCards の bulk UPSERT を実 grant スケール (数十枚) で
+// 検証するためのフィクスチャを生成する。n 件の card_id (BK-0001..) と
+// 「全件 count コピーずつ」の期待値マップをペアで返す。
+func bulkScale(n, count int) ([]string, map[string]int) {
+	cardIDs := make([]string, n)
+	expected := make(map[string]int, n)
+	for i := range cardIDs {
+		id := fmt.Sprintf("BK-%04d", i+1)
+		cardIDs[i] = id
+		expected[id] = count
+	}
+	return cardIDs, expected
+}

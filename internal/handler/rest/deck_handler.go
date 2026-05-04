@@ -6,17 +6,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/kenyamaneko/overload-party-card/internal/service"
+	"github.com/kenyamaneko/overload-party-card/internal/usecase"
+	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 )
 
 // DeckHandler はデッキ CRUD の REST エンドポイントを処理します。
 type DeckHandler struct {
-	deckService *service.DeckService
+	deckInteractor *usecase.DeckInteractor
 }
 
 // NewDeckHandler は DeckHandler を生成します。
-func NewDeckHandler(deckService *service.DeckService) *DeckHandler {
-	return &DeckHandler{deckService: deckService}
+func NewDeckHandler(deckInteractor *usecase.DeckInteractor) *DeckHandler {
+	return &DeckHandler{deckInteractor: deckInteractor}
 }
 
 // GetDecks はプレイヤーのデッキ一覧を返します。
@@ -27,7 +28,7 @@ func (h *DeckHandler) GetDecks(c *gin.Context) {
 		return
 	}
 
-	decks, err := h.deckService.GetDecks(c.Request.Context(), playerID)
+	decks, err := h.deckInteractor.GetDecks(c.Request.Context(), playerID)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -44,7 +45,7 @@ func (h *DeckHandler) GetDeck(c *gin.Context) {
 		return
 	}
 
-	deck, cards, err := h.deckService.GetDeck(c.Request.Context(), playerID, deckID)
+	deck, cards, err := h.deckInteractor.GetDeck(c.Request.Context(), playerID, deckID)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -56,13 +57,13 @@ func (h *DeckHandler) GetDeck(c *gin.Context) {
 func (h *DeckHandler) CreateDeck(c *gin.Context) {
 	playerID := c.Param("playerId")
 
-	var req service.CreateDeckRequest
+	var req apicard.DeckCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	deck, err := h.deckService.CreateDeck(c.Request.Context(), playerID, req)
+	deck, err := h.deckInteractor.CreateDeck(c.Request.Context(), playerID, req)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -79,13 +80,13 @@ func (h *DeckHandler) UpdateDeck(c *gin.Context) {
 		return
 	}
 
-	var req service.UpdateDeckRequest
+	var req apicard.DeckUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	deck, err := h.deckService.UpdateDeck(c.Request.Context(), playerID, deckID, req)
+	deck, err := h.deckInteractor.UpdateDeck(c.Request.Context(), playerID, deckID, req)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -102,7 +103,7 @@ func (h *DeckHandler) DeleteDeck(c *gin.Context) {
 		return
 	}
 
-	if err := h.deckService.DeleteDeck(c.Request.Context(), playerID, deckID); err != nil {
+	if err := h.deckInteractor.DeleteDeck(c.Request.Context(), playerID, deckID); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -118,7 +119,7 @@ func (h *DeckHandler) ValidateDeckForBattle(c *gin.Context) {
 		return
 	}
 
-	if err := h.deckService.ValidateDeckForBattle(c.Request.Context(), playerID, deckID); err != nil {
+	if err := h.deckInteractor.ValidateDeckForBattle(c.Request.Context(), playerID, deckID); err != nil {
 		respondError(c, err)
 		return
 	}

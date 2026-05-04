@@ -31,12 +31,12 @@ $$ LANGUAGE plpgsql;
 CREATE TABLE card.card_definitions (
   card_id        VARCHAR(10) NOT NULL,               -- カード識別子（例: SH-0001）
   card_name      VARCHAR(100) NOT NULL,              -- カード名
-  resource_label VARCHAR(30) NOT NULL DEFAULT '',     -- リソースラベル
+  resource_label VARCHAR(30) NOT NULL,                -- リソースラベル
   faction        VARCHAR(20) NOT NULL CHECK (faction IN ('SHE', 'Tenki', 'Sugar', 'Tuners', 'Neutral')), -- 陣営（SHE / Tenki / Sugar / Tuners / Neutral）
   card_type      VARCHAR(30) NOT NULL,               -- カードタイプ（Resource / Support）
   subtype        VARCHAR(30),                        -- サブタイプ（Compute/Data カテゴリのみ設定: VM/Container/Database 等）
-  resizable      BOOLEAN NOT NULL DEFAULT false,     -- Resizable 属性
-  elastic        BOOLEAN NOT NULL DEFAULT false,     -- Elastic 属性
+  resizable      BOOLEAN NOT NULL,                   -- Resizable 属性
+  elastic        BOOLEAN NOT NULL,                   -- Elastic 属性
   stats          JSONB NOT NULL,                     -- ステータス定義
   effect_text    VARCHAR(500),                       -- 効果テキスト（表示用）
   effects        JSONB,                              -- 効果定義（JSON 配列）
@@ -58,8 +58,8 @@ CREATE TRIGGER trg_card_definitions_updated_at BEFORE UPDATE ON card.card_defini
 CREATE TABLE card.player_cards (
   player_id  UUID NOT NULL, -- 所有プレイヤー (cross-schema reference to account.players; app-level integrity, not enforced by FK)
   card_id    VARCHAR(10) NOT NULL,                   -- カード識別子
-  art_no     BIGINT NOT NULL DEFAULT 0,              -- アート番号 (Default: 0)
-  count      INT NOT NULL DEFAULT 1,                 -- 所持枚数 (Default: 1)
+  art_no     BIGINT NOT NULL,                        -- アート番号
+  count      INT NOT NULL,                           -- 所持枚数
   PRIMARY KEY (player_id, card_id, art_no)
 );
 
@@ -81,8 +81,8 @@ CREATE TABLE card.deck_cards (
   player_id  UUID NOT NULL,                          -- ルート親参照
   deck_id    BIGINT NOT NULL,                        -- 親テーブル参照
   card_id    VARCHAR(10) NOT NULL,                   -- カード識別子
-  art_no     BIGINT NOT NULL DEFAULT 0,              -- アート番号 (Default: 0)
-  count      INT NOT NULL DEFAULT 1,                 -- 枚数 (Default: 1)
+  art_no     BIGINT NOT NULL,                        -- アート番号
+  count      INT NOT NULL,                           -- 枚数
   PRIMARY KEY (player_id, deck_id, card_id, art_no),
   FOREIGN KEY (player_id, deck_id) REFERENCES card.decks(player_id, deck_id) ON DELETE CASCADE
 );

@@ -5,23 +5,23 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/kenyamaneko/overload-party-card/internal/service"
+	"github.com/kenyamaneko/overload-party-card/internal/usecase"
 )
 
 // CardHandler はカードマスター関連の REST エンドポイントを処理します。
 type CardHandler struct {
-	cardService *service.CardService
+	cardInteractor *usecase.CardInteractor
 }
 
 // NewCardHandler は CardHandler を生成します。
-func NewCardHandler(cardService *service.CardService) *CardHandler {
-	return &CardHandler{cardService: cardService}
+func NewCardHandler(cardInteractor *usecase.CardInteractor) *CardHandler {
+	return &CardHandler{cardInteractor: cardInteractor}
 }
 
 // ListAllRaw はカードマスター全件を返します。
 // battle 起動時と gateway キャッシュ構築で使用されます。
 func (h *CardHandler) ListAllRaw(c *gin.Context) {
-	cards, err := h.cardService.FindAllRaw(c.Request.Context())
+	cards, err := h.cardInteractor.ListCards(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -36,7 +36,7 @@ func (h *CardHandler) ListForPlayer(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "playerId is required"})
 		return
 	}
-	cards, err := h.cardService.GetAllCards(c.Request.Context(), playerID)
+	cards, err := h.cardInteractor.ListCardsWithOwnership(c.Request.Context(), playerID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

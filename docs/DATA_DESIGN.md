@@ -26,6 +26,7 @@ card スキーマはカードマスターデータ・プレイヤーの所持カ
 | `resource_label` | VARCHAR(30) | No | リソースラベル |
 | `faction` | VARCHAR(20) | No | 陣営（SHE / Tenki / Sugar / Tuners / Neutral） |
 | `card_type` | VARCHAR(30) | No | カードタイプ（Resource / Support） |
+| `subtype` | VARCHAR(30) | Yes | サブタイプ（Compute/Data カテゴリのみ設定: VM/Container/Database 等） |
 | `resizable` | BOOLEAN | No | Resizable 属性 |
 | `elastic` | BOOLEAN | No | Elastic 属性 |
 | `stats` | JSONB | No | ステータス定義 |
@@ -77,8 +78,8 @@ Platform / Attachment / Strategy / Incident / Reactive には `stats` フィー�
 |---|---|---|---|
 | `player_id` | UUID | No | 所有プレイヤー (cross-schema reference to account.players; app-level integrity, not enforced by FK) |
 | `card_id` | VARCHAR(10) | No | カード識別子 |
-| `art_no` | BIGINT | No | アート番号 (Default: 0) |
-| `count` | INT | No | 所持枚数 (Default: 1) |
+| `art_no` | BIGINT | No | アート番号 |
+| `count` | INT | No | 所持枚数 |
 <!-- END GENERATED: player_cards -->
 
 ### decks
@@ -119,8 +120,8 @@ Platform / Attachment / Strategy / Incident / Reactive には `stats` フィー�
 | `player_id` | UUID | No | ルート親参照 |
 | `deck_id` | BIGINT | No | 親テーブル参照 |
 | `card_id` | VARCHAR(10) | No | カード識別子 |
-| `art_no` | BIGINT | No | アート番号 (Default: 0) |
-| `count` | INT | No | 枚数 (Default: 1) |
+| `art_no` | BIGINT | No | アート番号 |
+| `count` | INT | No | 枚数 |
 <!-- END GENERATED: deck_cards -->
 
 ### processed_events
@@ -133,7 +134,7 @@ Pub/Sub subscriber の冪等性を保証するテーブル。
 | カラム名 | 型 | Nullable | 説明 |
 |---|---|---|---|
 | `event_id` | UUID | No | Pub/Sub EventID (publisher 生成の UUIDv4) |
-| `event_type` | TEXT | No | イベント種別 (faction_purchased / player_onboarded) |
+| `event_type` | TEXT | No | イベント種別 (faction_purchased / player_onboarded) - ADR-022 |
 | `processed_at` | TIMESTAMPTZ | No | 処理日時 |
 <!-- END GENERATED: processed_events -->
 

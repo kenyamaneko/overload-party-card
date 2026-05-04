@@ -119,7 +119,7 @@ REST で直接呼ばれるケースでの冪等性は gateway のオーケスト
 
 ## テスト戦略
 
-service 層は in-memory mock で仕様ベースに単体テストする。repository 層は **Testcontainers で postgres:16-alpine を起動して実 PostgreSQL に対して検証する**。理由:
+usecase 層は in-memory mock で仕様ベースに単体テストする。repository 層は **Testcontainers で postgres:16-alpine を起動して実 PostgreSQL に対して検証する**。理由:
 
 - `pgxpool.Pool.Query` はコンパイル時のカラム名チェックがなく、SQL 誤りは実 DB でしか検出できない
 - `deck_cards` の `ON DELETE CASCADE`、`player_cards` の UPSERT (`ON CONFLICT ... DO UPDATE`)、`processed_events` の冪等性ガードなど、SQL レイヤーの仕様は実 DB でしか検証できない
@@ -137,11 +137,12 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 
 運用上の注意点のみ:
 
+- **`PORT`**: 起動ポート。未設定で起動不可
 - **`ENV`**: `dev` / `stg` / `prod` のいずれか。未設定で起動不可。`prod` / `stg` は Cloud Logging 互換の JSON slog、`dev` はテキスト slog にルーティングする
-- **`DATABASE_URL`**: card スキーマへの接続文字列。未設定で起動不可
+- **`DATABASE_CONN`**: card スキーマへの接続文字列。未設定で起動不可
 - **`PUBSUB_PROJECT_ID`**: card は `faction-purchased` / `player-onboarded` subscriber を持つため必須
-- **`FACTION_PURCHASED_SUBSCRIPTION`**: 未設定時は `"faction-purchased-card-sub"` を使用。本番以外で別名を使う場合に上書き
-- **`PLAYER_ONBOARDED_SUBSCRIPTION`**: 未設定時は `"player-onboarded-card-sub"` を使用。本番以外で別名を使う場合に上書き
+- **`FACTION_PURCHASED_SUBSCRIPTION`**: faction-purchased subscription 名。未設定で起動不可
+- **`PLAYER_ONBOARDED_SUBSCRIPTION`**: player-onboarded subscription 名。未設定で起動不可
 
 ### カードデータ変更時
 

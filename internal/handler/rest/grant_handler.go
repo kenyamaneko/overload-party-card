@@ -5,17 +5,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/kenyamaneko/overload-party-card/internal/service"
+	"github.com/kenyamaneko/overload-party-card/internal/usecase"
 )
 
 // GrantHandler はカードパック配布の REST エンドポイントを処理します。
 type GrantHandler struct {
-	grantService *service.GrantService
+	grantInteractor *usecase.GrantInteractor
 }
 
 // NewGrantHandler は GrantHandler を生成します。
-func NewGrantHandler(grantService *service.GrantService) *GrantHandler {
-	return &GrantHandler{grantService: grantService}
+func NewGrantHandler(grantInteractor *usecase.GrantInteractor) *GrantHandler {
+	return &GrantHandler{grantInteractor: grantInteractor}
 }
 
 type grantPackRequest struct {
@@ -40,7 +40,7 @@ func (h *GrantHandler) GrantInitialPack(c *gin.Context) {
 		return
 	}
 
-	granted, err := h.grantService.GrantInitialPack(c.Request.Context(), playerID, req.Faction)
+	granted, err := h.grantInteractor.GrantInitialPack(c.Request.Context(), playerID, req.Faction)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -62,7 +62,7 @@ func (h *GrantHandler) GrantFactionPack(c *gin.Context) {
 		return
 	}
 
-	granted, err := h.grantService.GrantFactionPack(c.Request.Context(), playerID, req.Faction)
+	granted, err := h.grantInteractor.GrantFactionPack(c.Request.Context(), playerID, req.Faction)
 	if err != nil {
 		respondError(c, err)
 		return

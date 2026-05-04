@@ -3,13 +3,12 @@ package port
 import (
 	"context"
 
-	"github.com/kenyamaneko/overload-party-card/internal/model"
-	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
+	"github.com/kenyamaneko/overload-party-card/internal/domain"
 )
 
 // CardRepo はカード定義の永続化を抽象化するインターフェースです。
 type CardRepo interface {
-	FindAll(ctx context.Context) ([]*apicard.CardDefinition, error)
+	FindAll(ctx context.Context) ([]*domain.Card, error)
 	// FindCardIDsByFactions は指定ファクション群に属する有効カードの card_id を返します。
 	// 配布対象カードをハードコードではなく card_definitions に委ねるためのメソッドです。
 	FindCardIDsByFactions(ctx context.Context, factions []string) ([]string, error)
@@ -17,7 +16,7 @@ type CardRepo interface {
 
 // PlayerCardRepo はプレイヤー所持カードの永続化を抽象化するインターフェースです。
 type PlayerCardRepo interface {
-	GetPlayerCards(ctx context.Context, playerID string) ([]*model.PlayerCard, error)
+	GetPlayerCards(ctx context.Context, playerID string) ([]*domain.PlayerCard, error)
 	// AddCards は UPSERT-with-add セマンティクスで所持カードを追加します。
 	// 戻り値は追加されたコピー総数（= len(cardIDs) * countPerCard）です。
 	AddCards(ctx context.Context, playerID string, cardIDs []string, countPerCard int) (int, error)
@@ -31,10 +30,13 @@ type ProcessedEventRepo interface {
 
 // DeckRepo はデッキの永続化を抽象化するインターフェースです。
 type DeckRepo interface {
-	Create(ctx context.Context, deck *apicard.Deck, cards []apicard.DeckCard) error
-	FindByPlayerID(ctx context.Context, playerID string) ([]*apicard.Deck, error)
-	FindByID(ctx context.Context, playerID string, deckID int64) (*apicard.Deck, error)
-	GetDeckCards(ctx context.Context, playerID string, deckID int64) ([]apicard.DeckCard, error)
-	Update(ctx context.Context, deck *apicard.Deck, cards []apicard.DeckCard) error
+	// Create は decks 行と deck_cards 行を 1 トランザクションで挿入し、
+	// 採番された deck_id を返します。入力は mutation しません。
+	Create(ctx context.Context, deck domain.Deck, entries []domain.DeckCardEntry) (int64, error)
+	FindByPlayerID(ctx context.Context, playerID string) ([]*domain.Deck, error)
+	FindByID(ctx context.Context, playerID string, deckID int64) (*domain.Deck, error)
+	GetDeckCards(ctx context.Context, playerID string, deckID int64) ([]domain.DeckCard, error)
+	// Update はデッキを更新し deck_cards を差し替えます。入力は mutation しません。
+	Update(ctx context.Context, deck domain.Deck, entries []domain.DeckCardEntry) error
 	Delete(ctx context.Context, playerID string, deckID int64) error
 }

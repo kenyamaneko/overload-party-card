@@ -13,7 +13,7 @@ import (
 )
 
 // Fn 未設定の endpoint は既定応答を返す (空配列 or 空 struct + 200、または 204)。
-func TestServer_DefaultResponses(t *testing.T) {
+func TestNewServer(t *testing.T) {
 	tests := []struct {
 		name       string
 		method     string
@@ -49,7 +49,7 @@ func TestServer_DefaultResponses(t *testing.T) {
 }
 
 // CreateDeckFn は typed request を受け取って typed response を返せる。
-func TestServer_CreateDeckFn_RoundTrip(t *testing.T) {
+func TestCreateDeckFn(t *testing.T) {
 	srv := apicardserverfake.NewServer()
 	defer srv.Close()
 
@@ -80,7 +80,7 @@ func TestServer_CreateDeckFn_RoundTrip(t *testing.T) {
 
 // ValidateDeckForBattleFn で 400 ErrDeckInvalid を擬似できる。cardclient 側が
 // status code + error body message から ErrDeckInvalid を生成するための契約を固定する。
-func TestServer_ValidateDeckForBattleFn_CanReturn400(t *testing.T) {
+func TestValidateDeckForBattleFn(t *testing.T) {
 	srv := apicardserverfake.NewServer()
 	defer srv.Close()
 
@@ -102,7 +102,7 @@ func TestServer_ValidateDeckForBattleFn_CanReturn400(t *testing.T) {
 }
 
 // GetDeckFn で DeckWithCardsResponse を返せる (wrapper 型の round trip)。
-func TestServer_GetDeckFn_ReturnsWrappedResponse(t *testing.T) {
+func TestGetDeckFn(t *testing.T) {
 	srv := apicardserverfake.NewServer()
 	defer srv.Close()
 

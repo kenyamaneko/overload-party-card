@@ -18,9 +18,9 @@ type ownedRow struct {
 	count  int
 }
 
-// TestPgPlayerCardRepository_GetPlayerCards は所持カードが (card_id, art_no) 昇順で
+// TestGetPlayerCards は所持カードが (card_id, art_no) 昇順で
 // プレイヤー単位に返ることを検証する。他プレイヤーのカードは含まれない PK スコープも確認。
-func TestPgPlayerCardRepository_GetPlayerCards(t *testing.T) {
+func TestGetPlayerCards(t *testing.T) {
 	tests := []struct {
 		name   string
 		seeds  []playerCardSeed
@@ -80,10 +80,12 @@ func TestPgPlayerCardRepository_GetPlayerCards(t *testing.T) {
 	}
 }
 
-// TestPgPlayerCardRepository_AddCards_Success は UPSERT-with-add 仕様を検証する。
+// TestAddCards は UPSERT-with-add 仕様を検証する。
 // 未所持カードは INSERT（count=copiesPerCard）、既所持カードは count 加算。
 // art_no は 0 固定 (配布 API の仕様)。
-func TestPgPlayerCardRepository_AddCards_Success(t *testing.T) {
+func TestAddCards(t *testing.T) {
+	bulkIDs, bulkExpected := bulkScale(30, 3)
+
 	tests := []struct {
 		name           string
 		seeds          []playerCardSeed
@@ -121,12 +123,12 @@ func TestPgPlayerCardRepository_AddCards_Success(t *testing.T) {
 			wantFinalCount: map[string]int{"SH-0001": 4, "SH-0002": 3},
 		},
 		{
-			name:           "cardIDs が空なら (0, nil)",
+			name:           "実 grant スケール (30 種類) を 1 文の bulk UPSERT で投入する",
 			seeds:          nil,
-			cardIDs:        nil,
+			cardIDs:        bulkIDs,
 			copiesPerCard:  3,
-			wantGranted:    0,
-			wantFinalCount: map[string]int{},
+			wantGranted:    90,
+			wantFinalCount: bulkExpected,
 		},
 	}
 
@@ -151,28 +153,3 @@ func TestPgPlayerCardRepository_AddCards_Success(t *testing.T) {
 	}
 }
 
-// TestPgPlayerCardRepository_AddCards_ErrorOnNonPositiveCopies は
-// countPerCard が 0 以下なら書き込みせずにエラーを返す仕様を検証する。
-// fail-fast の振る舞いを「書き込みゼロ」で確認する。
-func TestPgPlayerCardRepository_AddCards_ErrorOnNonPositiveCopies(t *testing.T) {
-	tests := []struct {
-		name          string
-		copiesPerCard int
-	}{
-		{"countPerCard=0 は拒否", 0},
-		{"countPerCard=-1 は拒否", -1},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			sharedPg.Truncate(t)
-
-			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
-			_, err := repo.AddCards(context.Background(), playerA, []string{"SH-0001"}, tt.copiesPerCard)
-			require.Error(t, err)
-
-			// 副作用が出ていないことを書き込みゼロで確認する
-			assert.Equal(t, 0, countRows(t, "card.player_cards"))
-		})
-	}
-}

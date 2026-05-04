@@ -12,10 +12,10 @@ import (
 	"github.com/kenyamaneko/overload-party-card/internal/repository"
 )
 
-// TestPgProcessedEventRepository_Insert は冪等性ガードの仕様を検証する。
+// TestInsert は冪等性ガードの仕様を検証する。
 // 新規 event_id は (true, nil) を返し、同一 event_id の再挿入は (false, nil) を返す。
 // ON CONFLICT DO NOTHING RETURNING で pgx.ErrNoRows が潰されていることも間接的に確認する。
-func TestPgProcessedEventRepository_Insert(t *testing.T) {
+func TestInsert(t *testing.T) {
 	tests := []struct {
 		name         string
 		preInsert    []string // 先に insert しておく event_id 群

@@ -5,12 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
+	"github.com/kenyamaneko/overload-party-card/internal/domain"
 	"github.com/kenyamaneko/overload-party-card/internal/port"
 )
 
@@ -27,13 +26,15 @@ func NewPgDeckRepository(pool *pgxpool.Pool) *PgDeckRepository {
 }
 
 // Create はデッキとそのカード構成をトランザクション内で作成します。
-func (r *PgDeckRepository) Create(ctx context.Context, deck *apicard.Deck, cards []apicard.DeckCard) error {
+// 採番された deck_id を返します。入力は mutation しません。
+func (r *PgDeckRepository) Create(ctx context.Context, deck domain.Deck, entries []domain.DeckCardEntry) (int64, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
+		return 0, fmt.Errorf("begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	var deckID int64
 	err = tx.QueryRow(ctx,
 		`INSERT INTO decks (player_id, deck_name, playmat_no, sleeve_no, created_at, updated_at)
 		 VALUES ($1,$2,$3,$4,$5,$6) RETURNING deck_id`,
@@ -43,23 +44,23 @@ func (r *PgDeckRepository) Create(ctx context.Context, deck *apicard.Deck, cards
 		deck.SleeveNo,
 		deck.CreatedAt,
 		deck.UpdatedAt,
-	).Scan(&deck.DeckID)
+	).Scan(&deckID)
 	if err != nil {
-		return fmt.Errorf("insert deck: %w", err)
+		return 0, fmt.Errorf("insert deck: %w", err)
 	}
 
-	for i := range cards {
-		cards[i].DeckID = deck.DeckID
-	}
-
+	cards := buildDeckCards(deck.PlayerID, deckID, entries)
 	if err := bulkInsertDeckCards(ctx, tx, cards); err != nil {
-		return err
+		return 0, err
 	}
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return 0, fmt.Errorf("commit tx: %w", err)
+	}
+	return deckID, nil
 }
 
 // FindByPlayerID は指定プレイヤーの全デッキを返します。
-func (r *PgDeckRepository) FindByPlayerID(ctx context.Context, playerID string) ([]*apicard.Deck, error) {
+func (r *PgDeckRepository) FindByPlayerID(ctx context.Context, playerID string) ([]*domain.Deck, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT player_id, deck_id, deck_name, playmat_no, sleeve_no, created_at, updated_at
 		 FROM decks WHERE player_id = $1 ORDER BY updated_at DESC`,
@@ -70,7 +71,7 @@ func (r *PgDeckRepository) FindByPlayerID(ctx context.Context, playerID string) 
 	}
 	defer rows.Close()
 
-	decks := make([]*apicard.Deck, 0, 8)
+	decks := make([]*domain.Deck, 0, 8)
 	for rows.Next() {
 		d, err := scanDeck(rows)
 		if err != nil {
@@ -85,7 +86,7 @@ func (r *PgDeckRepository) FindByPlayerID(ctx context.Context, playerID string) 
 }
 
 // FindByID は指定プレイヤーの指定デッキを返します。
-func (r *PgDeckRepository) FindByID(ctx context.Context, playerID string, deckID int64) (*apicard.Deck, error) {
+func (r *PgDeckRepository) FindByID(ctx context.Context, playerID string, deckID int64) (*domain.Deck, error) {
 	row := r.pool.QueryRow(ctx,
 		`SELECT player_id, deck_id, deck_name, playmat_no, sleeve_no, created_at, updated_at
 		 FROM decks WHERE player_id = $1 AND deck_id = $2`,
@@ -103,7 +104,7 @@ func (r *PgDeckRepository) FindByID(ctx context.Context, playerID string, deckID
 }
 
 // GetDeckCards は指定デッキのカード構成を返します。
-func (r *PgDeckRepository) GetDeckCards(ctx context.Context, playerID string, deckID int64) ([]apicard.DeckCard, error) {
+func (r *PgDeckRepository) GetDeckCards(ctx context.Context, playerID string, deckID int64) ([]domain.DeckCard, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT player_id, deck_id, card_id, art_no, count
 		 FROM deck_cards WHERE player_id = $1 AND deck_id = $2`,
@@ -114,9 +115,9 @@ func (r *PgDeckRepository) GetDeckCards(ctx context.Context, playerID string, de
 	}
 	defer rows.Close()
 
-	cards := make([]apicard.DeckCard, 0, 16)
+	cards := make([]domain.DeckCard, 0, 16)
 	for rows.Next() {
-		var dc apicard.DeckCard
+		var dc domain.DeckCard
 		if err := rows.Scan(&dc.PlayerID, &dc.DeckID, &dc.CardID, &dc.ArtNo, &dc.Count); err != nil {
 			return nil, fmt.Errorf("scan deck card: %w", err)
 		}
@@ -129,7 +130,8 @@ func (r *PgDeckRepository) GetDeckCards(ctx context.Context, playerID string, de
 }
 
 // Update はデッキとそのカード構成をトランザクション内で更新します。
-func (r *PgDeckRepository) Update(ctx context.Context, deck *apicard.Deck, cards []apicard.DeckCard) error {
+// 入力は mutation しません。updated_at は呼び出し側が事前に設定して渡します。
+func (r *PgDeckRepository) Update(ctx context.Context, deck domain.Deck, entries []domain.DeckCardEntry) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
@@ -144,7 +146,6 @@ func (r *PgDeckRepository) Update(ctx context.Context, deck *apicard.Deck, cards
 		return fmt.Errorf("delete old deck cards: %w", err)
 	}
 
-	deck.UpdatedAt = time.Now()
 	_, err = tx.Exec(ctx,
 		`UPDATE decks SET deck_name = $1, playmat_no = $2, sleeve_no = $3, updated_at = $4
 		 WHERE player_id = $5 AND deck_id = $6`,
@@ -159,6 +160,7 @@ func (r *PgDeckRepository) Update(ctx context.Context, deck *apicard.Deck, cards
 		return fmt.Errorf("update deck: %w", err)
 	}
 
+	cards := buildDeckCards(deck.PlayerID, deck.DeckID, entries)
 	if err := bulkInsertDeckCards(ctx, tx, cards); err != nil {
 		return err
 	}
@@ -177,8 +179,8 @@ func (r *PgDeckRepository) Delete(ctx context.Context, playerID string, deckID i
 	return nil
 }
 
-func scanDeck(row pgx.Row) (*apicard.Deck, error) {
-	var d apicard.Deck
+func scanDeck(row pgx.Row) (*domain.Deck, error) {
+	var d domain.Deck
 	err := row.Scan(
 		&d.PlayerID,
 		&d.DeckID,
@@ -194,7 +196,23 @@ func scanDeck(row pgx.Row) (*apicard.Deck, error) {
 	return &d, nil
 }
 
-func bulkInsertDeckCards(ctx context.Context, db dbtx, cards []apicard.DeckCard) error {
+// buildDeckCards は entries を deck_cards 行 (PlayerID, DeckID 付き) に変換します。
+// 入力 slice は読み取り専用、結果は新規 slice として返します。
+func buildDeckCards(playerID string, deckID int64, entries []domain.DeckCardEntry) []domain.DeckCard {
+	cards := make([]domain.DeckCard, len(entries))
+	for i, e := range entries {
+		cards[i] = domain.DeckCard{
+			PlayerID: playerID,
+			DeckID:   deckID,
+			CardID:   e.CardID,
+			ArtNo:    e.ArtNo,
+			Count:    e.Count,
+		}
+	}
+	return cards
+}
+
+func bulkInsertDeckCards(ctx context.Context, db dbtx, cards []domain.DeckCard) error {
 	if len(cards) == 0 {
 		return nil
 	}

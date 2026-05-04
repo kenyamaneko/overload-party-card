@@ -19,7 +19,7 @@ import (
 	"github.com/kenyamaneko/overload-party-card/internal/handler/rest"
 	"github.com/kenyamaneko/overload-party-card/internal/repository"
 	"github.com/kenyamaneko/overload-party-card/internal/router"
-	"github.com/kenyamaneko/overload-party-card/internal/service"
+	"github.com/kenyamaneko/overload-party-card/internal/usecase"
 )
 
 func main() {
@@ -58,15 +58,15 @@ func run() error {
 		return fmt.Errorf("load card cache: %w", err)
 	}
 
-	cardSvc := service.NewCardService(cardRepo, playerCardRepo)
-	deckSvc := service.NewDeckService(deckRepo, playerCardRepo, cardCache)
-	playerCardSvc := service.NewPlayerCardService(playerCardRepo, cardCache)
-	grantSvc := service.NewGrantService(cardRepo, playerCardRepo)
+	cardInteractor := usecase.NewCardInteractor(cardRepo, playerCardRepo)
+	deckInteractor := usecase.NewDeckInteractor(deckRepo, playerCardRepo, cardCache)
+	playerCardInteractor := usecase.NewPlayerCardInteractor(playerCardRepo, cardCache)
+	grantInteractor := usecase.NewGrantInteractor(cardRepo, playerCardRepo)
 
-	cardH := rest.NewCardHandler(cardSvc)
-	deckH := rest.NewDeckHandler(deckSvc)
-	playerCardH := rest.NewPlayerCardHandler(playerCardSvc)
-	grantH := rest.NewGrantHandler(grantSvc)
+	cardH := rest.NewCardHandler(cardInteractor)
+	deckH := rest.NewDeckHandler(deckInteractor)
+	playerCardH := rest.NewPlayerCardHandler(playerCardInteractor)
+	grantH := rest.NewGrantHandler(grantInteractor)
 
 	r := router.New(cardH, deckH, playerCardH, grantH)
 
@@ -90,8 +90,8 @@ func run() error {
 		}
 	}()
 
-	factionSub := pubsubadapter.NewFactionPurchasedSubscriber(factionStream, grantSvc, eventRepo)
-	onboardedSub := pubsubadapter.NewPlayerOnboardedSubscriber(onboardedStream, grantSvc, eventRepo)
+	factionSub := pubsubadapter.NewFactionPurchasedSubscriber(factionStream, grantInteractor, eventRepo)
+	onboardedSub := pubsubadapter.NewPlayerOnboardedSubscriber(onboardedStream, grantInteractor, eventRepo)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),

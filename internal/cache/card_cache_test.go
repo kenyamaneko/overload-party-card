@@ -27,11 +27,11 @@ func TestLoadFromBytes_CardCount(t *testing.T) {
 	require.NotZero(t, cc.Count(), "no cards loaded")
 }
 
-// TestResourceLabel_PresenceMatchesType は、resource_label の有無が
+// TestLoadFromBytes_ResourceLabelInvariant は、resource_label の有無が
 // CardType の resource/support 区分と一致することを確認します。
 // 1 枚ごとに「リソース種別なら label あり／それ以外なら label なし」を
 // 等式で検証することで、if による分岐フィルタを不要にしています。
-func TestResourceLabel_PresenceMatchesType(t *testing.T) {
+func TestLoadFromBytes_ResourceLabelInvariant(t *testing.T) {
 	cc := loadTestCache(t)
 	for cardID, card := range cc.All() {
 		isResource := isResourceType(card.CardType)

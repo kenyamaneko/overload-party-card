@@ -1,4 +1,4 @@
-package service
+package usecase
 
 import (
 	"context"
@@ -10,8 +10,7 @@ import (
 
 	gamedesign "github.com/kenyamaneko/overload-party-common/packages/game-design-constants"
 
-	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
-	"github.com/kenyamaneko/overload-party-card/internal/model"
+	"github.com/kenyamaneko/overload-party-card/internal/domain"
 	"github.com/kenyamaneko/overload-party-card/internal/port"
 )
 
@@ -30,7 +29,7 @@ type fakeGrantCardRepo struct {
 	retErr      error
 }
 
-func (f *fakeGrantCardRepo) FindAll(_ context.Context) ([]*apicard.CardDefinition, error) {
+func (f *fakeGrantCardRepo) FindAll(_ context.Context) ([]*domain.Card, error) {
 	return nil, nil
 }
 
@@ -51,7 +50,7 @@ type fakeGrantPlayerCardRepo struct {
 	called          bool
 }
 
-func (f *fakeGrantPlayerCardRepo) GetPlayerCards(_ context.Context, _ string) ([]*model.PlayerCard, error) {
+func (f *fakeGrantPlayerCardRepo) GetPlayerCards(_ context.Context, _ string) ([]*domain.PlayerCard, error) {
 	return nil, nil
 }
 
@@ -78,11 +77,11 @@ type grantCase struct {
 	wantErrIs    error // nil なら成功ケース
 }
 
-// TestGrantService_GrantInitialPack は「初期配布は選択ファクション + Neutral」
+// TestGrantInitialPack は「初期配布は選択ファクション + Neutral」
 // という配布仕様を検証する。
 // faction pack との責務分離（Neutral 同梱の有無）が仕様上の差分なので
 // FindCardIDsByFactions に渡された factions を仕様として assert する。
-func TestGrantService_GrantInitialPack(t *testing.T) {
+func TestGrantInitialPack(t *testing.T) {
 	tests := []grantCase{
 		{
 			name:         "SHE 選択時は SHE と Neutral の card_id を引いて配布する",
@@ -113,6 +112,12 @@ func TestGrantService_GrantInitialPack(t *testing.T) {
 			cardRepoErr: errGrantTestDBDown,
 			wantErrIs:   errGrantTestDBDown,
 		},
+		{
+			name:        "active カード 0 件なら ErrCardMasterEmpty を返し AddCards を呼ばない",
+			faction:     gamedesign.FactionSHE,
+			repoCardIDs: nil,
+			wantErrIs:   port.ErrCardMasterEmpty,
+		},
 	}
 
 	for _, tt := range tests {
@@ -122,11 +127,11 @@ func TestGrantService_GrantInitialPack(t *testing.T) {
 	}
 }
 
-// TestGrantService_GrantFactionPack は「faction 購入配布は選択ファクションのみ
+// TestGrantFactionPack は「faction 購入配布は選択ファクションのみ
 // (Neutral 無し)」という配布仕様を検証する。
 // initial pack との唯一の責務差分が「Neutral を含めないこと」なので
 // FindCardIDsByFactions に渡された factions にその仕様を固定する。
-func TestGrantService_GrantFactionPack(t *testing.T) {
+func TestGrantFactionPack(t *testing.T) {
 	tests := []grantCase{
 		{
 			name:         "SHE 購入時は SHE のみの card_id を引いて配布する (Neutral 無し)",
@@ -157,6 +162,12 @@ func TestGrantService_GrantFactionPack(t *testing.T) {
 			cardRepoErr: errGrantTestDBDown,
 			wantErrIs:   errGrantTestDBDown,
 		},
+		{
+			name:        "active カード 0 件なら ErrCardMasterEmpty を返し AddCards を呼ばない",
+			faction:     gamedesign.FactionSHE,
+			repoCardIDs: nil,
+			wantErrIs:   port.ErrCardMasterEmpty,
+		},
 	}
 
 	for _, tt := range tests {
@@ -166,15 +177,15 @@ func TestGrantService_GrantFactionPack(t *testing.T) {
 	}
 }
 
-// grantInvoker は initial / faction それぞれの GrantService メソッドを
+// grantInvoker は initial / faction それぞれの GrantInteractor メソッドを
 // 同じテストランナーから呼び出すための薄いアダプタ。
-type grantInvoker func(svc *GrantService, ctx context.Context, playerID, faction string) (int, error)
+type grantInvoker func(svc *GrantInteractor, ctx context.Context, playerID, faction string) (int, error)
 
-func grantInitialPackInvoker(svc *GrantService, ctx context.Context, playerID, faction string) (int, error) {
+func grantInitialPackInvoker(svc *GrantInteractor, ctx context.Context, playerID, faction string) (int, error) {
 	return svc.GrantInitialPack(ctx, playerID, faction)
 }
 
-func grantFactionPackInvoker(svc *GrantService, ctx context.Context, playerID, faction string) (int, error) {
+func grantFactionPackInvoker(svc *GrantInteractor, ctx context.Context, playerID, faction string) (int, error) {
 	return svc.GrantFactionPack(ctx, playerID, faction)
 }
 
@@ -185,7 +196,7 @@ func runGrantCase(t *testing.T, tt grantCase, playerID string, invoke grantInvok
 	t.Helper()
 	cardRepo := &fakeGrantCardRepo{retIDs: tt.repoCardIDs, retErr: tt.cardRepoErr}
 	pcRepo := &fakeGrantPlayerCardRepo{retAdded: tt.addedReturn}
-	svc := NewGrantService(cardRepo, pcRepo)
+	svc := NewGrantInteractor(cardRepo, pcRepo)
 
 	got, err := invoke(svc, context.Background(), playerID, tt.faction)
 

@@ -5,17 +5,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/kenyamaneko/overload-party-card/internal/service"
+	"github.com/kenyamaneko/overload-party-card/internal/usecase"
 )
 
 // PlayerCardHandler はプレイヤー所持カードの REST エンドポイントを処理します。
 type PlayerCardHandler struct {
-	playerCardService *service.PlayerCardService
+	playerCardInteractor *usecase.PlayerCardInteractor
 }
 
 // NewPlayerCardHandler は PlayerCardHandler を生成します。
-func NewPlayerCardHandler(playerCardService *service.PlayerCardService) *PlayerCardHandler {
-	return &PlayerCardHandler{playerCardService: playerCardService}
+func NewPlayerCardHandler(playerCardInteractor *usecase.PlayerCardInteractor) *PlayerCardHandler {
+	return &PlayerCardHandler{playerCardInteractor: playerCardInteractor}
 }
 
 // GetPlayerCards はプレイヤーの所持カード一覧を返します。
@@ -25,7 +25,7 @@ func (h *PlayerCardHandler) GetPlayerCards(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "playerId is required"})
 		return
 	}
-	cards, err := h.playerCardService.GetPlayerCards(c.Request.Context(), playerID)
+	cards, err := h.playerCardInteractor.GetPlayerCards(c.Request.Context(), playerID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -29,14 +29,14 @@ func (f *fakeInitialGranter) GrantInitialPack(_ context.Context, playerID, facti
 	return 6, nil
 }
 
-// TestPlayerOnboardedSubscriber_Consumes は「オンボーディング完了時に初期パック
+// TestPlayerOnboardedSubscriber_Start は「オンボーディング完了時に初期パック
 // (initial_faction_id + Neutral) を 1 イベント単位で冪等に配布する」仕様を
 // Start() → stream.Consume → process の経路で固定する。
 //
 // 契約検証は apiscenariofake 経由で scenario 側の publish 型をそのまま使う
 // (scenario が schema を変えたら card のテストが compile / 実行で破綻するように
 // 設計し、乖離を CI で検知する)。
-func TestPlayerOnboardedSubscriber_Consumes(t *testing.T) {
+func TestPlayerOnboardedSubscriber_Start(t *testing.T) {
 	publishValid := func(ctx context.Context, pub *apiscenariofake.Publisher, _ *apiscenariofake.Broker) {
 		_ = apiscenariofake.PublishPlayerOnboarded(ctx, pub, apiscenario.PlayerOnboardedEvent{
 			PlayerID:         "player-1",

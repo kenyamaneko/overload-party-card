@@ -13,4 +13,7 @@ var (
 	ErrRestrictionExceeded = errors.New("restriction exceeded")
 	// ErrInvalidArgument はリクエストパラメータのバリデーション失敗時に返します。
 	ErrInvalidArgument = errors.New("invalid argument")
+	// ErrCardMasterEmpty は配布対象 faction に有効なカードが 1 件も存在しない場合に
+	// 返します。カードマスターの不整合を示す運用エラーです。
+	ErrCardMasterEmpty = errors.New("card master empty for requested factions")
 )

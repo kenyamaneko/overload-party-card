@@ -33,20 +33,21 @@ type Config struct {
 // 未設定の必須環境変数があれば即エラーで返し、デフォルトへの暗黙 fallback は行いません。
 func FromEnv() (*Config, error) {
 	cfg := &Config{
-		Port:                         9003,
 		DatabaseConn:                 os.Getenv("DATABASE_CONN"),
 		PubsubProjectID:              os.Getenv("PUBSUB_PROJECT_ID"),
-		FactionPurchasedSubscription: getEnv("FACTION_PURCHASED_SUBSCRIPTION", "faction-purchased-card-sub"),
-		PlayerOnboardedSubscription:  getEnv("PLAYER_ONBOARDED_SUBSCRIPTION", "player-onboarded-card-sub"),
+		FactionPurchasedSubscription: os.Getenv("FACTION_PURCHASED_SUBSCRIPTION"),
+		PlayerOnboardedSubscription:  os.Getenv("PLAYER_ONBOARDED_SUBSCRIPTION"),
 	}
 
-	if raw := os.Getenv("PORT"); raw != "" {
-		n, err := strconv.Atoi(raw)
-		if err != nil {
-			return nil, fmt.Errorf("config: PORT %q: %w", raw, err)
-		}
-		cfg.Port = n
+	rawPort := os.Getenv("PORT")
+	if rawPort == "" {
+		return nil, fmt.Errorf("config: PORT is required")
 	}
+	n, err := strconv.Atoi(rawPort)
+	if err != nil {
+		return nil, fmt.Errorf("config: PORT %q: %w", rawPort, err)
+	}
+	cfg.Port = n
 
 	envRaw := os.Getenv("ENV")
 	if envRaw == "" {
@@ -65,14 +66,11 @@ func FromEnv() (*Config, error) {
 	if cfg.PubsubProjectID == "" {
 		return nil, fmt.Errorf("config: PUBSUB_PROJECT_ID is required (card subscribes to faction-purchased / player-onboarded events)")
 	}
-	return cfg, nil
-}
-
-// getEnv は未設定時に fallback を返すヘルパです。
-// fallback は subscription 名のリテラル (SSoT は overload-party-infra の Terraform) を直接指定します。
-func getEnv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
+	if cfg.FactionPurchasedSubscription == "" {
+		return nil, fmt.Errorf("config: FACTION_PURCHASED_SUBSCRIPTION is required")
 	}
-	return fallback
+	if cfg.PlayerOnboardedSubscription == "" {
+		return nil, fmt.Errorf("config: PLAYER_ONBOARDED_SUBSCRIPTION is required")
+	}
+	return cfg, nil
 }

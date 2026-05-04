@@ -1,22 +1,22 @@
-package service
+package usecase
 
 import (
 	"context"
 	"fmt"
 
-	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 	"github.com/kenyamaneko/overload-party-card/internal/port"
+	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 )
 
-// CardService はカードマスターの読み取り操作を提供します。
-type CardService struct {
+// CardInteractor はカードマスターの読み取り操作を提供します。
+type CardInteractor struct {
 	cardRepo       port.CardRepo
 	playerCardRepo port.PlayerCardRepo
 }
 
-// NewCardService は CardService を生成します。
-func NewCardService(cardRepo port.CardRepo, playerCardRepo port.PlayerCardRepo) *CardService {
-	return &CardService{cardRepo: cardRepo, playerCardRepo: playerCardRepo}
+// NewCardInteractor は CardInteractor を生成します。
+func NewCardInteractor(cardRepo port.CardRepo, playerCardRepo port.PlayerCardRepo) *CardInteractor {
+	return &CardInteractor{cardRepo: cardRepo, playerCardRepo: playerCardRepo}
 }
 
 // CardWithOwnership はカード定義にプレイヤーの所持状態を付与した型です。
@@ -25,8 +25,8 @@ type CardWithOwnership struct {
 	IsOwned bool `json:"is_owned"`
 }
 
-// GetAllCards は全カードにプレイヤーの所持状態を付与して返します。
-func (s *CardService) GetAllCards(ctx context.Context, playerID string) ([]*CardWithOwnership, error) {
+// ListCardsWithOwnership は全カードにプレイヤーの所持状態を付与して返します。
+func (s *CardInteractor) ListCardsWithOwnership(ctx context.Context, playerID string) ([]*CardWithOwnership, error) {
 	cards, err := s.cardRepo.FindAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get all cards: %w", err)
@@ -45,19 +45,19 @@ func (s *CardService) GetAllCards(ctx context.Context, playerID string) ([]*Card
 	result := make([]*CardWithOwnership, len(cards))
 	for i, card := range cards {
 		result[i] = &CardWithOwnership{
-			CardDefinition: card,
+			CardDefinition: cardToAPI(card),
 			IsOwned:        owned[card.CardID],
 		}
 	}
 	return result, nil
 }
 
-// FindAllRaw はカードマスター全件を返します。
+// ListCards はカードマスター全件を返します。
 // battle / gateway が起動時にインメモリキャッシュを構築するために使用します。
-func (s *CardService) FindAllRaw(ctx context.Context) ([]*apicard.CardDefinition, error) {
+func (s *CardInteractor) ListCards(ctx context.Context) ([]*apicard.CardDefinition, error) {
 	cards, err := s.cardRepo.FindAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("find all raw cards: %w", err)
 	}
-	return cards, nil
+	return cardsToAPI(cards), nil
 }

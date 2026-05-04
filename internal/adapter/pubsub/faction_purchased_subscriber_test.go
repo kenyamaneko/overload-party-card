@@ -29,14 +29,14 @@ func (f *fakeFactionGranter) GrantFactionPack(_ context.Context, playerID, facti
 	return 3, nil
 }
 
-// TestFactionPurchasedSubscriber_Consumes は「shop 購入起因の faction パック配布
+// TestFactionPurchasedSubscriber_Start は「shop 購入起因の faction パック配布
 // (Neutral 含まず) を 1 イベント単位で冪等に処理する」仕様を Start() →
 // stream.Consume → process の経路で固定する。
 //
 // 契約検証は apishopfake 経由で shop 側の publish 型をそのまま使う
 // (shop が schema を変えたら card のテストが compile / 実行で破綻するように
 // 設計し、乖離を CI で検知する)。
-func TestFactionPurchasedSubscriber_Consumes(t *testing.T) {
+func TestFactionPurchasedSubscriber_Start(t *testing.T) {
 	publishValid := func(ctx context.Context, pub *apishopfake.Publisher, _ *apishopfake.Broker) {
 		_ = apishopfake.PublishFactionPurchased(ctx, pub, apishop.FactionPurchasedEvent{
 			PlayerID: "player-1",

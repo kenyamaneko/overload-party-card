@@ -11,7 +11,7 @@ import (
 	"github.com/kenyamaneko/overload-party-card/internal/port"
 )
 
-// initialPackGranter は GrantService の GrantInitialPack に依存する
+// initialPackGranter は GrantInteractor の GrantInitialPack に依存する
 // 最小インターフェースです。テスト時に差し替えるために抽出しています。
 type initialPackGranter interface {
 	GrantInitialPack(ctx context.Context, playerID, faction string) (int, error)
@@ -26,19 +26,19 @@ type initialPackGranter interface {
 // (player-onboarded-dlq) に寄せます。
 type PlayerOnboardedSubscriber struct {
 	stream       port.MessageStream
-	grantService initialPackGranter
+	grantInteractor initialPackGranter
 	eventRepo    port.ProcessedEventRepo
 }
 
 // NewPlayerOnboardedSubscriber は PlayerOnboardedSubscriber を生成します。
 func NewPlayerOnboardedSubscriber(
 	stream port.MessageStream,
-	grantService initialPackGranter,
+	grantInteractor initialPackGranter,
 	eventRepo port.ProcessedEventRepo,
 ) *PlayerOnboardedSubscriber {
 	return &PlayerOnboardedSubscriber{
 		stream:       stream,
-		grantService: grantService,
+		grantInteractor: grantInteractor,
 		eventRepo:    eventRepo,
 	}
 }
@@ -62,7 +62,7 @@ func (s *PlayerOnboardedSubscriber) process(ctx context.Context, data []byte) er
 		return fmt.Errorf("player-onboarded-card: unexpected event_type %q", ev.EventType)
 	}
 
-	// GrantService は独自の UPSERT を使うため同一 tx に含められない。
+	// GrantInteractor は独自の UPSERT を使うため同一 tx に含められない。
 	// processed_events INSERT は fast-path の重複適用ガードとして機能する。
 	inserted, err := s.eventRepo.Insert(ctx, ev.EventID, ev.EventType)
 	if err != nil {
@@ -74,7 +74,7 @@ func (s *PlayerOnboardedSubscriber) process(ctx context.Context, data []byte) er
 		return nil
 	}
 
-	granted, err := s.grantService.GrantInitialPack(ctx, ev.PlayerID, ev.InitialFactionID)
+	granted, err := s.grantInteractor.GrantInitialPack(ctx, ev.PlayerID, ev.InitialFactionID)
 	if err != nil {
 		slog.Error("player-onboarded-card grant failed",
 			"event_id", ev.EventID,

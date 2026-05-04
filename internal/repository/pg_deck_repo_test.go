@@ -10,32 +10,32 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/kenyamaneko/overload-party-card/internal/domain"
 	"github.com/kenyamaneko/overload-party-card/internal/port"
 	"github.com/kenyamaneko/overload-party-card/internal/repository"
-	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 )
 
-// TestPgDeckRepository_Create はデッキヘッダと deck_cards を同一 tx で書き込む仕様を検証する。
+// TestCreate はデッキヘッダと deck_cards を同一 tx で書き込む仕様を検証する。
 // - deck_id は GENERATED ALWAYS AS IDENTITY で自動採番される
 // - 渡された cards の deck_id は自動で埋められる
 // - cards が空でも deck 行だけが作られる
-func TestPgDeckRepository_Create(t *testing.T) {
+func TestCreate(t *testing.T) {
 	tests := []struct {
 		name      string
-		cards     []apicard.DeckCard
+		entries   []domain.DeckCardEntry
 		wantCards int
 	}{
 		{
 			name: "deck + 複数 cards を同時に作成",
-			cards: []apicard.DeckCard{
-				{PlayerID: playerA, CardID: "SH-0001", ArtNo: 0, Count: 3},
-				{PlayerID: playerA, CardID: "SH-0002", ArtNo: 0, Count: 2},
+			entries: []domain.DeckCardEntry{
+				{CardID: "SH-0001", ArtNo: 0, Count: 3},
+				{CardID: "SH-0002", ArtNo: 0, Count: 2},
 			},
 			wantCards: 2,
 		},
 		{
 			name:      "cards 空でも deck は作られる",
-			cards:     nil,
+			entries:   nil,
 			wantCards: 0,
 		},
 	}
@@ -47,30 +47,30 @@ func TestPgDeckRepository_Create(t *testing.T) {
 			ctx := context.Background()
 
 			now := time.Now().UTC().Truncate(time.Microsecond)
-			deck := &apicard.Deck{
+			deck := domain.Deck{
 				PlayerID:  playerA,
 				DeckName:  "Starter",
 				CreatedAt: now,
 				UpdatedAt: now,
 			}
 
-			err := repo.Create(ctx, deck, tt.cards)
+			deckID, err := repo.Create(ctx, deck, tt.entries)
 			require.NoError(t, err)
-			assert.NotZero(t, deck.DeckID, "deck_id should be auto-assigned")
+			assert.NotZero(t, deckID, "deck_id should be auto-assigned")
 
-			got, err := repo.GetDeckCards(ctx, playerA, deck.DeckID)
+			got, err := repo.GetDeckCards(ctx, playerA, deckID)
 			require.NoError(t, err)
 			assert.Len(t, got, tt.wantCards)
 			for _, dc := range got {
-				assert.Equal(t, deck.DeckID, dc.DeckID, "deck_id should propagate to deck_cards")
+				assert.Equal(t, deckID, dc.DeckID, "deck_id should propagate to deck_cards")
 			}
 		})
 	}
 }
 
-// TestPgDeckRepository_FindByPlayerID はプレイヤーのデッキが updated_at 降順で返ること、
+// TestFindByPlayerID はプレイヤーのデッキが updated_at 降順で返ること、
 // 他プレイヤーのデッキは含まれない PK スコープを検証する。
-func TestPgDeckRepository_FindByPlayerID(t *testing.T) {
+func TestFindByPlayerID(t *testing.T) {
 	tests := []struct {
 		name      string
 		setup     func(t *testing.T) []string // 戻り値: 期待される deck_name 順序 (player_A 視点、updated_at DESC)
@@ -125,8 +125,8 @@ func TestPgDeckRepository_FindByPlayerID(t *testing.T) {
 	}
 }
 
-// TestPgDeckRepository_FindByID_Success は (player_id, deck_id) で絞った取得が成功する仕様を検証する。
-func TestPgDeckRepository_FindByID_Success(t *testing.T) {
+// TestFindByID_Success は (player_id, deck_id) で絞った取得が成功する仕様を検証する。
+func TestFindByID_Success(t *testing.T) {
 	sharedPg.Truncate(t)
 	deckID := insertDeck(t, playerA, "Target Deck")
 
@@ -137,9 +137,9 @@ func TestPgDeckRepository_FindByID_Success(t *testing.T) {
 	assert.Equal(t, playerA, got.PlayerID)
 }
 
-// TestPgDeckRepository_FindByID_NotFound は存在しない / 他プレイヤー配下の deck_id が
+// TestFindByID_NotFound は存在しない / 他プレイヤー配下の deck_id が
 // 全て ErrNotFound で返る仕様を検証する。PK スコープを超えた認可漏れがないことを示す。
-func TestPgDeckRepository_FindByID_NotFound(t *testing.T) {
+func TestFindByID_NotFound(t *testing.T) {
 	tests := []struct {
 		name     string
 		setup    func(t *testing.T) int64
@@ -173,9 +173,9 @@ func TestPgDeckRepository_FindByID_NotFound(t *testing.T) {
 	}
 }
 
-// TestPgDeckRepository_GetDeckCards は (player_id, deck_id) スコープで deck_cards を
+// TestGetDeckCards は (player_id, deck_id) スコープで deck_cards を
 // 返す仕様を検証する。
-func TestPgDeckRepository_GetDeckCards(t *testing.T) {
+func TestGetDeckCards(t *testing.T) {
 	tests := []struct {
 		name      string
 		setup     func(t *testing.T) (string, int64) // target player_id, deck_id
@@ -223,10 +223,10 @@ func TestPgDeckRepository_GetDeckCards(t *testing.T) {
 	}
 }
 
-// TestPgDeckRepository_Update はカード構成が「差し替え」セマンティクスで書き換わること、
+// TestUpdate はカード構成が「差し替え」セマンティクスで書き換わること、
 // deck_name / playmat_no が更新されることを検証する。
 // 既存 deck_cards を全削除してから新規 bulk insert する実装の仕様。
-func TestPgDeckRepository_Update(t *testing.T) {
+func TestUpdate(t *testing.T) {
 	sharedPg.Truncate(t)
 	deckID := insertDeck(t, playerA, "Original")
 	seedDeckCard(t, deckCardSeed{playerA, deckID, "SH-0001", 0, 3})
@@ -236,13 +236,14 @@ func TestPgDeckRepository_Update(t *testing.T) {
 	ctx := context.Background()
 
 	newPlaymat := int64(7)
-	err := repo.Update(ctx, &apicard.Deck{
+	err := repo.Update(ctx, domain.Deck{
 		PlayerID:  playerA,
 		DeckID:    deckID,
 		DeckName:  "Renamed",
 		PlaymatNo: &newPlaymat,
-	}, []apicard.DeckCard{
-		{PlayerID: playerA, DeckID: deckID, CardID: "SH-0003", ArtNo: 0, Count: 3},
+		UpdatedAt: time.Now(),
+	}, []domain.DeckCardEntry{
+		{CardID: "SH-0003", ArtNo: 0, Count: 3},
 	})
 	require.NoError(t, err)
 
@@ -258,9 +259,9 @@ func TestPgDeckRepository_Update(t *testing.T) {
 	assert.Equal(t, "SH-0003", cards[0].CardID)
 }
 
-// TestPgDeckRepository_Delete はデッキ削除で deck_cards も CASCADE 削除される仕様と、
+// TestDelete はデッキ削除で deck_cards も CASCADE 削除される仕様と、
 // 他プレイヤーのデッキには影響しない PK スコープを検証する。
-func TestPgDeckRepository_Delete(t *testing.T) {
+func TestDelete(t *testing.T) {
 	tests := []struct {
 		name            string
 		setup           func(t *testing.T) (int64, int64) // target deck_id, other deck_id

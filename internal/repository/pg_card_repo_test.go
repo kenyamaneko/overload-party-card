@@ -12,9 +12,9 @@ import (
 	"github.com/kenyamaneko/overload-party-card/internal/repository"
 )
 
-// TestPgCardRepository_FindAll は is_active=true のカードだけが card_id 昇順で
+// TestFindAll は is_active=true のカードだけが card_id 昇順で
 // 返ることを、データの母集団を変えた複数ケースで検証する。
-func TestPgCardRepository_FindAll(t *testing.T) {
+func TestFindAll(t *testing.T) {
 	tests := []struct {
 		name    string
 		seeds   []cardSeed
@@ -62,10 +62,10 @@ func TestPgCardRepository_FindAll(t *testing.T) {
 	}
 }
 
-// TestPgCardRepository_FindCardIDsByFactions は指定 faction 群の active カードの
+// TestFindCardIDsByFactions は指定 faction 群の active カードの
 // card_id だけが昇順で返ることを検証する。配布対象をハードコードせず
 // card_definitions 由来にする契約を仕様として確認する。
-func TestPgCardRepository_FindCardIDsByFactions(t *testing.T) {
+func TestFindCardIDsByFactions(t *testing.T) {
 	allSeeds := []cardSeed{
 		{"SH-0001", "SHE A", "SHE", "Compute", "unlimited", true},
 		{"SH-0002", "SHE B", "SHE", "Compute", "unlimited", true},
