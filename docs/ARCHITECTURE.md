@@ -117,6 +117,26 @@ REST で直接呼ばれるケースでの冪等性は gateway のオーケスト
 
 「配布 API 自体を冪等にする」方向に倒すと、「本当に 2 回目の配布がほしい」ケース（シーズン報酬・補填等）の実装が歪む。責務を呼び出し側に寄せるのは意図的な設計。
 
+## Presenter 層の位置づけ
+
+`internal/presenter/` は domain ↔ wire DTO (`packages/api-card`) の境界変換を集約するパッケージ。usecase / handler / repository から変換ロジックを物理的に分離し、wire 表現の変更が業務層に波及しないようにする。
+
+**現状は厳密な Presenter パターンではない。** Uncle Bob クリーンアーキテクチャ原典の Presenter は output port (interface) を介して usecase が結果を「押し出す」構造を取り、usecase 層は wire DTO 型を一切 import しない。本サービスでは usecase が presenter 関数を直接呼び、戻り値で wire DTO を返すため、依存方向としては usecase → wire DTO 型への参照が残っている。実態は Mapper パターンに近い。
+
+この折衷を選んだ理由:
+
+- Go 慣用は「戻り値で返す」スタイルを好み、output port の副作用ベース設計とは噛み合わせが悪い
+- wire 形式が REST のみで複数 wire (gRPC / GraphQL) の差し替え要件が現状ない
+- 厳密な Presenter は endpoint ごとに output port interface と presenter struct が必要になり、3 リポ × N endpoint の規模では割に合わない
+
+**将来の移行パス。** 複数 wire 形式の差し替えが必要になった時点で、以下の順で段階的に厳密 Presenter へ昇格できる:
+
+1. presenter 関数のシグネチャを output port interface (`type XxxOutput interface { Present(...) }`) に置き換える
+2. usecase struct に output port を依存注入し、戻り値返却を `s.output.Present(...)` 呼び出しに差し替える
+3. handler 側で wire 形式ごとに presenter struct を実装 (`JSONPresenter` / `GRPCPresenter`)、endpoint 構築時に注入
+
+現状の package 配置 (`internal/presenter/`) と命名はこの移行を阻害しない。usecase の wire DTO への依存を切り離す改修だけで Presenter パターンに到達できる。
+
 ## テスト戦略
 
 usecase 層は in-memory mock で仕様ベースに単体テストする。repository 層は **Testcontainers で postgres:16-alpine を起動して実 PostgreSQL に対して検証する**。理由:

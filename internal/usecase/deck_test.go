@@ -29,14 +29,14 @@ func newMockDeckRepo() *mockDeckRepo {
 	}
 }
 
-func (m *mockDeckRepo) Create(_ context.Context, deck domain.Deck, entries []domain.DeckCardEntry) (int64, error) {
+func (m *mockDeckRepo) Create(_ context.Context, deck domain.Deck, deckCardEntries []domain.DeckCardEntry) (int64, error) {
 	id := m.nextDeckID
 	m.nextDeckID++
 	deck.DeckID = id
 	stored := deck
 	m.decks[stored.PlayerID] = append(m.decks[stored.PlayerID], &stored)
-	cards := make([]domain.DeckCard, len(entries))
-	for i, e := range entries {
+	cards := make([]domain.DeckCard, len(deckCardEntries))
+	for i, e := range deckCardEntries {
 		cards[i] = domain.DeckCard{
 			PlayerID: stored.PlayerID,
 			DeckID:   id,
@@ -66,7 +66,7 @@ func (m *mockDeckRepo) GetDeckCards(_ context.Context, _ string, deckID int64) (
 	return m.deckCards[deckID], nil
 }
 
-func (m *mockDeckRepo) Update(_ context.Context, deck domain.Deck, entries []domain.DeckCardEntry) error {
+func (m *mockDeckRepo) Update(_ context.Context, deck domain.Deck, deckCardEntries []domain.DeckCardEntry) error {
 	stored := deck
 	for i, d := range m.decks[deck.PlayerID] {
 		if d.DeckID == deck.DeckID {
@@ -74,8 +74,8 @@ func (m *mockDeckRepo) Update(_ context.Context, deck domain.Deck, entries []dom
 			break
 		}
 	}
-	cards := make([]domain.DeckCard, len(entries))
-	for i, e := range entries {
+	cards := make([]domain.DeckCard, len(deckCardEntries))
+	for i, e := range deckCardEntries {
 		cards[i] = domain.DeckCard{
 			PlayerID: deck.PlayerID,
 			DeckID:   deck.DeckID,

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/kenyamaneko/overload-party-card/internal/port"
+	"github.com/kenyamaneko/overload-party-card/internal/presenter"
 	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 )
 
@@ -45,7 +46,7 @@ func (s *CardInteractor) ListCardsWithOwnership(ctx context.Context, playerID st
 	result := make([]*CardWithOwnership, len(cards))
 	for i, card := range cards {
 		result[i] = &CardWithOwnership{
-			CardDefinition: cardToAPI(card),
+			CardDefinition: presenter.ToCardDefinition(card),
 			IsOwned:        owned[card.CardID],
 		}
 	}
@@ -59,5 +60,5 @@ func (s *CardInteractor) ListCards(ctx context.Context) ([]*apicard.CardDefiniti
 	if err != nil {
 		return nil, fmt.Errorf("find all raw cards: %w", err)
 	}
-	return cardsToAPI(cards), nil
+	return presenter.ToCardDefinitions(cards), nil
 }

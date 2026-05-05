@@ -31,3 +31,23 @@ type DeckCardEntry struct {
 	ArtNo  int64
 	Count  int
 }
+
+// ToEntry は永続化済みの DeckCard を Entry 形式 (PlayerID/DeckID 抜き) に正規化します。
+// バトル前バリデーション等、入力経路 (リクエスト / DB) を問わず同じ検証ロジックに
+// 流すための共通正規化です。
+func (d DeckCard) ToEntry() DeckCardEntry {
+	return DeckCardEntry{
+		CardID: d.CardID,
+		ArtNo:  d.ArtNo,
+		Count:  d.Count,
+	}
+}
+
+// DeckCardEntriesFromCards は DeckCard slice を Entry slice に変換します。
+func DeckCardEntriesFromCards(cards []DeckCard) []DeckCardEntry {
+	entries := make([]DeckCardEntry, len(cards))
+	for i, c := range cards {
+		entries[i] = c.ToEntry()
+	}
+	return entries
+}

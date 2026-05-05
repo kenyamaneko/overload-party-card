@@ -27,7 +27,7 @@ func NewPgDeckRepository(pool *pgxpool.Pool) *PgDeckRepository {
 
 // Create はデッキとそのカード構成をトランザクション内で作成します。
 // 採番された deck_id を返します。入力は mutation しません。
-func (r *PgDeckRepository) Create(ctx context.Context, deck domain.Deck, entries []domain.DeckCardEntry) (int64, error) {
+func (r *PgDeckRepository) Create(ctx context.Context, deck domain.Deck, deckCardEntries []domain.DeckCardEntry) (int64, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("begin tx: %w", err)
@@ -49,7 +49,7 @@ func (r *PgDeckRepository) Create(ctx context.Context, deck domain.Deck, entries
 		return 0, fmt.Errorf("insert deck: %w", err)
 	}
 
-	cards := buildDeckCards(deck.PlayerID, deckID, entries)
+	cards := buildDeckCards(deck.PlayerID, deckID, deckCardEntries)
 	if err := bulkInsertDeckCards(ctx, tx, cards); err != nil {
 		return 0, err
 	}
@@ -131,7 +131,7 @@ func (r *PgDeckRepository) GetDeckCards(ctx context.Context, playerID string, de
 
 // Update はデッキとそのカード構成をトランザクション内で更新します。
 // 入力は mutation しません。updated_at は呼び出し側が事前に設定して渡します。
-func (r *PgDeckRepository) Update(ctx context.Context, deck domain.Deck, entries []domain.DeckCardEntry) error {
+func (r *PgDeckRepository) Update(ctx context.Context, deck domain.Deck, deckCardEntries []domain.DeckCardEntry) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
@@ -160,7 +160,7 @@ func (r *PgDeckRepository) Update(ctx context.Context, deck domain.Deck, entries
 		return fmt.Errorf("update deck: %w", err)
 	}
 
-	cards := buildDeckCards(deck.PlayerID, deck.DeckID, entries)
+	cards := buildDeckCards(deck.PlayerID, deck.DeckID, deckCardEntries)
 	if err := bulkInsertDeckCards(ctx, tx, cards); err != nil {
 		return err
 	}
@@ -196,11 +196,11 @@ func scanDeck(row pgx.Row) (*domain.Deck, error) {
 	return &d, nil
 }
 
-// buildDeckCards は entries を deck_cards 行 (PlayerID, DeckID 付き) に変換します。
+// buildDeckCards は deckCardEntries を deck_cards 行 (PlayerID, DeckID 付き) に変換します。
 // 入力 slice は読み取り専用、結果は新規 slice として返します。
-func buildDeckCards(playerID string, deckID int64, entries []domain.DeckCardEntry) []domain.DeckCard {
-	cards := make([]domain.DeckCard, len(entries))
-	for i, e := range entries {
+func buildDeckCards(playerID string, deckID int64, deckCardEntries []domain.DeckCardEntry) []domain.DeckCard {
+	cards := make([]domain.DeckCard, len(deckCardEntries))
+	for i, e := range deckCardEntries {
 		cards[i] = domain.DeckCard{
 			PlayerID: playerID,
 			DeckID:   deckID,

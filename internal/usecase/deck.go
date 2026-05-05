@@ -9,6 +9,7 @@ import (
 	"github.com/kenyamaneko/overload-party-card/internal/constants"
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
 	"github.com/kenyamaneko/overload-party-card/internal/port"
+	"github.com/kenyamaneko/overload-party-card/internal/presenter"
 	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 )
 
@@ -34,13 +35,13 @@ func (s *DeckInteractor) CreateDeck(ctx context.Context, playerID string, req ap
 		return nil, fmt.Errorf("get owned cards: %w", err)
 	}
 
-	entries := entriesFromAPI(req.Cards)
-	if err := s.validateDeckCards(entries, ownedCards); err != nil {
+	deckCardEntries := presenter.DeckCardEntriesFromRequest(req.Cards)
+	if err := s.validateDeckCards(deckCardEntries, ownedCards); err != nil {
 		return nil, err
 	}
 
 	totalCards := 0
-	for _, e := range entries {
+	for _, e := range deckCardEntries {
 		totalCards += e.Count
 	}
 
@@ -54,7 +55,7 @@ func (s *DeckInteractor) CreateDeck(ctx context.Context, playerID string, req ap
 		UpdatedAt: now,
 	}
 
-	deckID, err := s.deckRepo.Create(ctx, deck, entries)
+	deckID, err := s.deckRepo.Create(ctx, deck, deckCardEntries)
 	if err != nil {
 		return nil, fmt.Errorf("create deck: %w", err)
 	}
@@ -65,7 +66,7 @@ func (s *DeckInteractor) CreateDeck(ctx context.Context, playerID string, req ap
 		return nil, fmt.Errorf("get deck cards for deck %d: %w", deck.DeckID, err)
 	}
 
-	return deckToAPI(&deck, cards, totalCards == constants.DeckSize), nil
+	return presenter.ToDeck(&deck, cards, totalCards == constants.DeckSize), nil
 }
 
 // GetDecks はプレイヤーの全デッキを is_valid 付きで返します。
@@ -86,7 +87,7 @@ func (s *DeckInteractor) GetDecks(ctx context.Context, playerID string) ([]*apic
 		if err != nil {
 			return nil, fmt.Errorf("get deck cards for deck %d: %w", d.DeckID, err)
 		}
-		result[i] = deckToAPI(d, cards, s.computeIsValid(cards, ownedCards))
+		result[i] = presenter.ToDeck(d, cards, s.computeIsValid(cards, ownedCards))
 	}
 	return result, nil
 }
@@ -103,8 +104,8 @@ func (s *DeckInteractor) GetDeck(ctx context.Context, playerID string, deckID in
 		return nil, nil, fmt.Errorf("get deck cards: %w", err)
 	}
 
-	apiCards := deckCardsToAPI(cards)
-	apiDeck := deckToAPI(deck, cards, false)
+	apiCards := presenter.ToDeckCards(cards)
+	apiDeck := presenter.ToDeck(deck, cards, false)
 	apiDeck.DeckCards = apiCards
 	return apiDeck, apiCards, nil
 }
@@ -116,13 +117,13 @@ func (s *DeckInteractor) UpdateDeck(ctx context.Context, playerID string, deckID
 		return nil, fmt.Errorf("get owned cards: %w", err)
 	}
 
-	entries := entriesFromAPI(req.Cards)
-	if err := s.validateDeckCards(entries, ownedCards); err != nil {
+	deckCardEntries := presenter.DeckCardEntriesFromRequest(req.Cards)
+	if err := s.validateDeckCards(deckCardEntries, ownedCards); err != nil {
 		return nil, err
 	}
 
 	totalCards := 0
-	for _, e := range entries {
+	for _, e := range deckCardEntries {
 		totalCards += e.Count
 	}
 
@@ -135,7 +136,7 @@ func (s *DeckInteractor) UpdateDeck(ctx context.Context, playerID string, deckID
 		UpdatedAt: time.Now(),
 	}
 
-	if err := s.deckRepo.Update(ctx, deck, entries); err != nil {
+	if err := s.deckRepo.Update(ctx, deck, deckCardEntries); err != nil {
 		return nil, fmt.Errorf("update deck: %w", err)
 	}
 
@@ -143,7 +144,7 @@ func (s *DeckInteractor) UpdateDeck(ctx context.Context, playerID string, deckID
 	if err != nil {
 		return nil, fmt.Errorf("get deck cards for deck %d: %w", deck.DeckID, err)
 	}
-	return deckToAPI(&deck, cards, totalCards == constants.DeckSize), nil
+	return presenter.ToDeck(&deck, cards, totalCards == constants.DeckSize), nil
 }
 
 // DeleteDeck は指定デッキを削除します。
@@ -159,10 +160,10 @@ func (s *DeckInteractor) ValidateDeckForBattle(ctx context.Context, playerID str
 		return fmt.Errorf("get deck cards: %w", err)
 	}
 
-	entries := entriesFromDeckCards(deckCards)
+	deckCardEntries := domain.DeckCardEntriesFromCards(deckCards)
 
 	totalCards := 0
-	for _, e := range entries {
+	for _, e := range deckCardEntries {
 		totalCards += e.Count
 	}
 	if totalCards != constants.DeckSize {
@@ -174,17 +175,17 @@ func (s *DeckInteractor) ValidateDeckForBattle(ctx context.Context, playerID str
 		return fmt.Errorf("get owned cards: %w", err)
 	}
 
-	return s.validateDeckCards(entries, ownedCards)
+	return s.validateDeckCards(deckCardEntries, ownedCards)
 }
 
-func (s *DeckInteractor) validateDeckCards(entries []domain.DeckCardEntry, ownedCards []*domain.PlayerCard) error {
+func (s *DeckInteractor) validateDeckCards(deckCardEntries []domain.DeckCardEntry, ownedCards []*domain.PlayerCard) error {
 	type ownedKey struct {
 		cardID string
 		artNo  int64
 	}
 
 	totalCards := 0
-	for _, e := range entries {
+	for _, e := range deckCardEntries {
 		if e.Count <= 0 {
 			return fmt.Errorf("%w: card %s variant %d: count must be positive", port.ErrInvalidDeck, e.CardID, e.ArtNo)
 		}
@@ -199,7 +200,7 @@ func (s *DeckInteractor) validateDeckCards(entries []domain.DeckCardEntry, owned
 		owned[ownedKey{c.CardID, c.ArtNo}] = c.Count
 	}
 
-	for _, e := range entries {
+	for _, e := range deckCardEntries {
 		key := ownedKey{e.CardID, e.ArtNo}
 		if owned[key] < e.Count {
 			return fmt.Errorf("%w: card %s variant %d: not enough owned (need %d, have %d)",
@@ -208,7 +209,7 @@ func (s *DeckInteractor) validateDeckCards(entries []domain.DeckCardEntry, owned
 	}
 
 	cardIDTotals := make(map[string]int)
-	for _, e := range entries {
+	for _, e := range deckCardEntries {
 		cardIDTotals[e.CardID] += e.Count
 	}
 	for cardID, total := range cardIDTotals {
@@ -238,6 +239,6 @@ func (s *DeckInteractor) computeIsValid(deckCards []domain.DeckCard, ownedCards 
 		return false
 	}
 
-	entries := entriesFromDeckCards(deckCards)
-	return s.validateDeckCards(entries, ownedCards) == nil
+	deckCardEntries := domain.DeckCardEntriesFromCards(deckCards)
+	return s.validateDeckCards(deckCardEntries, ownedCards) == nil
 }

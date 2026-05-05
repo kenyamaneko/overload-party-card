@@ -32,11 +32,11 @@ type ProcessedEventRepo interface {
 type DeckRepo interface {
 	// Create は decks 行と deck_cards 行を 1 トランザクションで挿入し、
 	// 採番された deck_id を返します。入力は mutation しません。
-	Create(ctx context.Context, deck domain.Deck, entries []domain.DeckCardEntry) (int64, error)
+	Create(ctx context.Context, deck domain.Deck, deckCardEntries []domain.DeckCardEntry) (int64, error)
 	FindByPlayerID(ctx context.Context, playerID string) ([]*domain.Deck, error)
 	FindByID(ctx context.Context, playerID string, deckID int64) (*domain.Deck, error)
 	GetDeckCards(ctx context.Context, playerID string, deckID int64) ([]domain.DeckCard, error)
 	// Update はデッキを更新し deck_cards を差し替えます。入力は mutation しません。
-	Update(ctx context.Context, deck domain.Deck, entries []domain.DeckCardEntry) error
+	Update(ctx context.Context, deck domain.Deck, deckCardEntries []domain.DeckCardEntry) error
 	Delete(ctx context.Context, playerID string, deckID int64) error
 }
