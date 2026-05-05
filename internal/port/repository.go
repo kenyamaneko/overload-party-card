@@ -22,6 +22,14 @@ type PlayerCardRepo interface {
 	AddCards(ctx context.Context, playerID string, cardIDs []string, countPerCard int) (int, error)
 }
 
+// CardPackRepo は配布パックマスター (card.card_pack) の永続化を抽象化するインターフェースです。
+// 実装は配布リクエストごとに DB を引く前提 (キャッシュなし: ADR-032 §2)。
+type CardPackRepo interface {
+	// GetPack は pack_id に対応するパック定義を返します。
+	// 行が存在しない場合 ErrNotFound を返します (運用停止 = is_active=false は別エラー: ErrPackInactive)。
+	GetPack(ctx context.Context, packID string) (*domain.CardPack, error)
+}
+
 // ProcessedEventRepo は処理済み Pub/Sub イベントを追跡するインターフェースです。
 type ProcessedEventRepo interface {
 	// Insert は新規行が挿入された場合 true を返します（冪等性ガード）。

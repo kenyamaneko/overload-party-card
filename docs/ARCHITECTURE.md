@@ -54,6 +54,18 @@ cache.CardCache (起動時に全件ロード) → サービス内メモリ
 
 CardCache は読み取り専用。マスター改定時は Pod 再起動で invalidation する（将来的に Pub/Sub invalidation を検討中）。ローリング再起動中に新旧バージョンが混在する窓があるが、カードマスター改定は破壊的変更ではない運用ルール（新カード追加・非アクティブ化のみ）で許容している。
 
+## pack マスターはキャッシュしない
+
+`card.card_pack` は配布リクエストごとに DB を引く（[ADR-032](https://github.com/kenyamaneko/overload-party-common/blob/main/docs/adr/032-card-pack-introduction-and-grant-unification.md) §2 で確定）。CardCache 同様の起動時 fail-fast ロード戦略は **採らない**。
+
+理由:
+
+1. **配布履歴の audit 性**: 各購入が「その時点の pack 定義に従って配布された」ことを再現可能にする必要があり、Pod 起動時スナップショットでは「いつどの定義で配ったか」が曖昧になる
+2. **遡及配布の運用**: 後から pack 内容を変更したとき、既存購入者にも差分配布する運用要件を許容する。キャッシュだとローリング再起動中に「新 Pod は新定義 / 旧 Pod は旧定義」が混在し、遡及配布が予測不能になる
+3. **配布タイミングの即時反映**: pack 定義変更が次の配布リクエストから直ちに効く（Pod 再起動不要）
+
+CardCache は静的なカードマスターを参照する read-heavy ホットパス（デッキ構築・battle 判定）で使う前提で、性質が違う。配布リクエストは onboarding / shop 購入の頻度でホットパスではなく、`card_pack` は件数も小さい（10〜20 行オーダー）ため PK lookup は ms オーダーで毎回 DB 参照のコストは無視できる。
+
 ## `is_valid` を DB に保存しない判断
 
 デッキの `is_valid` は API レスポンス生成時に都度算出する。DB には持たない。
@@ -68,7 +80,7 @@ CardCache は読み取り専用。マスター改定時は Pod 再起動で inva
 
 ## Pub/Sub subscriber の冪等性
 
-card は `faction-purchased-card-sub` と `player-onboarded-card-sub` を購読してパック配布をイベント駆動で実行する (ADR-022)。冪等性は `card.processed_events` テーブルに `event_id` を INSERT することで前段ガードとして機能させる。
+card は `player-onboarded-card-sub` を購読してパック配布をイベント駆動で実行する (ADR-022 / ADR-031)。`card-pack-purchased-card-sub` は ADR-032 に伴い導入予定で本セクションが想定する subscriber 群に同様に従う。冪等性は `card.processed_events` テーブルに `event_id` を INSERT することで前段ガードとして機能させる。
 
 ただし **完全な idempotency 保証ではない**:
 
@@ -78,16 +90,18 @@ card は `faction-purchased-card-sub` と `player-onboarded-card-sub` を購読�
 
 at-least-once を at-most-once 相当に近づけるための前段ガードであり、strict exactly-once を謳っていない点に注意。将来 GrantService を processed_events と同一 tx に組み込む設計変更で完全 idempotent にできる（現状は実用上の優先度が低い）。
 
-### subscriber の責務分離 (ADR-022)
+### subscriber の責務分離 (ADR-022 / ADR-031 / ADR-032)
 
-ADR-022 で `FactionSelectedEvent` を業務事実単位に分解した結果、card は 2 subscriber を持つ:
+ADR-022 で `FactionSelectedEvent` を業務事実単位に分解し、ADR-031 / ADR-032 で `faction-purchased` を `card-pack-purchased` (card 向け) + `faction-acquired` (account / gateway 向け) に再分解した結果、card は以下の subscriber を持つ:
 
-| subscriber | 副作用 |
-|---|---|
-| `faction-purchased-card-sub` | shop 購入時に **faction のカードのみ** (Neutral 無し) を配布 |
-| `player-onboarded-card-sub` | onboarding 完了時に **初期パック (faction + Neutral)** を配布 |
+| subscriber | 副作用 | 備考 |
+|---|---|---|
+| `player-onboarded-card-sub` | onboarding 完了時に `initial_<faction>` pack を配布 (内部で `GrantPack(playerID, "initial_"+faction)`) | 導入済み |
+| `card-pack-purchased-card-sub` | shop の card_pack 系商品 (faction_set / 限定パック等) 購入時に `card_pack_id` で指定された pack を配布 | ADR-032 PR 2 で追加 |
 
-旧 `faction-selected-card-sub` が持っていた `source` フィールド分岐は不要になった。業務事実と topic が 1 対 1 に対応するため、subscriber は自身の topic に紐づく副作用だけを実行する。
+card は `faction-acquired` を購読**しない** (faction 所有権の SSoT は account の責務、ADR-031)。業務事実と topic が 1 対 1 に対応するため、subscriber は自身の topic に紐づく副作用だけを実行する。
+
+旧 `faction-purchased-card-sub` (および `faction-selected-card-sub`) は廃止された。配布の業務文脈 (initial / 購入 / 限定) は subscriber が `pack_id` を組み立てる (or wire payload で受け取る) 形に集約され、配布の SSoT は `card.card_pack` マスターに移管された (ADR-032)。
 
 ### 握りつぶし禁止: 不明イベントも Nack
 
@@ -111,11 +125,13 @@ ADR-022 で `FactionSelectedEvent` を業務事実単位に分解した結果、
 
 ## カード配布 API の非冪等契約
 
-`grant-initial-pack` / `grant-faction-pack` は **呼ばれた回数ぶん 3 枚ずつ加算する**。自前で冪等性を持たない。
+card の配布 API は `usecase.GrantInteractor.GrantPack(playerID, packID)` のみで、Pub/Sub subscriber 経由でだけ呼ばれる。**呼ばれた回数ぶん `card_pack.copies_per_card` 枚ずつ加算する**。自前で冪等性を持たない。
 
-REST で直接呼ばれるケースでの冪等性は gateway のオーケストレーション層が担保する（`account.player_factions` の存在をもって重複呼び出しを抑止）。Pub/Sub 経由のケースは上述 processed_events で前段ガードする。
+冪等性は `card.processed_events` の event_id 前段ガードで at-most-once 相当に近づける（上記「Pub/Sub subscriber の冪等性」を参照）。`processed_events` INSERT と `GrantPack` 内の `player_cards` UPSERT を同一 tx に乗せられない既存制約は、本ADR でも踏襲する（ADR-032）。
 
-「配布 API 自体を冪等にする」方向に倒すと、「本当に 2 回目の配布がほしい」ケース（シーズン報酬・補填等）の実装が歪む。責務を呼び出し側に寄せるのは意図的な設計。
+「配布 API 自体を冪等にする」方向に倒すと、「本当に 2 回目の配布がほしい」ケース（シーズン報酬・補填等）の実装が歪む。責務を publisher 側 (shop の outbox / scenario の outbox) に寄せるのは意図的な設計。
+
+REST 経由の同期配布エンドポイント (`grant-initial-pack` / `grant-faction-pack`) は ADR-026 で account REST が縮退した時点で実 caller を失っており、ADR-032 で完全削除された。配布は scenario の `player-onboarded` event と shop の `card-pack-purchased` event (今後追加) を経由した Pub/Sub 駆動のみで行われる。
 
 ## Presenter 層の位置づけ
 
@@ -160,8 +176,7 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 - **`PORT`**: 起動ポート。未設定で起動不可
 - **`ENV`**: `dev` / `stg` / `prod` のいずれか。未設定で起動不可。`prod` / `stg` は Cloud Logging 互換の JSON slog、`dev` はテキスト slog にルーティングする
 - **`DATABASE_CONN`**: card スキーマへの接続文字列。未設定で起動不可
-- **`PUBSUB_PROJECT_ID`**: card は `faction-purchased` / `player-onboarded` subscriber を持つため必須
-- **`FACTION_PURCHASED_SUBSCRIPTION`**: faction-purchased subscription 名。未設定で起動不可
+- **`PUBSUB_PROJECT_ID`**: card は `player-onboarded` subscriber を持つため必須 (ADR-032 PR 2 で `card-pack-purchased` も追加予定)
 - **`PLAYER_ONBOARDED_SUBSCRIPTION`**: player-onboarded subscription 名。未設定で起動不可
 
 ### カードデータ変更時
@@ -170,6 +185,15 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 2. `python3 scripts/generate_cards.py` を実行して `db/seed/cards_seed.sql` / `data/cards_gen.json` を更新
 3. コミット（`validate.yaml` が drift を検出する）
 4. デプロイ後に ops の `db-migrate` を走らせて seed を反映
+
+### card_pack マスター変更時
+
+1. `data/card_packs.yaml` を編集（pack の追加・配布枚数変更・selection 変更・`is_active` 切り替え等）
+2. `python3 scripts/generate_card_packs.py` を実行して `db/seed/card_packs_seed.sql` を更新
+3. コミット
+4. デプロイ後に ops の `db-migrate` を走らせて seed を反映
+
+`is_active=false` で pack を非アクティブ化する際の運用順序は ADR-032 §5「pack 非アクティブ化の運用順序」に従う（shop product を先に停止 → outbox drain → card_pack を停止）。
 
 ### 型定義変更時
 
@@ -182,7 +206,9 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 
 | トピック | 購読名 | publisher |
 |---|---|---|
-| `faction-purchased` | `faction-purchased-card-sub` | shop |
 | `player-onboarded` | `player-onboarded-card-sub` | scenario |
+| `card-pack-purchased` | `card-pack-purchased-card-sub` | shop (ADR-032 PR 2 で追加予定) |
 
 publisher 列はこのリポジトリからは導けないので、変更時は各サービスの発行状況も確認すること。
+
+旧 `faction-purchased` topic は ADR-031 で `card-pack-purchased` (card 向け) と `faction-acquired` (account / gateway 向け) に分割されたため、card 側は購読しない。

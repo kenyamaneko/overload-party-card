@@ -49,6 +49,7 @@ func run() error {
 	defer pool.Close()
 
 	cardRepo := repository.NewPgCardRepository(pool)
+	cardPackRepo := repository.NewPgCardPackRepository(pool)
 	playerCardRepo := repository.NewPgPlayerCardRepository(pool)
 	deckRepo := repository.NewPgDeckRepository(pool)
 	eventRepo := repository.NewPgProcessedEventRepository(pool)
@@ -61,24 +62,13 @@ func run() error {
 	cardInteractor := usecase.NewCardInteractor(cardRepo, playerCardRepo)
 	deckInteractor := usecase.NewDeckInteractor(deckRepo, playerCardRepo, cardCache)
 	playerCardInteractor := usecase.NewPlayerCardInteractor(playerCardRepo, cardCache)
-	grantInteractor := usecase.NewGrantInteractor(cardRepo, playerCardRepo)
+	grantInteractor := usecase.NewGrantInteractor(cardPackRepo, cardRepo, playerCardRepo)
 
 	cardH := rest.NewCardHandler(cardInteractor)
 	deckH := rest.NewDeckHandler(deckInteractor)
 	playerCardH := rest.NewPlayerCardHandler(playerCardInteractor)
-	grantH := rest.NewGrantHandler(grantInteractor)
 
-	r := router.New(cardH, deckH, playerCardH, grantH)
-
-	factionStream, err := pubsubadapter.NewStream(ctx, cfg.PubsubProjectID, cfg.FactionPurchasedSubscription)
-	if err != nil {
-		return fmt.Errorf("faction-purchased stream: %w", err)
-	}
-	defer func() {
-		if cerr := factionStream.Close(); cerr != nil {
-			slog.Warn("faction-purchased stream close", "error", cerr)
-		}
-	}()
+	r := router.New(cardH, deckH, playerCardH)
 
 	onboardedStream, err := pubsubadapter.NewStream(ctx, cfg.PubsubProjectID, cfg.PlayerOnboardedSubscription)
 	if err != nil {
@@ -90,7 +80,6 @@ func run() error {
 		}
 	}()
 
-	factionSub := pubsubadapter.NewFactionPurchasedSubscriber(factionStream, grantInteractor, eventRepo)
 	onboardedSub := pubsubadapter.NewPlayerOnboardedSubscriber(onboardedStream, grantInteractor, eventRepo)
 
 	srv := &http.Server{
@@ -105,24 +94,17 @@ func run() error {
 		"pubsub_project", cfg.PubsubProjectID,
 	)
 
-	return runHTTPAndSubscribers(ctx, srv, factionSub, onboardedSub)
+	return runHTTPAndSubscribers(ctx, srv, onboardedSub)
 }
 
 // runHTTPAndSubscribers は HTTP server と Pub/Sub subscriber 群を並行起動し、
 // どれかの失敗・シグナル到来で全体を graceful に停止する。
-func runHTTPAndSubscribers(ctx context.Context, srv *http.Server, factionSub, onboardedSub subscriber) error {
+func runHTTPAndSubscribers(ctx context.Context, srv *http.Server, onboardedSub subscriber) error {
 	g, gCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			return fmt.Errorf("http server: %w", err)
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		if err := factionSub.Start(gCtx); err != nil && gCtx.Err() == nil {
-			return fmt.Errorf("faction-purchased subscriber: %w", err)
 		}
 		return nil
 	})

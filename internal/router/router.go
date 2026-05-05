@@ -9,11 +9,14 @@ import (
 )
 
 // New は card サービスの HTTP ルーターを構築します。
+//
+// 配布 (grant) エンドポイントは ADR-032 / ADR-026 に伴い廃止されました。
+// 配布は scenario の `player-onboarded` event と shop の `card-pack-purchased` event
+// (今後追加) を経由した Pub/Sub 駆動のみで行われます。
 func New(
 	cardH *rest.CardHandler,
 	deckH *rest.DeckHandler,
 	playerCardH *rest.PlayerCardHandler,
-	grantH *rest.GrantHandler,
 ) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -36,8 +39,6 @@ func New(
 			players.PUT("/decks/:deckId", deckH.UpdateDeck)
 			players.DELETE("/decks/:deckId", deckH.DeleteDeck)
 			players.POST("/decks/:deckId/validate-for-battle", deckH.ValidateDeckForBattle)
-			players.POST("/grant-initial-pack", grantH.GrantInitialPack)
-			players.POST("/grant-faction-pack", grantH.GrantFactionPack)
 		}
 	}
 	return r

@@ -11,18 +11,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// fakeInitialGranter は initialPackGranter のテスト用スタブです。
-type fakeInitialGranter struct {
+// fakePackGranter は packGranter のテスト用スタブです。
+type fakePackGranter struct {
 	err          error
 	calls        int
 	lastPlayerID string
-	lastFaction  string
+	lastPackID   string
 }
 
-func (f *fakeInitialGranter) GrantInitialPack(_ context.Context, playerID, faction string) (int, error) {
+func (f *fakePackGranter) GrantPack(_ context.Context, playerID, packID string) (int, error) {
 	f.calls++
 	f.lastPlayerID = playerID
-	f.lastFaction = faction
+	f.lastPackID = packID
 	if f.err != nil {
 		return 0, f.err
 	}
@@ -51,17 +51,17 @@ func TestPlayerOnboardedSubscriber_Start(t *testing.T) {
 		repoInsertErr    error
 		granterErr       error
 		wantAck          bool
-		assertGranter    func(t *testing.T, g *fakeInitialGranter)
+		assertGranter    func(t *testing.T, g *fakePackGranter)
 	}{
 		{
-			name:             "新規イベントは初期パックを配布して Ack する",
+			name:             "新規イベントは initial_<faction> pack で配布して Ack する",
 			publish:          publishValid,
 			repoInsertResult: true,
 			wantAck:          true,
-			assertGranter: func(t *testing.T, g *fakeInitialGranter) {
+			assertGranter: func(t *testing.T, g *fakePackGranter) {
 				assert.Equal(t, 1, g.calls)
 				assert.Equal(t, "player-1", g.lastPlayerID)
-				assert.Equal(t, "Tuners", g.lastFaction, "initial_faction_id がそのまま GrantInitialPack に渡る")
+				assert.Equal(t, "initial_Tuners", g.lastPackID, "initial_faction_id を 'initial_<faction>' pack_id に組み立てて GrantPack に渡す")
 			},
 		},
 		{
@@ -69,7 +69,7 @@ func TestPlayerOnboardedSubscriber_Start(t *testing.T) {
 			publish:          publishValid,
 			repoInsertResult: false,
 			wantAck:          true,
-			assertGranter: func(t *testing.T, g *fakeInitialGranter) {
+			assertGranter: func(t *testing.T, g *fakePackGranter) {
 				assert.Equal(t, 0, g.calls, "冪等ガードにより granter 未呼び出し")
 			},
 		},
@@ -78,17 +78,17 @@ func TestPlayerOnboardedSubscriber_Start(t *testing.T) {
 			publish:       publishValid,
 			repoInsertErr: errors.New("db down"),
 			wantAck:       false,
-			assertGranter: func(t *testing.T, g *fakeInitialGranter) {
+			assertGranter: func(t *testing.T, g *fakePackGranter) {
 				assert.Equal(t, 0, g.calls, "dedup 失敗時は granter まで到達しない")
 			},
 		},
 		{
-			name:             "GrantInitialPack 失敗: Nack でリトライ",
+			name:             "GrantPack 失敗: Nack でリトライ",
 			publish:          publishValid,
 			repoInsertResult: true,
 			granterErr:       errors.New("grant failed"),
 			wantAck:          false,
-			assertGranter: func(t *testing.T, g *fakeInitialGranter) {
+			assertGranter: func(t *testing.T, g *fakePackGranter) {
 				assert.Equal(t, 1, g.calls)
 			},
 		},
@@ -98,7 +98,7 @@ func TestPlayerOnboardedSubscriber_Start(t *testing.T) {
 				broker.Publish(apiscenario.TopicPlayerOnboarded, []byte("not-json"))
 			},
 			wantAck: false,
-			assertGranter: func(t *testing.T, g *fakeInitialGranter) {
+			assertGranter: func(t *testing.T, g *fakePackGranter) {
 				assert.Equal(t, 0, g.calls)
 			},
 		},
@@ -113,7 +113,7 @@ func TestPlayerOnboardedSubscriber_Start(t *testing.T) {
 				}))
 			},
 			wantAck: false,
-			assertGranter: func(t *testing.T, g *fakeInitialGranter) {
+			assertGranter: func(t *testing.T, g *fakePackGranter) {
 				assert.Equal(t, 0, g.calls, "event_type フィルタで granter に到達しない")
 			},
 		},
@@ -125,7 +125,7 @@ func TestPlayerOnboardedSubscriber_Start(t *testing.T) {
 			pub := apiscenariofake.NewPublisher(broker)
 			stream := apiscenariofake.NewStream(apiscenariofake.NewSubscriber(broker), apiscenario.TopicPlayerOnboarded)
 
-			granter := &fakeInitialGranter{err: tt.granterErr}
+			granter := &fakePackGranter{err: tt.granterErr}
 			repo := &fakeProcessedEventRepo{
 				insertResult: tt.repoInsertResult,
 				insertErr:    tt.repoInsertErr,
