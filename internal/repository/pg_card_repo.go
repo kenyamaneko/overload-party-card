@@ -49,36 +49,6 @@ func (r *PgCardRepository) FindAll(ctx context.Context) ([]*domain.Card, error) 
 	return cards, nil
 }
 
-// FindCardIDsByFactions は指定ファクション群に属する有効カードの card_id を返します。
-func (r *PgCardRepository) FindCardIDsByFactions(ctx context.Context, factions []string) ([]string, error) {
-	if len(factions) == 0 {
-		return nil, nil
-	}
-	rows, err := r.pool.Query(ctx,
-		`SELECT card_id FROM card_definitions
-		 WHERE is_active = true AND faction = ANY($1)
-		 ORDER BY card_id`,
-		factions,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("query card_ids by factions: %w", err)
-	}
-	defer rows.Close()
-
-	ids := make([]string, 0, 64)
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("scan card_id: %w", err)
-		}
-		ids = append(ids, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate card_ids: %w", err)
-	}
-	return ids, nil
-}
-
 func scanCard(rows pgx.Rows) (*domain.Card, error) {
 	var c domain.Card
 	var stats, effects json.RawMessage

@@ -92,19 +92,26 @@ CREATE TABLE card.deck_cards (
 -- =============================================================================
 -- 配布パック (どのカードを何枚配るか) の SSoT。shop からは
 -- shop.product_card_pack_refs.card_pack_id で論理参照される (FK なし)。
+-- 配布対象カードと枚数は子テーブル card.card_pack_cards に正規化する。
 
 CREATE TABLE card.card_pack (
-  pack_id          VARCHAR(50) NOT NULL,                    -- パック識別子（例: faction_set_she）
-  description      VARCHAR(200) NOT NULL DEFAULT '',         -- 運営用説明
-  selection        JSONB NOT NULL,                          -- 配布対象カード集合の指定方式
-  copies_per_card  INT NOT NULL CHECK (copies_per_card > 0),-- 配布対象カード 1 種あたりの配布枚数
-  is_active        BOOLEAN NOT NULL DEFAULT true,           -- 配布有効フラグ
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),      -- 作成日時
-  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),      -- 更新日時
+  pack_id     VARCHAR(50) NOT NULL,                    -- パック識別子（例: faction_set_she）
+  description VARCHAR(200) NOT NULL DEFAULT '',         -- 運営用説明
+  is_active   BOOLEAN NOT NULL DEFAULT true,           -- 配布有効フラグ
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),      -- 作成日時
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),      -- 更新日時
   PRIMARY KEY (pack_id)
 );
 
 CREATE TRIGGER trg_card_pack_updated_at BEFORE UPDATE ON card.card_pack FOR EACH ROW EXECUTE FUNCTION card.update_updated_at();
+
+CREATE TABLE card.card_pack_cards (
+  pack_id VARCHAR(50) NOT NULL,                            -- 親パック識別子
+  card_id VARCHAR(10) NOT NULL,                            -- 配布対象カード識別子
+  copies  INT         NOT NULL CHECK (copies > 0),         -- 当該パック当該カードの配布枚数
+  PRIMARY KEY (pack_id, card_id),
+  FOREIGN KEY (pack_id) REFERENCES card.card_pack(pack_id) ON DELETE CASCADE
+);
 
 -- =============================================================================
 -- card.processed_events (Pub/Sub subscriber idempotency)

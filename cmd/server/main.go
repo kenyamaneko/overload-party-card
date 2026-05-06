@@ -62,7 +62,7 @@ func run() error {
 	cardInteractor := usecase.NewCardInteractor(cardRepo, playerCardRepo)
 	deckInteractor := usecase.NewDeckInteractor(deckRepo, playerCardRepo, cardCache)
 	playerCardInteractor := usecase.NewPlayerCardInteractor(playerCardRepo, cardCache)
-	grantInteractor := usecase.NewGrantInteractor(cardPackRepo, cardRepo, playerCardRepo)
+	grantInteractor := usecase.NewGrantInteractor(cardPackRepo, playerCardRepo)
 
 	cardH := rest.NewCardHandler(cardInteractor)
 	deckH := rest.NewDeckHandler(deckInteractor)

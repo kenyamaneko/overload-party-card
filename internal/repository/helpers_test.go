@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/kenyamaneko/overload-party-card/internal/domain"
 )
 
 // cardSeed は card.card_definitions への最小シード入力。
@@ -119,16 +121,16 @@ const (
 	playerB = "22222222-2222-2222-2222-222222222222"
 )
 
-// bulkScale は AddCards の bulk UPSERT を実 grant スケール (数十枚) で
-// 検証するためのフィクスチャを生成する。n 件の card_id (BK-0001..) と
-// 「全件 count コピーずつ」の期待値マップをペアで返す。
-func bulkScale(n, count int) ([]string, map[string]int) {
-	cardIDs := make([]string, n)
+// bulkCardPackCards は AddCards の bulk UPSERT を実 grant スケール (数十枚) で
+// 検証するためのフィクスチャを生成する。n 件の (card_id, copies) ペアと
+// 「全件 copies コピーずつ」の期待値マップをペアで返す。
+func bulkCardPackCards(n, copies int) ([]domain.CardPackCard, map[string]int) {
+	cards := make([]domain.CardPackCard, n)
 	expected := make(map[string]int, n)
-	for i := range cardIDs {
+	for i := range cards {
 		id := fmt.Sprintf("BK-%04d", i+1)
-		cardIDs[i] = id
-		expected[id] = count
+		cards[i] = domain.CardPackCard{CardID: id, Copies: copies}
+		expected[id] = copies
 	}
-	return cardIDs, expected
+	return cards, expected
 }

@@ -64,7 +64,7 @@ CardCache は読み取り専用。マスター改定時は Pod 再起動で inva
 2. **遡及配布の運用**: 後から pack 内容を変更したとき、既存購入者にも差分配布する運用要件を許容する。キャッシュだとローリング再起動中に「新 Pod は新定義 / 旧 Pod は旧定義」が混在し、遡及配布が予測不能になる
 3. **配布タイミングの即時反映**: pack 定義変更が次の配布リクエストから直ちに効く（Pod 再起動不要）
 
-CardCache は静的なカードマスターを参照する read-heavy ホットパス（デッキ構築・battle 判定）で使う前提で、性質が違う。配布リクエストは onboarding / shop 購入の頻度でホットパスではなく、`card_pack` は件数も小さい（10〜20 行オーダー）ため PK lookup は ms オーダーで毎回 DB 参照のコストは無視できる。
+CardCache は静的なカードマスターを参照する read-heavy ホットパス（デッキ構築・battle 判定）で使う前提で、性質が違う。配布リクエストは onboarding / shop 購入の頻度でホットパスではなく、`card_pack` は件数も小さい（数件オーダー）ため pack ヘッダ + 内包カード行の LEFT JOIN は ms オーダーで毎回 DB 参照のコストは無視できる。
 
 ## `is_valid` を DB に保存しない判断
 
@@ -127,7 +127,7 @@ card は `faction-acquired` を購読**しない** (faction 所有権の SSoT �
 
 ## カード配布 API の非冪等契約
 
-card の配布 API は `usecase.GrantInteractor.GrantPack(playerID, packID)` のみで、Pub/Sub subscriber 経由でだけ呼ばれる。**呼ばれた回数ぶん `card_pack.copies_per_card` 枚ずつ加算する**。自前で冪等性を持たない。
+card の配布 API は `usecase.GrantInteractor.GrantPack(playerID, packID)` のみで、Pub/Sub subscriber 経由でだけ呼ばれる。pack に登録された `(card_id, copies)` ペアを **呼ばれた回数ぶん加算する**。自前で冪等性を持たない。
 
 冪等性は `card.processed_events` の event_id 前段ガードで at-most-once 相当に近づける（上記「Pub/Sub subscriber の冪等性」を参照）。`processed_events` INSERT と `GrantPack` 内の `player_cards` UPSERT を同一 tx に乗せられない既存制約は、本ADR でも踏襲する（ADR-032）。
 
@@ -190,7 +190,7 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 
 ### card_pack マスター変更時
 
-1. `data/card_packs.yaml` を編集（pack の追加・配布枚数変更・selection 変更・`is_active` 切り替え等）
+1. `data/card_packs.yaml` を編集（pack の追加・カード追加 / 削除・配布枚数変更・`is_active` 切り替え等）
 2. `python3 scripts/generate_card_packs.py` を実行して `db/seed/card_packs_seed.sql` を更新
 3. コミット
 4. デプロイ後に ops の `db-migrate` を走らせて seed を反映

@@ -1,8 +1,7 @@
-# Card pack master (SSoT for `card.card_pack` table).
+# Card pack master (SSoT for `card.card_pack` and `card.card_pack_cards`).
 #
-# 各 pack は配布対象カード集合と各カードの配布枚数の組。配布の合成
-# (basic + 選択 faction 等) は subscriber 側で複数 pack を順次配布する形で
-# 表現する。
+# 各 pack は配布対象カードと配布枚数の組。subscriber 側で複数 pack を順次配布
+# することで合成的な配布 (basic + 選択 faction 等) を表現する。
 #
 # 直接編集してよいのは本ファイルのみ。db/seed/card_packs_seed.sql は
 # scripts/generate_card_packs.py で生成される。
@@ -10,35 +9,147 @@
 packs:
   - pack_id: basic
     description: 全プレイヤー共通の Neutral 基本セット
-    selection:
-      type: by_factions
-      factions: [Neutral]
-    copies_per_card: 3
+    cards:
+      NT-0001: 3
+      NT-0002: 3
+      NT-0003: 3
+      NT-0004: 3
+      NT-0005: 3
+      NT-0006: 3
+      NT-0007: 3
+      NT-0008: 3
+      NT-0009: 3
+      NT-0010: 3
+      NT-0011: 3
+      NT-0012: 3
+      NT-0013: 3
+      NT-0014: 3
+      NT-0015: 3
+      NT-0016: 3
+      NT-0017: 3
+      NT-0018: 3
+      NT-0019: 3
+      NT-0020: 3
+      NT-0021: 3
+      NT-0022: 3
+      NT-0023: 3
+      NT-0024: 3
+      NT-0025: 3
+      NT-0026: 3
+      NT-0027: 3
+      NT-0028: 3
+      NT-0029: 3
+      NT-0030: 3
+      NT-0031: 3
+      NT-0032: 3
+      NT-0033: 3
+      NT-0034: 3
 
   - pack_id: faction_set_she
     description: SHE 基本セット
-    selection:
-      type: by_factions
-      factions: [SHE]
-    copies_per_card: 3
+    cards:
+      SH-0001: 3
+      SH-0002: 3
+      SH-0003: 3
+      SH-0004: 3
+      SH-0005: 3
+      SH-0006: 3
+      SH-0007: 3
+      SH-0008: 3
+      SH-0009: 3
+      SH-0010: 3
+      SH-0011: 3
+      SH-0012: 3
+      SH-0013: 3
+      SH-0014: 3
+      SH-0015: 3
+      SH-0016: 3
+      SH-0017: 3
+      SH-0018: 3
+      SH-0019: 3
+      SH-0020: 3
+      SH-0021: 3
+      SH-0022: 3
+      SH-0023: 3
+      SH-0024: 3
+      SH-0025: 3
 
   - pack_id: faction_set_tenki
     description: Tenki 基本セット
-    selection:
-      type: by_factions
-      factions: [Tenki]
-    copies_per_card: 3
+    cards:
+      TK-0001: 3
+      TK-0002: 3
+      TK-0003: 3
+      TK-0004: 3
+      TK-0005: 3
+      TK-0006: 3
+      TK-0007: 3
+      TK-0008: 3
+      TK-0009: 3
+      TK-0010: 3
+      TK-0011: 3
+      TK-0012: 3
+      TK-0013: 3
+      TK-0014: 3
+      TK-0015: 3
+      TK-0016: 3
+      TK-0017: 3
+      TK-0018: 3
+      TK-0019: 3
+      TK-0020: 3
+      TK-0021: 3
+      TK-0022: 3
+      TK-0023: 3
+      TK-0024: 3
+      TK-0025: 3
 
   - pack_id: faction_set_sugar
     description: Sugar 基本セット
-    selection:
-      type: by_factions
-      factions: [Sugar]
-    copies_per_card: 3
+    cards:
+      SL-0001: 3
+      SL-0002: 3
+      SL-0003: 3
+      SL-0004: 3
+      SL-0005: 3
+      SL-0006: 3
+      SL-0007: 3
+      SL-0008: 3
+      SL-0009: 3
+      SL-0010: 3
+      SL-0011: 3
+      SL-0012: 3
+      SL-0013: 3
+      SL-0014: 3
+      SL-0015: 3
+      SL-0016: 3
+      SL-0017: 3
+      SL-0018: 3
+      SL-0019: 3
+      SL-0020: 3
+      SL-0021: 3
+      SL-0022: 3
+      SL-0023: 3
+      SL-0024: 3
 
   - pack_id: faction_set_tuners
     description: Tuners 基本セット
-    selection:
-      type: by_factions
-      factions: [Tuners]
-    copies_per_card: 3
+    cards:
+      TN-0001: 3
+      TN-0002: 3
+      TN-0003: 3
+      TN-0004: 3
+      TN-0005: 3
+      TN-0006: 3
+      TN-0007: 3
+      TN-0008: 3
+      TN-0009: 3
+      TN-0010: 3
+      TN-0011: 3
+      TN-0012: 3
+      TN-0013: 3
+      TN-0014: 3
+      TN-0015: 3
+      TN-0016: 3
+      TN-0017: 3
+      TN-0018: 3
+
