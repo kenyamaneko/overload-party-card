@@ -9,10 +9,6 @@ import (
 )
 
 // New は card サービスの HTTP ルーターを構築します。
-//
-// 配布 (grant) エンドポイントは ADR-032 / ADR-026 に伴い廃止されました。
-// 配布は scenario の `player-onboarded` event と shop の `card-pack-purchased` event
-// (今後追加) を経由した Pub/Sub 駆動のみで行われます。
 func New(
 	cardH *rest.CardHandler,
 	deckH *rest.DeckHandler,

@@ -32,8 +32,8 @@ func NewGrantInteractor(
 }
 
 // GrantPack は card_pack マスターから対象 pack を取得し、selection に従って
-// プレイヤーへカードを配布します。pack マスターは配布リクエストごとに DB を引きます
-// (キャッシュなし: ADR-032 §2 / docs/ARCHITECTURE.md「pack マスターはキャッシュしない」)。
+// プレイヤーへカードを配布します。pack マスターは配布リクエストごとに
+// CardPackRepo 経由で取得します (キャッシュ戦略は repository 実装の責務)。
 //
 // 戻り値は配布されたコピー総数。pack 不在は port.ErrNotFound、運用停止 pack は
 // port.ErrPackInactive、selection が不正は port.ErrInvalidPackSelection を返します。
@@ -71,4 +71,3 @@ func (s *GrantInteractor) resolveSelection(ctx context.Context, sel domain.Selec
 	}
 	return nil, fmt.Errorf("%w: unknown selection type %T", port.ErrInvalidPackSelection, sel)
 }
-

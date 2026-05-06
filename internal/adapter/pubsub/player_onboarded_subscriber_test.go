@@ -12,26 +12,25 @@ import (
 )
 
 // fakePackGranter は packGranter のテスト用スタブです。
+// errOnPack に一致する pack_id だけエラーを返す形にすると、N 回呼びの中で
+// 何回目に失敗したかを直接表現できます。
 type fakePackGranter struct {
-	err          error
-	calls        int
-	lastPlayerID string
-	lastPackID   string
+	errOnPack string
+	err       error
+	gotPacks  []string
 }
 
-func (f *fakePackGranter) GrantPack(_ context.Context, playerID, packID string) (int, error) {
-	f.calls++
-	f.lastPlayerID = playerID
-	f.lastPackID = packID
-	if f.err != nil {
+func (f *fakePackGranter) GrantPack(_ context.Context, _, packID string) (int, error) {
+	f.gotPacks = append(f.gotPacks, packID)
+	if f.err != nil && (f.errOnPack == "" || f.errOnPack == packID) {
 		return 0, f.err
 	}
 	return 6, nil
 }
 
-// TestPlayerOnboardedSubscriber_Start は「オンボーディング完了時に初期パック
-// (initial_faction_id + Neutral) を 1 イベント単位で冪等に配布する」仕様を
-// Start() → stream.Consume → process の経路で固定する。
+// TestPlayerOnboardedSubscriber_Start は「オンボーディング完了時に basic pack
+// と選択 faction の基本セットを順次配布する」仕様を Start() → stream.Consume
+// → process の経路で固定する。
 //
 // 契約検証は apiscenariofake 経由で scenario 側の publish 型をそのまま使う
 // (scenario が schema を変えたら card のテストが compile / 実行で破綻するように
@@ -50,57 +49,56 @@ func TestPlayerOnboardedSubscriber_Start(t *testing.T) {
 		repoInsertResult bool
 		repoInsertErr    error
 		granterErr       error
+		granterErrOnPack string
 		wantAck          bool
-		assertGranter    func(t *testing.T, g *fakePackGranter)
+		wantPacks        []string
 	}{
 		{
-			name:             "新規イベントは initial_<faction> pack で配布して Ack する",
+			name:             "新規イベントは basic と faction_set_<faction> を順次配布して Ack する",
 			publish:          publishValid,
 			repoInsertResult: true,
 			wantAck:          true,
-			assertGranter: func(t *testing.T, g *fakePackGranter) {
-				assert.Equal(t, 1, g.calls)
-				assert.Equal(t, "player-1", g.lastPlayerID)
-				assert.Equal(t, "initial_Tuners", g.lastPackID, "initial_faction_id を 'initial_<faction>' pack_id に組み立てて GrantPack に渡す")
-			},
+			wantPacks:        []string{"basic", "faction_set_Tuners"},
 		},
 		{
 			name:             "重複イベント (processed_events 既存): 配布せず Ack",
 			publish:          publishValid,
 			repoInsertResult: false,
 			wantAck:          true,
-			assertGranter: func(t *testing.T, g *fakePackGranter) {
-				assert.Equal(t, 0, g.calls, "冪等ガードにより granter 未呼び出し")
-			},
+			wantPacks:        nil,
 		},
 		{
 			name:          "processed_events insert 失敗: Nack でリトライ",
 			publish:       publishValid,
 			repoInsertErr: errors.New("db down"),
 			wantAck:       false,
-			assertGranter: func(t *testing.T, g *fakePackGranter) {
-				assert.Equal(t, 0, g.calls, "dedup 失敗時は granter まで到達しない")
-			},
+			wantPacks:     nil,
 		},
 		{
-			name:             "GrantPack 失敗: Nack でリトライ",
+			name:             "1 回目 (basic) GrantPack 失敗: Nack で 2 回目は呼ばない",
 			publish:          publishValid,
 			repoInsertResult: true,
 			granterErr:       errors.New("grant failed"),
+			granterErrOnPack: "basic",
 			wantAck:          false,
-			assertGranter: func(t *testing.T, g *fakePackGranter) {
-				assert.Equal(t, 1, g.calls)
-			},
+			wantPacks:        []string{"basic"},
+		},
+		{
+			name:             "2 回目 (faction) GrantPack 失敗: Nack。1 回目は呼ばれている",
+			publish:          publishValid,
+			repoInsertResult: true,
+			granterErr:       errors.New("grant failed"),
+			granterErrOnPack: "faction_set_Tuners",
+			wantAck:          false,
+			wantPacks:        []string{"basic", "faction_set_Tuners"},
 		},
 		{
 			name: "malformed JSON: Nack して DLQ 送り",
 			publish: func(_ context.Context, _ *apiscenariofake.Publisher, broker *apiscenariofake.Broker) {
 				broker.Publish(apiscenario.TopicPlayerOnboarded, []byte("not-json"))
 			},
-			wantAck: false,
-			assertGranter: func(t *testing.T, g *fakePackGranter) {
-				assert.Equal(t, 0, g.calls)
-			},
+			wantAck:   false,
+			wantPacks: nil,
 		},
 		{
 			name: "未知 event_type: Nack して DLQ で publisher バグ検出",
@@ -112,10 +110,8 @@ func TestPlayerOnboardedSubscriber_Start(t *testing.T) {
 					InitialFactionID: "SHE",
 				}))
 			},
-			wantAck: false,
-			assertGranter: func(t *testing.T, g *fakePackGranter) {
-				assert.Equal(t, 0, g.calls, "event_type フィルタで granter に到達しない")
-			},
+			wantAck:   false,
+			wantPacks: nil,
 		},
 	}
 
@@ -125,7 +121,7 @@ func TestPlayerOnboardedSubscriber_Start(t *testing.T) {
 			pub := apiscenariofake.NewPublisher(broker)
 			stream := apiscenariofake.NewStream(apiscenariofake.NewSubscriber(broker), apiscenario.TopicPlayerOnboarded)
 
-			granter := &fakePackGranter{err: tt.granterErr}
+			granter := &fakePackGranter{err: tt.granterErr, errOnPack: tt.granterErrOnPack}
 			repo := &fakeProcessedEventRepo{
 				insertResult: tt.repoInsertResult,
 				insertErr:    tt.repoInsertErr,
@@ -146,8 +142,7 @@ func TestPlayerOnboardedSubscriber_Start(t *testing.T) {
 
 			handlerErr := stream.ExpectHandled(t, time.Second)
 			assert.Equal(t, tt.wantAck, handlerErr == nil, "ack 判定 (nil=ack, err=%v)", handlerErr)
-
-			tt.assertGranter(t, granter)
+			assert.Equal(t, tt.wantPacks, granter.gotPacks)
 		})
 	}
 }

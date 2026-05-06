@@ -90,17 +90,15 @@ CREATE TABLE card.deck_cards (
 -- =============================================================================
 -- Card Pack Master (schema: card)
 -- =============================================================================
--- ADR-032 で導入。配布パックの定義 (どのカードを何枚配るか) の SSoT。
--- shop は `shop.product_card_pack_refs.card_pack_id` で本表の pack_id を論理参照する
--- (cross-schema, cross-DB 参照のため FK は張らない / ADR-014)。
--- 配布リクエストごとに DB 参照する (キャッシュなし: ADR-032 §2 / docs/ARCHITECTURE.md)。
+-- 配布パック (どのカードを何枚配るか) の SSoT。shop からは
+-- shop.product_card_pack_refs.card_pack_id で論理参照される (FK なし)。
 
 CREATE TABLE card.card_pack (
-  pack_id          VARCHAR(50) NOT NULL,                    -- e.g. "initial_she" / "faction_set_she" / "limited_2026_summer"
-  description      VARCHAR(200) NOT NULL DEFAULT '',         -- 運営用説明 (UI には出さない)
-  selection        JSONB NOT NULL,                          -- 配布対象 ({"type":"by_factions","factions":[...]} or {"type":"by_card_ids","card_ids":[...]})
-  copies_per_card  INT NOT NULL CHECK (copies_per_card > 0),-- 配布対象の各カードを何枚配るか
-  is_active        BOOLEAN NOT NULL DEFAULT true,           -- 配布停止フラグ
+  pack_id          VARCHAR(50) NOT NULL,                    -- パック識別子（例: faction_set_she）
+  description      VARCHAR(200) NOT NULL DEFAULT '',         -- 運営用説明
+  selection        JSONB NOT NULL,                          -- 配布対象カード集合の指定方式
+  copies_per_card  INT NOT NULL CHECK (copies_per_card > 0),-- 配布対象カード 1 種あたりの配布枚数
+  is_active        BOOLEAN NOT NULL DEFAULT true,           -- 配布有効フラグ
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),      -- 作成日時
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),      -- 更新日時
   PRIMARY KEY (pack_id)

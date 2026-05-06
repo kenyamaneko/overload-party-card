@@ -96,8 +96,10 @@ ADR-022 で `FactionSelectedEvent` を業務事実単位に分解し、ADR-031 /
 
 | subscriber | 副作用 | 備考 |
 |---|---|---|
-| `player-onboarded-card-sub` | onboarding 完了時に `initial_<faction>` pack を配布 (内部で `GrantPack(playerID, "initial_"+faction)`) | 導入済み |
+| `player-onboarded-card-sub` | onboarding 完了時に `basic` pack と `faction_set_<faction>` pack を順次配布 (内部で `GrantPack` を 2 回呼ぶ) | 導入済み |
 | `card-pack-purchased-card-sub` | shop の card_pack 系商品 (faction_set / 限定パック等) 購入時に `card_pack_id` で指定された pack を配布 | ADR-032 PR 2 で追加 |
+
+`player-onboarded` での 2 pack 配布は順次呼びのため、間でクラッシュすると「basic だけ配布された」「faction だけ配布された」「重複配布」のいずれかの状態が残りうる。これは下記「Pub/Sub subscriber の冪等性」で述べる at-most-once 相当の制約を 2 pack に拡張したもので、稼働前は許容する。
 
 card は `faction-acquired` を購読**しない** (faction 所有権の SSoT は account の責務、ADR-031)。業務事実と topic が 1 対 1 に対応するため、subscriber は自身の topic に紐づく副作用だけを実行する。
 

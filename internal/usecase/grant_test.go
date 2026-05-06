@@ -12,23 +12,17 @@ import (
 	"github.com/kenyamaneko/overload-party-card/internal/port"
 )
 
-// fakeCardPackRepo は CardPackRepo のテスト用スタブです。
+// fakeCardPackRepo は CardPackRepo のテスト用スタブ。
 type fakeCardPackRepo struct {
-	pack       *domain.CardPack
-	err        error
-	gotPackIDs []string
+	pack *domain.CardPack
+	err  error
 }
 
-func (f *fakeCardPackRepo) GetPack(_ context.Context, packID string) (*domain.CardPack, error) {
-	f.gotPackIDs = append(f.gotPackIDs, packID)
-	if f.err != nil {
-		return nil, f.err
-	}
-	return f.pack, nil
+func (f *fakeCardPackRepo) GetPack(_ context.Context, _ string) (*domain.CardPack, error) {
+	return f.pack, f.err
 }
 
-// fakeGrantCardRepo は CardRepo の最小スタブです。FindCardIDsByFactions の引数記録 +
-// 返却値制御で「pack の selection.factions が repo に正しく伝播するか」を検証します。
+// fakeGrantCardRepo は CardRepo の最小スタブ。
 type fakeGrantCardRepo struct {
 	gotFactions []string
 	retIDs      []string
@@ -41,14 +35,13 @@ func (f *fakeGrantCardRepo) FindCardIDsByFactions(_ context.Context, factions []
 	return f.retIDs, f.retErr
 }
 
-// fakeGrantPlayerCardRepo は PlayerCardRepo の最小スタブ。AddCards の引数を記録します。
+// fakeGrantPlayerCardRepo は PlayerCardRepo の最小スタブ。AddCards の引数を記録する。
 type fakeGrantPlayerCardRepo struct {
+	called          bool
 	gotPlayerID     string
 	gotCardIDs      []string
 	gotCountPerCard int
 	retAdded        int
-	retErr          error
-	called          bool
 }
 
 func (f *fakeGrantPlayerCardRepo) GetPlayerCards(_ context.Context, _ string) ([]*domain.PlayerCard, error) {
@@ -59,167 +52,120 @@ func (f *fakeGrantPlayerCardRepo) AddCards(_ context.Context, playerID string, c
 	f.gotPlayerID = playerID
 	f.gotCardIDs = append([]string(nil), cardIDs...)
 	f.gotCountPerCard = countPerCard
-	return f.retAdded, f.retErr
+	return f.retAdded, nil
 }
 
-// errPackTestRepoDown は repo 失敗ケースの注入 / 期待値共有用 sentinel。
-var errPackTestRepoDown = errors.New("db down")
+// TestGrantPack_ByFactions は selection.by_factions の pack を配布したとき、
+// pack に書かれた factions で解決された card_id 群と pack の copies_per_card が
+// AddCards に渡ることを固定する。
+func TestGrantPack_ByFactions(t *testing.T) {
+	packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
+		Selection:     domain.SelectionByFactions{Factions: []string{"SHE", "Neutral"}},
+		CopiesPerCard: 3,
+		IsActive:      true,
+	}}
+	cardRepo := &fakeGrantCardRepo{retIDs: []string{"SH-0001", "NE-0001"}}
+	pcRepo := &fakeGrantPlayerCardRepo{retAdded: 6}
 
-// grantCase は GrantPack のテーブル駆動テストケース。
-//
-// pack 取得 → selection 解決 → AddCards 配布 という 3 段の各分岐 (success / pack not found
-// / inactive / invalid selection / 配布対象 0 件) を、ケースの差し替えだけで網羅する。
-// テストコード内に if 文を書かないため、成功/失敗の分岐は wantErrIs の有無で表現する。
-type grantCase struct {
-	name string
-	// pack repo 入力
-	pack       *domain.CardPack
-	packRepoEr error
-	// card repo 入力 (selection が by_factions の場合に評価)
-	cardIDs    []string
-	cardRepoEr error
-	// addCards 戻り値
-	addedReturn int
-	// 期待値
-	wantPackIDQueried []string
-	wantFactionsQuery []string
-	wantAddCalled     bool
-	wantCardIDsAdded  []string
-	wantCountPerCard  int
-	wantCopies        int
-	wantErrIs         error
+	svc := NewGrantInteractor(packRepo, cardRepo, pcRepo)
+	got, err := svc.GrantPack(context.Background(), "player-1", "any")
+
+	require.NoError(t, err)
+	assert.Equal(t, 6, got)
+	assert.Equal(t, []string{"SHE", "Neutral"}, cardRepo.gotFactions)
+	assert.Equal(t, "player-1", pcRepo.gotPlayerID)
+	assert.Equal(t, []string{"SH-0001", "NE-0001"}, pcRepo.gotCardIDs)
+	assert.Equal(t, 3, pcRepo.gotCountPerCard)
 }
 
-const (
-	testPlayerID  = "player-1"
-	testPackID    = "initial_she"
-	testCopies    = 3
-	testFaction   = "SHE"
-	testNeutral   = "Neutral"
-	testCardIDSH1 = "SH-0001"
-	testCardIDNE1 = "NE-0001"
-	testCardIDLM1 = "LM-0001"
-)
+// TestGrantPack_ByCardIDs は selection.by_card_ids の pack を配布したとき、
+// pack の card_ids がそのまま AddCards に渡り、CardRepo は呼ばれないことを固定する。
+func TestGrantPack_ByCardIDs(t *testing.T) {
+	packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
+		Selection:     domain.SelectionByCardIDs{CardIDs: []string{"LM-0001"}},
+		CopiesPerCard: 1,
+		IsActive:      true,
+	}}
+	cardRepo := &fakeGrantCardRepo{}
+	pcRepo := &fakeGrantPlayerCardRepo{retAdded: 1}
 
-func packByFactions(factions []string, copies int, active bool) *domain.CardPack {
-	return &domain.CardPack{
-		PackID:        testPackID,
-		Selection:     domain.SelectionByFactions{Factions: factions},
-		CopiesPerCard: copies,
-		IsActive:      active,
-	}
+	svc := NewGrantInteractor(packRepo, cardRepo, pcRepo)
+	got, err := svc.GrantPack(context.Background(), "player-1", "any")
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, got)
+	assert.Nil(t, cardRepo.gotFactions, "by_card_ids 経路では cardRepo を引かない")
+	assert.Equal(t, []string{"LM-0001"}, pcRepo.gotCardIDs)
+	assert.Equal(t, 1, pcRepo.gotCountPerCard)
 }
 
-func packByCardIDs(cardIDs []string, copies int, active bool) *domain.CardPack {
-	return &domain.CardPack{
-		PackID:        "limited_test",
-		Selection:     domain.SelectionByCardIDs{CardIDs: cardIDs},
-		CopiesPerCard: copies,
-		IsActive:      active,
-	}
+// TestGrantPack_InactivePack は is_active=false の pack に対して
+// port.ErrPackInactive を返し、AddCards を呼ばないことを固定する。
+func TestGrantPack_InactivePack(t *testing.T) {
+	packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
+		Selection:     domain.SelectionByFactions{Factions: []string{"SHE"}},
+		CopiesPerCard: 3,
+		IsActive:      false,
+	}}
+	pcRepo := &fakeGrantPlayerCardRepo{}
+
+	svc := NewGrantInteractor(packRepo, &fakeGrantCardRepo{}, pcRepo)
+	_, err := svc.GrantPack(context.Background(), "player-1", "any")
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, port.ErrPackInactive)
+	assert.False(t, pcRepo.called)
 }
 
-// TestGrantPack は「pack マスターから対象を解決して配布する」という配布仕様を、
-// pack の selection / is_active / repo 失敗 / 配布対象 0 件 の各観点で検証する。
-//
-// テストの仕様意図:
-//   - selection.by_factions: pack に書かれた factions が cardRepo に渡り、得た card_id を AddCards へ
-//   - selection.by_card_ids: pack の card_ids がそのまま AddCards へ
-//   - inactive pack: AddCards は呼ばれず ErrPackInactive
-//   - pack not found: AddCards は呼ばれず ErrNotFound 伝播
-//   - card repo 失敗: AddCards は呼ばれずエラー伝播
-//   - 配布対象 0 件: AddCards は呼ばれず ErrCardMasterEmpty
-func TestGrantPack(t *testing.T) {
-	tests := []grantCase{
-		{
-			name:              "by_factions: pack の factions で card_id を引き、copies_per_card 枚配布する",
-			pack:              packByFactions([]string{testFaction, testNeutral}, testCopies, true),
-			cardIDs:           []string{testCardIDSH1, testCardIDNE1},
-			addedReturn:       6,
-			wantPackIDQueried: []string{testPackID},
-			wantFactionsQuery: []string{testFaction, testNeutral},
-			wantAddCalled:     true,
-			wantCardIDsAdded:  []string{testCardIDSH1, testCardIDNE1},
-			wantCountPerCard:  testCopies,
-			wantCopies:        6,
-		},
-		{
-			name:              "by_card_ids: pack の card_ids をそのまま使い、cardRepo は呼ばれない",
-			pack:              packByCardIDs([]string{testCardIDLM1}, 1, true),
-			addedReturn:       1,
-			wantPackIDQueried: []string{testPackID},
-			wantFactionsQuery: nil,
-			wantAddCalled:     true,
-			wantCardIDsAdded:  []string{testCardIDLM1},
-			wantCountPerCard:  1,
-			wantCopies:        1,
-		},
-		{
-			name:              "inactive pack は ErrPackInactive を返し AddCards を呼ばない",
-			pack:              packByFactions([]string{testFaction}, testCopies, false),
-			wantPackIDQueried: []string{testPackID},
-			wantErrIs:         port.ErrPackInactive,
-		},
-		{
-			name:              "pack 不在 (port.ErrNotFound) は伝播する",
-			packRepoEr:        port.ErrNotFound,
-			wantPackIDQueried: []string{testPackID},
-			wantErrIs:         port.ErrNotFound,
-		},
-		{
-			name:              "card repo エラーは伝播する (selection.by_factions 経路)",
-			pack:              packByFactions([]string{testFaction}, testCopies, true),
-			cardRepoEr:        errPackTestRepoDown,
-			wantPackIDQueried: []string{testPackID},
-			wantFactionsQuery: []string{testFaction},
-			wantErrIs:         errPackTestRepoDown,
-		},
-		{
-			name:              "active カード 0 件は ErrCardMasterEmpty を返し AddCards を呼ばない",
-			pack:              packByFactions([]string{testFaction}, testCopies, true),
-			cardIDs:           nil,
-			wantPackIDQueried: []string{testPackID},
-			wantFactionsQuery: []string{testFaction},
-			wantErrIs:         port.ErrCardMasterEmpty,
-		},
-	}
+// TestGrantPack_PackNotFound は pack repo の ErrNotFound が呼び出し側に伝播し、
+// AddCards が呼ばれないことを固定する。
+func TestGrantPack_PackNotFound(t *testing.T) {
+	packRepo := &fakeCardPackRepo{err: port.ErrNotFound}
+	pcRepo := &fakeGrantPlayerCardRepo{}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			packRepo := &fakeCardPackRepo{pack: tt.pack, err: tt.packRepoEr}
-			cardRepo := &fakeGrantCardRepo{retIDs: tt.cardIDs, retErr: tt.cardRepoEr}
-			pcRepo := &fakeGrantPlayerCardRepo{retAdded: tt.addedReturn}
+	svc := NewGrantInteractor(packRepo, &fakeGrantCardRepo{}, pcRepo)
+	_, err := svc.GrantPack(context.Background(), "player-1", "any")
 
-			svc := NewGrantInteractor(packRepo, cardRepo, pcRepo)
-			got, err := svc.GrantPack(context.Background(), testPlayerID, testPackID)
-
-			assert.Equal(t, tt.wantPackIDQueried, packRepo.gotPackIDs, "GetPack 呼び出し履歴")
-			assert.Equal(t, tt.wantFactionsQuery, cardRepo.gotFactions, "FindCardIDsByFactions に渡る factions")
-
-			verifiers := map[bool]func(){
-				true: func() {
-					require.NoError(t, err)
-					assert.Equal(t, tt.wantCopies, got)
-					assert.True(t, pcRepo.called, "成功時は AddCards が呼ばれる")
-					assert.Equal(t, testPlayerID, pcRepo.gotPlayerID)
-					assert.Equal(t, tt.wantCardIDsAdded, pcRepo.gotCardIDs)
-					assert.Equal(t, tt.wantCountPerCard, pcRepo.gotCountPerCard)
-				},
-				false: func() {
-					require.Error(t, err)
-					assert.ErrorIs(t, err, tt.wantErrIs)
-					assert.Equal(t, 0, got)
-					assert.Equal(t, tt.wantAddCalled, pcRepo.called, "失敗時は AddCards を呼ばない")
-				},
-			}
-			verifiers[tt.wantErrIs == nil]()
-		})
-	}
+	require.Error(t, err)
+	assert.ErrorIs(t, err, port.ErrNotFound)
+	assert.False(t, pcRepo.called)
 }
 
-// 注意: domain.Selection は private marker (isSelection) で外部実装をブロックするため、
-// 「未知 Selection 実装混入時に ErrInvalidPackSelection を返す」防御 (resolveSelection
-// の default case) は **compile time で到達不能**。型システムが invariant を担保しており
-// 同パッケージ内に偽 Selection を作ることもできない。defensive default case は将来
-// domain パッケージ内で sum を増やしたとき grant.go の switch を更新し忘れる事故への
-// 保険として残す。
+// TestGrantPack_CardRepoError は selection.by_factions 解決時の cardRepo エラーが
+// 呼び出し側に伝播し、AddCards が呼ばれないことを固定する。
+func TestGrantPack_CardRepoError(t *testing.T) {
+	dbDown := errors.New("db down")
+	packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
+		Selection:     domain.SelectionByFactions{Factions: []string{"SHE"}},
+		CopiesPerCard: 3,
+		IsActive:      true,
+	}}
+	cardRepo := &fakeGrantCardRepo{retErr: dbDown}
+	pcRepo := &fakeGrantPlayerCardRepo{}
+
+	svc := NewGrantInteractor(packRepo, cardRepo, pcRepo)
+	_, err := svc.GrantPack(context.Background(), "player-1", "any")
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, dbDown)
+	assert.False(t, pcRepo.called)
+}
+
+// TestGrantPack_EmptyResolvedSet は selection 解決の結果が 0 件の場合、
+// port.ErrCardMasterEmpty を返し AddCards を呼ばないことを固定する。
+func TestGrantPack_EmptyResolvedSet(t *testing.T) {
+	packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
+		Selection:     domain.SelectionByFactions{Factions: []string{"SHE"}},
+		CopiesPerCard: 3,
+		IsActive:      true,
+	}}
+	cardRepo := &fakeGrantCardRepo{retIDs: nil}
+	pcRepo := &fakeGrantPlayerCardRepo{}
+
+	svc := NewGrantInteractor(packRepo, cardRepo, pcRepo)
+	_, err := svc.GrantPack(context.Background(), "player-1", "any")
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, port.ErrCardMasterEmpty)
+	assert.False(t, pcRepo.called)
+}

@@ -1,74 +1,43 @@
 # Card pack master (SSoT for `card.card_pack` table).
 #
-# 各 pack は「どのカードを何枚配るか」を定義する配布ルール。
-# selection は配布対象の指定方式 (by_factions / by_card_ids) を type discriminator で表現。
+# 各 pack は配布対象カード集合と各カードの配布枚数の組。配布の合成
+# (basic + 選択 faction 等) は subscriber 側で複数 pack を順次配布する形で
+# 表現する。
 #
-# Owned by card service (SSoT). shop は `shop.product_card_pack_refs.card_pack_id` で
-# 本テーブルの pack_id を論理参照する (FK なし、整合は CI で検証 — overload-party-common#32)。
-#
-# 本ファイルが人間編集 SSoT。直接編集してよいのはここだけ。
-#   data/card_packs.yaml         (人間編集 SSoT、本ファイル)
-#   ↓ scripts/generate_card_packs.py
-#   db/seed/card_packs_seed.sql  (生成物、直接編集禁止)
-#
-# 関連 ADR:
-#   - ADR-032: card_pack 概念導入と GrantPack 統一
-#   - ADR-031: shop products 正規化と faction-purchased 業務事実分割
+# 直接編集してよいのは本ファイルのみ。db/seed/card_packs_seed.sql は
+# scripts/generate_card_packs.py で生成される。
 
 packs:
-  # ── Initial packs (オンボーディング: faction + Neutral 各 3 枚) ─────
-  - pack_id: initial_she
-    description: オンボーディング初期パック (SHE 選択時)
+  - pack_id: basic
+    description: 全プレイヤー共通の Neutral 基本セット
     selection:
       type: by_factions
-      factions: [SHE, Neutral]
+      factions: [Neutral]
     copies_per_card: 3
 
-  - pack_id: initial_tenki
-    description: オンボーディング初期パック (Tenki 選択時)
-    selection:
-      type: by_factions
-      factions: [Tenki, Neutral]
-    copies_per_card: 3
-
-  - pack_id: initial_sugar
-    description: オンボーディング初期パック (Sugar 選択時)
-    selection:
-      type: by_factions
-      factions: [Sugar, Neutral]
-    copies_per_card: 3
-
-  - pack_id: initial_tuners
-    description: オンボーディング初期パック (Tuners 選択時)
-    selection:
-      type: by_factions
-      factions: [Tuners, Neutral]
-    copies_per_card: 3
-
-  # ── Faction packs (ショップ faction_set 商品: faction 単独 各 3 枚) ──
   - pack_id: faction_set_she
-    description: ショップ faction_set 商品 (SHE)
+    description: SHE 基本セット
     selection:
       type: by_factions
       factions: [SHE]
     copies_per_card: 3
 
   - pack_id: faction_set_tenki
-    description: ショップ faction_set 商品 (Tenki)
+    description: Tenki 基本セット
     selection:
       type: by_factions
       factions: [Tenki]
     copies_per_card: 3
 
   - pack_id: faction_set_sugar
-    description: ショップ faction_set 商品 (Sugar)
+    description: Sugar 基本セット
     selection:
       type: by_factions
       factions: [Sugar]
     copies_per_card: 3
 
   - pack_id: faction_set_tuners
-    description: ショップ faction_set 商品 (Tuners)
+    description: Tuners 基本セット
     selection:
       type: by_factions
       factions: [Tuners]

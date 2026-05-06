@@ -17,8 +17,8 @@ var (
 	// 返します。カードマスターの不整合を示す運用エラーです。
 	ErrCardMasterEmpty = errors.New("card master empty for requested factions")
 	// ErrPackInactive は配布対象パックが is_active=false で運用停止中の場合に返します。
-	// 運用順序ミス (shop product より先に card_pack を停止) の検出に使われ、
-	// subscriber は本エラーで Nack して DLQ に寄せます (ADR-032 §5)。
+	// 呼び出し側はこのエラーを Nack 等で上位に伝搬し、DLQ で人間が運用順序の
+	// 不整合 (例: shop product より先に card_pack を停止) を検知できるようにします。
 	ErrPackInactive = errors.New("card pack is inactive")
 	// ErrInvalidPackSelection は card_pack.selection JSONB に未知の type discriminator が
 	// 含まれていた場合に返します。pack マスターのデータ不整合を示します。

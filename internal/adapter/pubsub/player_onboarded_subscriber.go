@@ -18,8 +18,7 @@ type packGranter interface {
 }
 
 // PlayerOnboardedSubscriber は player-onboarded subscription からイベントを取得し、
-// オンボーディング完了プレイヤーへ初期カードパック
-// (`initial_<faction>` pack: 選択 faction のカード + Neutral カード) を配布します。
+// オンボーディング完了プレイヤーへ basic pack と選択 faction の基本セットを配布します。
 //
 // 冪等性は event_id ベースの processed_events で担保します。
 // 未知の event_type / malformed payload は Ack ではなく Nack して DLQ
@@ -37,9 +36,9 @@ func NewPlayerOnboardedSubscriber(
 	eventRepo port.ProcessedEventRepo,
 ) *PlayerOnboardedSubscriber {
 	return &PlayerOnboardedSubscriber{
-		stream:       stream,
+		stream:          stream,
 		grantInteractor: grantInteractor,
-		eventRepo:    eventRepo,
+		eventRepo:       eventRepo,
 	}
 }
 
@@ -62,8 +61,6 @@ func (s *PlayerOnboardedSubscriber) process(ctx context.Context, data []byte) er
 		return fmt.Errorf("player-onboarded-card: unexpected event_type %q", ev.EventType)
 	}
 
-	// GrantInteractor は独自の UPSERT を使うため同一 tx に含められない。
-	// processed_events INSERT は fast-path の重複適用ガードとして機能する。
 	inserted, err := s.eventRepo.Insert(ctx, ev.EventID, ev.EventType)
 	if err != nil {
 		slog.Error("player-onboarded-card processed_events insert failed",
@@ -74,25 +71,27 @@ func (s *PlayerOnboardedSubscriber) process(ctx context.Context, data []byte) er
 		return nil
 	}
 
-	// pack_id は subscriber が業務文脈 (= initial 配布) を pack 命名規則で解釈する。
-	// card_pack マスター側で `initial_<faction>` は SSoT として定義されている (data/card_packs.yaml)。
-	packID := "initial_" + ev.InitialFactionID
-	granted, err := s.grantInteractor.GrantPack(ctx, ev.PlayerID, packID)
-	if err != nil {
-		slog.Error("player-onboarded-card grant failed",
-			"event_id", ev.EventID,
-			"player_id", ev.PlayerID,
-			"pack_id", packID,
-			"error", err,
-		)
-		return fmt.Errorf("player-onboarded-card: grant: %w", err)
+	factionPackID := "faction_set_" + ev.InitialFactionID
+	totalGranted := 0
+	for _, packID := range []string{"basic", factionPackID} {
+		granted, err := s.grantInteractor.GrantPack(ctx, ev.PlayerID, packID)
+		if err != nil {
+			slog.Error("player-onboarded-card grant failed",
+				"event_id", ev.EventID,
+				"player_id", ev.PlayerID,
+				"pack_id", packID,
+				"error", err,
+			)
+			return fmt.Errorf("player-onboarded-card: grant %q: %w", packID, err)
+		}
+		totalGranted += granted
 	}
 
 	slog.Info("player-onboarded-card granted",
 		"event_id", ev.EventID,
 		"player_id", ev.PlayerID,
-		"pack_id", packID,
-		"copies", granted,
+		"faction", ev.InitialFactionID,
+		"copies", totalGranted,
 	)
 	return nil
 }
