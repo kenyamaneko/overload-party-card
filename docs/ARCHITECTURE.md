@@ -94,10 +94,10 @@ at-least-once を at-most-once 相当に近づけるための前段ガードで�
 
 ADR-022 で `FactionSelectedEvent` を業務事実単位に分解し、ADR-031 / ADR-032 で `faction-purchased` を `card-pack-purchased` (card 向け) + `faction-acquired` (account / gateway 向け) に再分解した結果、card は以下の subscriber を持つ:
 
-| subscriber | 副作用 | 備考 |
-|---|---|---|
-| `player-onboarded-card-sub` | onboarding 完了時に `basic` pack と `faction_set_<faction>` pack を順次配布 (内部で `GrantPack` を 2 回呼ぶ) | 導入済み |
-| `card-pack-purchased-card-sub` | shop の card_pack 系商品 (faction_set / 限定パック等) 購入時に `card_pack_id` で指定された pack を配布 | ADR-032 PR 2 で追加 |
+| subscriber | 副作用 |
+|---|---|
+| `player-onboarded-card-sub` | onboarding 完了時に `basic` pack と `faction_set_<faction>` pack を順次配布 (内部で `GrantPack` を 2 回呼ぶ) |
+| `card-pack-purchased-card-sub` | shop の card_pack 系商品 (faction_set / 限定パック等) 購入時に `card_pack_id` で指定された pack を配布 |
 
 `player-onboarded` での 2 pack 配布は順次呼びのため、間でクラッシュすると「basic だけ配布された」「faction だけ配布された」「重複配布」のいずれかの状態が残りうる。これは下記「Pub/Sub subscriber の冪等性」で述べる at-most-once 相当の制約を 2 pack に拡張したもので、稼働前は許容する。
 
@@ -178,8 +178,9 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 - **`PORT`**: 起動ポート。未設定で起動不可
 - **`ENV`**: `dev` / `stg` / `prod` のいずれか。未設定で起動不可。`prod` / `stg` は Cloud Logging 互換の JSON slog、`dev` はテキスト slog にルーティングする
 - **`DATABASE_CONN`**: card スキーマへの接続文字列。未設定で起動不可
-- **`PUBSUB_PROJECT_ID`**: card は `player-onboarded` subscriber を持つため必須 (ADR-032 PR 2 で `card-pack-purchased` も追加予定)
+- **`PUBSUB_PROJECT_ID`**: card は `player-onboarded` / `card-pack-purchased` subscriber を持つため必須
 - **`PLAYER_ONBOARDED_SUBSCRIPTION`**: player-onboarded subscription 名。未設定で起動不可
+- **`CARD_PACK_PURCHASED_SUBSCRIPTION`**: card-pack-purchased subscription 名。未設定で起動不可
 
 ### カードデータ変更時
 

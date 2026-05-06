@@ -22,7 +22,7 @@ card は以下の機能ドメインを所有する。
 | デッキバリデーション | 枚数・所持・制限ルールの検証（都度算出） |
 | バトル前検証 | `validate-for-battle` でバトル開始前のゲートキーパー |
 | カードパック配布 | 初回ファクション選択時・ショップ購入時のカード付与 |
-| Pub/Sub 消費 | `faction-purchased` / `player-onboarded` を購読しパック配布をイベント駆動で実行 (ADR-022) |
+| Pub/Sub 消費 | `card-pack-purchased` / `player-onboarded` を購読しパック配布をイベント駆動で実行 |
 
 card は **card スキーマの DB 行とカード定義 YAML (SSoT) を唯一の真実とし**、他サービスへカードマスターを複製しない。他サービスは `GET /internal/v1/cards` で起動時に読み取る read model を各自で持つ。
 
@@ -120,12 +120,14 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 
 ### 5.1 配布種別
 
-| API | 配布対象 | 呼び出し契機 |
-|---|---|---|
-| `POST .../grant-initial-pack` | 選択 faction + Neutral の全カード種類 × 3 枚 | onboarding 完了 (`player-onboarded` subscriber 経由) |
-| `POST .../grant-faction-pack` | 選択 faction の全カード種類 × 3 枚（Neutral なし） | ショップでの faction_set 購入 (`faction-purchased` subscriber 経由) |
+配布は内部 API `usecase.GrantInteractor.GrantPack(playerID, packID)` のみに集約され、`pack_id` をキーとして `card.card_pack` マスターから配布対象 (`card_id` × `copies`) を引く。subscriber 側で業務文脈に応じた `pack_id` を組み立てる:
 
-配布対象の faction は `card_definitions.faction` カラムで動的にフィルタする（ハードコードしない）。
+| 文脈 | 呼び出し元 | 渡す `pack_id` |
+|---|---|---|
+| onboarding 初期配布 | `player-onboarded-card-sub` | `basic` と `faction_set_<initial_faction>` の 2 回 |
+| shop 購入 | `card-pack-purchased-card-sub` | event payload の `card_pack_id` をそのまま |
+
+REST 経由の同期配布エンドポイントは ADR-032 で完全廃止されている。
 
 ### 5.2 書き込みセマンティクス
 
@@ -149,9 +151,9 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 
 ---
 
-## 6. Pub/Sub subscriber (`faction-purchased` / `player-onboarded`)
+## 6. Pub/Sub subscriber (`card-pack-purchased` / `player-onboarded`)
 
-ファクション取得・オンボーディング完了をイベント駆動でパック配布に変換する (ADR-022)。`card.processed_events` を使って at-least-once 配信を実質的に一度だけ適用する。
+shop 購入・オンボーディング完了をイベント駆動でパック配布に変換する。`card.processed_events` を使って at-least-once 配信を実質的に一度だけ適用する。
 
 ### 6.1 処理フロー (共通)
 
@@ -161,11 +163,11 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
    - 既存行があれば `inserted = false` で `Ack`（重複適用しない）
    - INSERT 自体が失敗したら `Nack`
 4. subscriber 固有の配布を実行:
-   - `faction-purchased-card-sub` → `GrantFactionPack`（faction のみ）
-   - `player-onboarded-card-sub` → `GrantInitialPack`（faction + Neutral）
+   - `card-pack-purchased-card-sub` → `GrantPack(playerID, ev.CardPackID)`
+   - `player-onboarded-card-sub` → `GrantPack(playerID, "basic")` + `GrantPack(playerID, "faction_set_<faction>")` を順次
 5. 配布成功 → `Ack`、配布失敗 → `Nack`（Pub/Sub がリトライ）
 
-ADR-022 で業務事実単位に topic を分解したため、旧 `source` フィールド分岐は撤廃された。各 subscriber は自身の topic に紐づく副作用だけを実行する。
+各 subscriber は自身の topic に紐づく副作用だけを実行する。
 
 ### 6.2 冪等性の契約
 
@@ -176,7 +178,7 @@ ADR-022 で業務事実単位に topic を分解したため、旧 `source` フ�
 
 ### 6.3 未知 event_type の扱い
 
-`Nack` を返す。リトライしても結果は変わらないが、subscriber 側で握りつぶさず DLQ (`faction-purchased-dlq` / `player-onboarded-dlq`) に回収してオペレーション側で検出するポリシー。publisher の契約違反やイベントスキーマ拡張時の取りこぼしを早期に気付けるようにする意図。
+`Nack` を返す。リトライしても結果は変わらないが、subscriber 側で握りつぶさず DLQ (`card-pack-purchased-dlq` / `player-onboarded-dlq`) に回収してオペレーション側で検出するポリシー。publisher の契約違反やイベントスキーマ拡張時の取りこぼしを早期に気付けるようにする意図。
 
 ---
 
@@ -205,7 +207,7 @@ ADR-022 で業務事実単位に topic を分解したため、旧 `source` フ�
 
 | トピック | 購読名 | 発行元 | 契機 |
 |---|---|---|---|
-| `faction-purchased` | `faction-purchased-card-sub` | shop | プレイヤーが shop で faction を購入した時 |
+| `card-pack-purchased` | `card-pack-purchased-card-sub` | shop | プレイヤーが shop で card_pack を含む商品 (faction_set / 限定 pack 等) を購入した時 |
 | `player-onboarded` | `player-onboarded-card-sub` | scenario | プレイヤーがオンボーディングを完了した時 |
 
-card は **イベントを発行しない**。ADR-022 で業務事実単位に topic を分離したため、subscriber は source 分岐なしで自 topic 固有の副作用だけを処理する。
+card は **イベントを発行しない**。subscriber は source 分岐なしで自 topic 固有の副作用だけを処理する。
