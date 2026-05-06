@@ -11,35 +11,34 @@ import (
 	"github.com/kenyamaneko/overload-party-card/internal/port"
 )
 
-// initialPackGranter は GrantInteractor の GrantInitialPack に依存する
+// packGranter は GrantInteractor の GrantPack に依存する
 // 最小インターフェースです。テスト時に差し替えるために抽出しています。
-type initialPackGranter interface {
-	GrantInitialPack(ctx context.Context, playerID, faction string) (int, error)
+type packGranter interface {
+	GrantPack(ctx context.Context, playerID, packID string) (int, error)
 }
 
 // PlayerOnboardedSubscriber は player-onboarded subscription からイベントを取得し、
-// オンボーディング完了プレイヤーへ初期カードパック
-// (initial_faction_id のカード + Neutral カード) を配布します。
+// オンボーディング完了プレイヤーへ basic pack と選択 faction の基本セットを配布します。
 //
 // 冪等性は event_id ベースの processed_events で担保します。
 // 未知の event_type / malformed payload は Ack ではなく Nack して DLQ
 // (player-onboarded-dlq) に寄せます。
 type PlayerOnboardedSubscriber struct {
-	stream       port.MessageStream
-	grantInteractor initialPackGranter
-	eventRepo    port.ProcessedEventRepo
+	stream          port.MessageStream
+	grantInteractor packGranter
+	eventRepo       port.ProcessedEventRepo
 }
 
 // NewPlayerOnboardedSubscriber は PlayerOnboardedSubscriber を生成します。
 func NewPlayerOnboardedSubscriber(
 	stream port.MessageStream,
-	grantInteractor initialPackGranter,
+	grantInteractor packGranter,
 	eventRepo port.ProcessedEventRepo,
 ) *PlayerOnboardedSubscriber {
 	return &PlayerOnboardedSubscriber{
-		stream:       stream,
+		stream:          stream,
 		grantInteractor: grantInteractor,
-		eventRepo:    eventRepo,
+		eventRepo:       eventRepo,
 	}
 }
 
@@ -62,8 +61,6 @@ func (s *PlayerOnboardedSubscriber) process(ctx context.Context, data []byte) er
 		return fmt.Errorf("player-onboarded-card: unexpected event_type %q", ev.EventType)
 	}
 
-	// GrantInteractor は独自の UPSERT を使うため同一 tx に含められない。
-	// processed_events INSERT は fast-path の重複適用ガードとして機能する。
 	inserted, err := s.eventRepo.Insert(ctx, ev.EventID, ev.EventType)
 	if err != nil {
 		slog.Error("player-onboarded-card processed_events insert failed",
@@ -74,22 +71,27 @@ func (s *PlayerOnboardedSubscriber) process(ctx context.Context, data []byte) er
 		return nil
 	}
 
-	granted, err := s.grantInteractor.GrantInitialPack(ctx, ev.PlayerID, ev.InitialFactionID)
-	if err != nil {
-		slog.Error("player-onboarded-card grant failed",
-			"event_id", ev.EventID,
-			"player_id", ev.PlayerID,
-			"faction", ev.InitialFactionID,
-			"error", err,
-		)
-		return fmt.Errorf("player-onboarded-card: grant: %w", err)
+	factionPackID := "faction_set_" + ev.InitialFactionID
+	totalGranted := 0
+	for _, packID := range []string{"basic", factionPackID} {
+		granted, err := s.grantInteractor.GrantPack(ctx, ev.PlayerID, packID)
+		if err != nil {
+			slog.Error("player-onboarded-card grant failed",
+				"event_id", ev.EventID,
+				"player_id", ev.PlayerID,
+				"pack_id", packID,
+				"error", err,
+			)
+			return fmt.Errorf("player-onboarded-card: grant %q: %w", packID, err)
+		}
+		totalGranted += granted
 	}
 
 	slog.Info("player-onboarded-card granted",
 		"event_id", ev.EventID,
 		"player_id", ev.PlayerID,
 		"faction", ev.InitialFactionID,
-		"copies", granted,
+		"copies", totalGranted,
 	)
 	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/kenyamaneko/overload-party-card/internal/domain"
 	"github.com/kenyamaneko/overload-party-card/internal/repository"
 )
 
@@ -81,24 +82,25 @@ func TestGetPlayerCards(t *testing.T) {
 }
 
 // TestAddCards は UPSERT-with-add 仕様を検証する。
-// 未所持カードは INSERT（count=copiesPerCard）、既所持カードは count 加算。
-// art_no は 0 固定 (配布 API の仕様)。
+// 未所持カードは INSERT、既所持カードは count 加算。各 CardPackCard.Copies が
+// 個別に加算され、カードごとに異なる枚数を一括処理できる。art_no は 0 固定。
 func TestAddCards(t *testing.T) {
-	bulkIDs, bulkExpected := bulkScale(30, 3)
+	bulkCards, bulkExpected := bulkCardPackCards(30, 3)
 
 	tests := []struct {
 		name           string
 		seeds          []playerCardSeed
-		cardIDs        []string
-		copiesPerCard  int
+		cards          []domain.CardPackCard
 		wantGranted    int
 		wantFinalCount map[string]int // card_id (art_no=0) → 期待 count
 	}{
 		{
-			name:           "全て新規カードは INSERT される",
-			seeds:          nil,
-			cardIDs:        []string{"SH-0001", "SH-0002"},
-			copiesPerCard:  3,
+			name:  "全て新規カードは INSERT される",
+			seeds: nil,
+			cards: []domain.CardPackCard{
+				{CardID: "SH-0001", Copies: 3},
+				{CardID: "SH-0002", Copies: 3},
+			},
 			wantGranted:    6,
 			wantFinalCount: map[string]int{"SH-0001": 3, "SH-0002": 3},
 		},
@@ -107,26 +109,26 @@ func TestAddCards(t *testing.T) {
 			seeds: []playerCardSeed{
 				{playerA, "SH-0001", 0, 2},
 			},
-			cardIDs:        []string{"SH-0001"},
-			copiesPerCard:  3,
+			cards:          []domain.CardPackCard{{CardID: "SH-0001", Copies: 3}},
 			wantGranted:    3,
 			wantFinalCount: map[string]int{"SH-0001": 5},
 		},
 		{
-			name: "新規と既所持が混在するケース",
+			name: "カードごとに異なる枚数を一括加算する",
 			seeds: []playerCardSeed{
 				{playerA, "SH-0001", 0, 1},
 			},
-			cardIDs:        []string{"SH-0001", "SH-0002"},
-			copiesPerCard:  3,
-			wantGranted:    6,
-			wantFinalCount: map[string]int{"SH-0001": 4, "SH-0002": 3},
+			cards: []domain.CardPackCard{
+				{CardID: "SH-0001", Copies: 3},
+				{CardID: "SH-0002", Copies: 1},
+			},
+			wantGranted:    4,
+			wantFinalCount: map[string]int{"SH-0001": 4, "SH-0002": 1},
 		},
 		{
 			name:           "実 grant スケール (30 種類) を 1 文の bulk UPSERT で投入する",
 			seeds:          nil,
-			cardIDs:        bulkIDs,
-			copiesPerCard:  3,
+			cards:          bulkCards,
 			wantGranted:    90,
 			wantFinalCount: bulkExpected,
 		},
@@ -140,7 +142,7 @@ func TestAddCards(t *testing.T) {
 			}
 
 			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
-			got, err := repo.AddCards(context.Background(), playerA, tt.cardIDs, tt.copiesPerCard)
+			got, err := repo.AddCards(context.Background(), playerA, tt.cards)
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantGranted, got)
 

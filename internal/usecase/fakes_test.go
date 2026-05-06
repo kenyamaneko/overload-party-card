@@ -60,7 +60,7 @@ func (r *inMemoryPlayerCardRepo) GetPlayerCards(_ context.Context, playerID stri
 	return r.playerCards[playerID], nil
 }
 
-func (r *inMemoryPlayerCardRepo) AddCards(_ context.Context, playerID string, cardIDs []string, countPerCard int) (int, error) {
+func (r *inMemoryPlayerCardRepo) AddCards(_ context.Context, playerID string, cards []domain.CardPackCard) (int, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	existing := make(map[string]*domain.PlayerCard, len(r.playerCards[playerID]))
@@ -69,16 +69,18 @@ func (r *inMemoryPlayerCardRepo) AddCards(_ context.Context, playerID string, ca
 			existing[pc.CardID] = pc
 		}
 	}
-	for _, id := range cardIDs {
-		if pc, ok := existing[id]; ok {
-			pc.Count += countPerCard
-			continue
+	total := 0
+	for _, c := range cards {
+		if pc, ok := existing[c.CardID]; ok {
+			pc.Count += c.Copies
+		} else {
+			pc := &domain.PlayerCard{PlayerID: playerID, CardID: c.CardID, ArtNo: 0, Count: c.Copies}
+			r.playerCards[playerID] = append(r.playerCards[playerID], pc)
+			existing[c.CardID] = pc
 		}
-		pc := &domain.PlayerCard{PlayerID: playerID, CardID: id, ArtNo: 0, Count: countPerCard}
-		r.playerCards[playerID] = append(r.playerCards[playerID], pc)
-		existing[id] = pc
+		total += c.Copies
 	}
-	return len(cardIDs) * countPerCard, nil
+	return total, nil
 }
 
 // Seed は事前データを投入するヘルパ。テストの初期状態を構築するために使う。

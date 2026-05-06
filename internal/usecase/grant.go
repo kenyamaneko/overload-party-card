@@ -4,65 +4,44 @@ import (
 	"context"
 	"fmt"
 
-	gamedesign "github.com/kenyamaneko/overload-party-common/packages/game-design-constants"
-
 	"github.com/kenyamaneko/overload-party-card/internal/port"
 )
 
-// copiesPerGrant は配布カード1種あたりの付与コピー数です。
-const copiesPerGrant = 3
-
-// GrantInteractor はカードパック配布（初期ファクション選択・ショップ購入）を管理します。
+// GrantInteractor はカードパック配布を管理します。
+// 配布対象 (どのカードを何枚) は card_pack マスター (port.CardPackRepo) で定義し、
+// 業務文脈 (initial / 購入 / 限定) は呼び出し側 (subscriber) が pack_id で表現します。
 // 読み取り専用の CardInteractor を汚さないよう書き込みパスを分離しています。
 type GrantInteractor struct {
-	cardRepo       port.CardRepo
+	cardPackRepo   port.CardPackRepo
 	playerCardRepo port.PlayerCardRepo
 }
 
 // NewGrantInteractor は GrantInteractor を生成します。
-func NewGrantInteractor(cardRepo port.CardRepo, playerCardRepo port.PlayerCardRepo) *GrantInteractor {
-	return &GrantInteractor{cardRepo: cardRepo, playerCardRepo: playerCardRepo}
+func NewGrantInteractor(
+	cardPackRepo port.CardPackRepo,
+	playerCardRepo port.PlayerCardRepo,
+) *GrantInteractor {
+	return &GrantInteractor{
+		cardPackRepo:   cardPackRepo,
+		playerCardRepo: playerCardRepo,
+	}
 }
 
-// GrantInitialPack は選択ファクション + Neutral のカード各3枚をプレイヤーに配布します。
-// 付与されたコピー総数を返します。
-func (s *GrantInteractor) GrantInitialPack(ctx context.Context, playerID, faction string) (int, error) {
-	if err := validateSelectableFaction(faction); err != nil {
-		return 0, err
-	}
-	factions := []string{faction, gamedesign.FactionNeutral}
-	cardIDs, err := s.cardRepo.FindCardIDsByFactions(ctx, factions)
+// GrantPack は card_pack マスターから対象 pack を取得し、内包カードをそのまま
+// プレイヤーへ配布します。
+//
+// 戻り値は配布されたコピー総数。pack 不在は port.ErrNotFound、運用停止 pack は
+// port.ErrPackInactive、内包カードが 0 件は port.ErrEmptyPack を返します。
+func (s *GrantInteractor) GrantPack(ctx context.Context, playerID, packID string) (int, error) {
+	pack, err := s.cardPackRepo.GetPack(ctx, packID)
 	if err != nil {
-		return 0, fmt.Errorf("find card ids for initial pack: %w", err)
+		return 0, fmt.Errorf("get card_pack %q: %w", packID, err)
 	}
-	if len(cardIDs) == 0 {
-		return 0, fmt.Errorf("%w: factions %v", port.ErrCardMasterEmpty, factions)
+	if !pack.IsActive {
+		return 0, fmt.Errorf("%w: pack %q", port.ErrPackInactive, packID)
 	}
-	return s.playerCardRepo.AddCards(ctx, playerID, cardIDs, copiesPerGrant)
-}
-
-// GrantFactionPack は選択ファクションのカードのみ（Neutral なし）各3枚を配布します。
-// ショップでの faction_set 購入後に呼ばれます。
-func (s *GrantInteractor) GrantFactionPack(ctx context.Context, playerID, faction string) (int, error) {
-	if err := validateSelectableFaction(faction); err != nil {
-		return 0, err
+	if len(pack.Cards) == 0 {
+		return 0, fmt.Errorf("%w: pack %q", port.ErrEmptyPack, packID)
 	}
-	factions := []string{faction}
-	cardIDs, err := s.cardRepo.FindCardIDsByFactions(ctx, factions)
-	if err != nil {
-		return 0, fmt.Errorf("find card ids for faction pack: %w", err)
-	}
-	if len(cardIDs) == 0 {
-		return 0, fmt.Errorf("%w: faction %q", port.ErrCardMasterEmpty, faction)
-	}
-	return s.playerCardRepo.AddCards(ctx, playerID, cardIDs, copiesPerGrant)
-}
-
-func validateSelectableFaction(faction string) error {
-	for _, f := range gamedesign.SelectableFactions {
-		if f == faction {
-			return nil
-		}
-	}
-	return fmt.Errorf("%w: faction %q is not one of %v", port.ErrInvalidArgument, faction, gamedesign.SelectableFactions)
+	return s.playerCardRepo.AddCards(ctx, playerID, pack.Cards)
 }

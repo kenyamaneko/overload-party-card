@@ -1,0 +1,281 @@
+# Card pack master (SSoT for `card.card_pack` and `card.card_pack_cards`).
+#
+# 各 pack は配布対象カードと配布枚数の組。subscriber 側で複数 pack を順次配布
+# することで合成的な配布 (basic + 選択 faction 等) を表現する。
+#
+# 直接編集してよいのは本ファイルのみ。db/seed/card_packs_seed.sql は
+# scripts/generate_card_packs.py で生成される。
+
+packs:
+  - pack_id: basic
+    description: 全プレイヤー共通の Neutral 基本セット
+    cards:
+      - card_id: NT-0001
+        copies: 3
+      - card_id: NT-0002
+        copies: 3
+      - card_id: NT-0003
+        copies: 3
+      - card_id: NT-0004
+        copies: 3
+      - card_id: NT-0005
+        copies: 3
+      - card_id: NT-0006
+        copies: 3
+      - card_id: NT-0007
+        copies: 3
+      - card_id: NT-0008
+        copies: 3
+      - card_id: NT-0009
+        copies: 3
+      - card_id: NT-0010
+        copies: 3
+      - card_id: NT-0011
+        copies: 3
+      - card_id: NT-0012
+        copies: 3
+      - card_id: NT-0013
+        copies: 3
+      - card_id: NT-0014
+        copies: 3
+      - card_id: NT-0015
+        copies: 3
+      - card_id: NT-0016
+        copies: 3
+      - card_id: NT-0017
+        copies: 3
+      - card_id: NT-0018
+        copies: 3
+      - card_id: NT-0019
+        copies: 3
+      - card_id: NT-0020
+        copies: 3
+      - card_id: NT-0021
+        copies: 3
+      - card_id: NT-0022
+        copies: 3
+      - card_id: NT-0023
+        copies: 3
+      - card_id: NT-0024
+        copies: 3
+      - card_id: NT-0025
+        copies: 3
+      - card_id: NT-0026
+        copies: 3
+      - card_id: NT-0027
+        copies: 3
+      - card_id: NT-0028
+        copies: 3
+      - card_id: NT-0029
+        copies: 3
+      - card_id: NT-0030
+        copies: 3
+      - card_id: NT-0031
+        copies: 3
+      - card_id: NT-0032
+        copies: 3
+      - card_id: NT-0033
+        copies: 3
+      - card_id: NT-0034
+        copies: 3
+
+  - pack_id: faction_set_she
+    description: SHE 基本セット
+    cards:
+      - card_id: SH-0001
+        copies: 3
+      - card_id: SH-0002
+        copies: 3
+      - card_id: SH-0003
+        copies: 3
+      - card_id: SH-0004
+        copies: 3
+      - card_id: SH-0005
+        copies: 3
+      - card_id: SH-0006
+        copies: 3
+      - card_id: SH-0007
+        copies: 3
+      - card_id: SH-0008
+        copies: 3
+      - card_id: SH-0009
+        copies: 3
+      - card_id: SH-0010
+        copies: 3
+      - card_id: SH-0011
+        copies: 3
+      - card_id: SH-0012
+        copies: 3
+      - card_id: SH-0013
+        copies: 3
+      - card_id: SH-0014
+        copies: 3
+      - card_id: SH-0015
+        copies: 3
+      - card_id: SH-0016
+        copies: 3
+      - card_id: SH-0017
+        copies: 3
+      - card_id: SH-0018
+        copies: 3
+      - card_id: SH-0019
+        copies: 3
+      - card_id: SH-0020
+        copies: 3
+      - card_id: SH-0021
+        copies: 3
+      - card_id: SH-0022
+        copies: 3
+      - card_id: SH-0023
+        copies: 3
+      - card_id: SH-0024
+        copies: 3
+      - card_id: SH-0025
+        copies: 3
+
+  - pack_id: faction_set_tenki
+    description: Tenki 基本セット
+    cards:
+      - card_id: TK-0001
+        copies: 3
+      - card_id: TK-0002
+        copies: 3
+      - card_id: TK-0003
+        copies: 3
+      - card_id: TK-0004
+        copies: 3
+      - card_id: TK-0005
+        copies: 3
+      - card_id: TK-0006
+        copies: 3
+      - card_id: TK-0007
+        copies: 3
+      - card_id: TK-0008
+        copies: 3
+      - card_id: TK-0009
+        copies: 3
+      - card_id: TK-0010
+        copies: 3
+      - card_id: TK-0011
+        copies: 3
+      - card_id: TK-0012
+        copies: 3
+      - card_id: TK-0013
+        copies: 3
+      - card_id: TK-0014
+        copies: 3
+      - card_id: TK-0015
+        copies: 3
+      - card_id: TK-0016
+        copies: 3
+      - card_id: TK-0017
+        copies: 3
+      - card_id: TK-0018
+        copies: 3
+      - card_id: TK-0019
+        copies: 3
+      - card_id: TK-0020
+        copies: 3
+      - card_id: TK-0021
+        copies: 3
+      - card_id: TK-0022
+        copies: 3
+      - card_id: TK-0023
+        copies: 3
+      - card_id: TK-0024
+        copies: 3
+      - card_id: TK-0025
+        copies: 3
+
+  - pack_id: faction_set_sugar
+    description: Sugar 基本セット
+    cards:
+      - card_id: SL-0001
+        copies: 3
+      - card_id: SL-0002
+        copies: 3
+      - card_id: SL-0003
+        copies: 3
+      - card_id: SL-0004
+        copies: 3
+      - card_id: SL-0005
+        copies: 3
+      - card_id: SL-0006
+        copies: 3
+      - card_id: SL-0007
+        copies: 3
+      - card_id: SL-0008
+        copies: 3
+      - card_id: SL-0009
+        copies: 3
+      - card_id: SL-0010
+        copies: 3
+      - card_id: SL-0011
+        copies: 3
+      - card_id: SL-0012
+        copies: 3
+      - card_id: SL-0013
+        copies: 3
+      - card_id: SL-0014
+        copies: 3
+      - card_id: SL-0015
+        copies: 3
+      - card_id: SL-0016
+        copies: 3
+      - card_id: SL-0017
+        copies: 3
+      - card_id: SL-0018
+        copies: 3
+      - card_id: SL-0019
+        copies: 3
+      - card_id: SL-0020
+        copies: 3
+      - card_id: SL-0021
+        copies: 3
+      - card_id: SL-0022
+        copies: 3
+      - card_id: SL-0023
+        copies: 3
+      - card_id: SL-0024
+        copies: 3
+
+  - pack_id: faction_set_tuners
+    description: Tuners 基本セット
+    cards:
+      - card_id: TN-0001
+        copies: 3
+      - card_id: TN-0002
+        copies: 3
+      - card_id: TN-0003
+        copies: 3
+      - card_id: TN-0004
+        copies: 3
+      - card_id: TN-0005
+        copies: 3
+      - card_id: TN-0006
+        copies: 3
+      - card_id: TN-0007
+        copies: 3
+      - card_id: TN-0008
+        copies: 3
+      - card_id: TN-0009
+        copies: 3
+      - card_id: TN-0010
+        copies: 3
+      - card_id: TN-0011
+        copies: 3
+      - card_id: TN-0012
+        copies: 3
+      - card_id: TN-0013
+        copies: 3
+      - card_id: TN-0014
+        copies: 3
+      - card_id: TN-0015
+        copies: 3
+      - card_id: TN-0016
+        copies: 3
+      - card_id: TN-0017
+        copies: 3
+      - card_id: TN-0018
+        copies: 3
+

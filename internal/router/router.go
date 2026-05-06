@@ -13,7 +13,6 @@ func New(
 	cardH *rest.CardHandler,
 	deckH *rest.DeckHandler,
 	playerCardH *rest.PlayerCardHandler,
-	grantH *rest.GrantHandler,
 ) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -36,8 +35,6 @@ func New(
 			players.PUT("/decks/:deckId", deckH.UpdateDeck)
 			players.DELETE("/decks/:deckId", deckH.DeleteDeck)
 			players.POST("/decks/:deckId/validate-for-battle", deckH.ValidateDeckForBattle)
-			players.POST("/grant-initial-pack", grantH.GrantInitialPack)
-			players.POST("/grant-faction-pack", grantH.GrantFactionPack)
 		}
 	}
 	return r

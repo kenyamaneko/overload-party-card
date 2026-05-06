@@ -9,17 +9,23 @@ import (
 // CardRepo はカード定義の永続化を抽象化するインターフェースです。
 type CardRepo interface {
 	FindAll(ctx context.Context) ([]*domain.Card, error)
-	// FindCardIDsByFactions は指定ファクション群に属する有効カードの card_id を返します。
-	// 配布対象カードをハードコードではなく card_definitions に委ねるためのメソッドです。
-	FindCardIDsByFactions(ctx context.Context, factions []string) ([]string, error)
 }
 
 // PlayerCardRepo はプレイヤー所持カードの永続化を抽象化するインターフェースです。
 type PlayerCardRepo interface {
 	GetPlayerCards(ctx context.Context, playerID string) ([]*domain.PlayerCard, error)
 	// AddCards は UPSERT-with-add セマンティクスで所持カードを追加します。
-	// 戻り値は追加されたコピー総数（= len(cardIDs) * countPerCard）です。
-	AddCards(ctx context.Context, playerID string, cardIDs []string, countPerCard int) (int, error)
+	// 各 CardPackCard.Copies が個別に加算されます。戻り値は加算したコピー総数です。
+	AddCards(ctx context.Context, playerID string, cards []domain.CardPackCard) (int, error)
+}
+
+// CardPackRepo は配布パックマスター (card.card_pack) の永続化を抽象化するインターフェースです。
+// 実装は配布リクエストごとに DB を引く前提でキャッシュは行いません (理由は
+// docs/ARCHITECTURE.md「pack マスターはキャッシュしない」を参照)。
+type CardPackRepo interface {
+	// GetPack は pack_id に対応するパック定義を返します。
+	// 行が存在しない場合 ErrNotFound を返します (運用停止 = is_active=false は別エラー: ErrPackInactive)。
+	GetPack(ctx context.Context, packID string) (*domain.CardPack, error)
 }
 
 // ProcessedEventRepo は処理済み Pub/Sub イベントを追跡するインターフェースです。

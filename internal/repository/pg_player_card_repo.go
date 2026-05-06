@@ -50,24 +50,31 @@ func (r *PgPlayerCardRepository) GetPlayerCards(ctx context.Context, playerID st
 }
 
 // AddCards は player_cards を UPSERT し、conflict 時は count を加算します。
-// 単一文の bulk UPSERT で実行し、追加されたコピー総数を返します。
-func (r *PgPlayerCardRepository) AddCards(ctx context.Context, playerID string, cardIDs []string, countPerCard int) (int, error) {
+// 各 CardPackCard.Copies が個別に加算されるため、カードごとに異なる枚数を一括で加算できます。
+// 単一文の bulk UPSERT で実行し、加算したコピー総数を返します。
+func (r *PgPlayerCardRepository) AddCards(ctx context.Context, playerID string, cards []domain.CardPackCard) (int, error) {
+	if len(cards) == 0 {
+		return 0, nil
+	}
+
 	var sb strings.Builder
 	sb.WriteString(`INSERT INTO player_cards (player_id, card_id, art_no, count) VALUES `)
 
-	args := make([]any, 0, len(cardIDs)*4)
-	for i, cid := range cardIDs {
+	args := make([]any, 0, len(cards)*4)
+	total := 0
+	for i, c := range cards {
 		if i > 0 {
 			sb.WriteString(",")
 		}
 		base := i*4 + 1
 		fmt.Fprintf(&sb, "($%d,$%d,$%d,$%d)", base, base+1, base+2, base+3)
-		args = append(args, playerID, cid, 0, countPerCard)
+		args = append(args, playerID, c.CardID, 0, c.Copies)
+		total += c.Copies
 	}
 	sb.WriteString(` ON CONFLICT (player_id, card_id, art_no) DO UPDATE SET count = player_cards.count + EXCLUDED.count`)
 
 	if _, err := r.pool.Exec(ctx, sb.String(), args...); err != nil {
 		return 0, fmt.Errorf("bulk upsert player_cards: %w", err)
 	}
-	return len(cardIDs) * countPerCard, nil
+	return total, nil
 }
