@@ -68,14 +68,21 @@ func TestPlayerOnboardedSubscriber_Start(t *testing.T) {
 			wantPacks:        nil,
 		},
 		{
-			name:          "processed_events insert 失敗: Nack でリトライ",
+			// processed_events への INSERT (dedup ガード) が失敗した場合、event を
+			// Ack で捨てると配布も dedup 記録もされずメッセージが失われる。Nack して
+			// Pub/Sub の at-least-once 再配送に乗せ、次回成功時に dedup と配布が走る
+			// ことを期待する仕様の固定。
+			name:          "processed_events INSERT 失敗時は Pub/Sub の再配送に乗せるため Nack する",
 			publish:       publishValid,
 			repoInsertErr: errors.New("db down"),
 			wantAck:       false,
 			wantPacks:     nil,
 		},
 		{
-			name:             "1 回目 (basic) GrantPack 失敗: Nack で 2 回目は呼ばない",
+			// basic → faction_set の順次配布は fail-fast: 1 回目失敗時点で 2 回目を
+			// 呼ばずに Nack する。1 回目失敗後にそのまま続行すると DB 状態によって
+			// 挙動が予測不能になるため、early exit を仕様として固定する。
+			name:             "1 回目 (basic) GrantPack 失敗時は 2 回目を呼ばずに Nack する (fail-fast)",
 			publish:          publishValid,
 			repoInsertResult: true,
 			granterErr:       errors.New("grant failed"),
@@ -84,7 +91,12 @@ func TestPlayerOnboardedSubscriber_Start(t *testing.T) {
 			wantPacks:        []string{"basic"},
 		},
 		{
-			name:             "2 回目 (faction) GrantPack 失敗: Nack。1 回目は呼ばれている",
+			// 2 回目 (faction) で失敗した時点で 1 回目 (basic) は配布完了済み = 不完全
+			// 配布が発生する。このとき Nack で再配送されても processed_events が
+			// 既に書かれていれば dedup で skip され、不完全配布のまま固定される。
+			// この at-most-once 相当の挙動 (docs/ARCHITECTURE.md「Pub/Sub subscriber
+			// の冪等性」) を仕様として固定する。
+			name:             "2 回目 (faction) GrantPack 失敗時は 1 回目だけ配布された状態で Nack する (不完全配布)",
 			publish:          publishValid,
 			repoInsertResult: true,
 			granterErr:       errors.New("grant failed"),

@@ -45,11 +45,19 @@ def validate(packs: list[dict]) -> None:
         seen_ids.add(pid)
 
         cards = pack.get("cards")
-        if not isinstance(cards, dict) or not cards:
-            raise ValueError(f"{pid}: cards must be a non-empty mapping of card_id -> copies")
-        for cid, copies in cards.items():
+        if not isinstance(cards, list) or not cards:
+            raise ValueError(f"{pid}: cards must be a non-empty list of {{card_id, copies}} entries")
+        seen_cids: set[str] = set()
+        for entry in cards:
+            if not isinstance(entry, dict):
+                raise ValueError(f"{pid}: cards entries must be mappings, got {entry!r}")
+            cid = entry.get("card_id")
+            copies = entry.get("copies")
             if not isinstance(cid, str) or not cid:
                 raise ValueError(f"{pid}: card_id must be a non-empty string, got {cid!r}")
+            if cid in seen_cids:
+                raise ValueError(f"{pid}: duplicate card_id {cid}")
+            seen_cids.add(cid)
             if not isinstance(copies, int) or copies <= 0:
                 raise ValueError(
                     f"{pid}/{cid}: copies must be a positive int, got {copies!r}"
@@ -85,9 +93,9 @@ def render_seed(packs: list[dict]) -> str:
     for pack in packs:
         pid = pack["pack_id"]
         pack_ids.append(pid)
-        for cid, copies in pack["cards"].items():
+        for entry in pack["cards"]:
             pack_card_rows.append(
-                f"  ({sql_quote(pid)}, {sql_quote(cid)}, {copies})"
+                f"  ({sql_quote(pid)}, {sql_quote(entry['card_id'])}, {entry['copies']})"
             )
 
     lines.append("-- Replace the entire card_pack_cards rows for the listed packs:")

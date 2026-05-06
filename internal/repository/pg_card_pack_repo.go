@@ -23,9 +23,7 @@ func NewPgCardPackRepository(pool *pgxpool.Pool) *PgCardPackRepository {
 }
 
 // GetPack は pack_id に対応するパック定義と内包カードを返します。
-// card_pack 行が存在しない場合 port.ErrNotFound を返します。
-// 内包カードは LEFT JOIN で取得するため card_pack_cards 行が 0 件でも
-// 空の Cards を持つ CardPack が返ります (運用判定は呼び出し側)。
+// 行が存在しない場合は port.ErrNotFound を返します。
 func (r *PgCardPackRepository) GetPack(ctx context.Context, packID string) (*domain.CardPack, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT p.pack_id, p.description, p.is_active, p.created_at, p.updated_at,

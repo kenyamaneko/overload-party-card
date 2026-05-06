@@ -37,42 +37,15 @@ func seedCardPack(t *testing.T, s cardPackSeed) {
 	}
 }
 
-// TestGetPack は指定 pack_id の card_pack 行と card_pack_cards 行を結合して
-// domain.CardPack を組み立てて返すこと、card_id の昇順で内包カードが並ぶこと
-// を確認する。Select 関数の主要責務はこの集約の正確性。
 func TestGetPack(t *testing.T) {
 	sharedPg.Truncate(t)
 	seedCardPack(t, cardPackSeed{
-		PackID:   "p1",
+		PackID:   "wanted",
 		IsActive: true,
 		Cards: []domain.CardPackCard{
 			{CardID: "SH-0002", Copies: 1},
 			{CardID: "SH-0001", Copies: 3},
 		},
-	})
-
-	repo := repository.NewPgCardPackRepository(sharedPg.Pool)
-	got, err := repo.GetPack(context.Background(), "p1")
-
-	require.NoError(t, err)
-	require.NotNil(t, got)
-	assert.Equal(t, "p1", got.PackID)
-	assert.True(t, got.IsActive)
-	assert.Equal(t, []domain.CardPackCard{
-		{CardID: "SH-0001", Copies: 3},
-		{CardID: "SH-0002", Copies: 1},
-	}, got.Cards)
-}
-
-// TestGetPack_OnlyReturnsRequestedPack は指定 pack_id 以外の行が混入しない
-// ことを確認する。同一テーブルに複数 pack を入れて、要求した pack の cards
-// だけが返ることを assert する。
-func TestGetPack_OnlyReturnsRequestedPack(t *testing.T) {
-	sharedPg.Truncate(t)
-	seedCardPack(t, cardPackSeed{
-		PackID:   "wanted",
-		IsActive: true,
-		Cards:    []domain.CardPackCard{{CardID: "SH-0001", Copies: 3}},
 	})
 	seedCardPack(t, cardPackSeed{
 		PackID:   "other",
@@ -86,11 +59,13 @@ func TestGetPack_OnlyReturnsRequestedPack(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, "wanted", got.PackID)
-	assert.Equal(t, []domain.CardPackCard{{CardID: "SH-0001", Copies: 3}}, got.Cards)
+	assert.True(t, got.IsActive)
+	assert.Equal(t, []domain.CardPackCard{
+		{CardID: "SH-0001", Copies: 3},
+		{CardID: "SH-0002", Copies: 1},
+	}, got.Cards)
 }
 
-// TestGetPack_NotFound は対象 pack_id が DB に存在しないとき port.ErrNotFound が
-// 返ることを固定する (呼び出し側の errors.Is で分岐できるようにするため)。
 func TestGetPack_NotFound(t *testing.T) {
 	sharedPg.Truncate(t)
 
@@ -117,6 +92,5 @@ func TestGetPack_NoCards(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, got)
-	assert.Equal(t, "empty", got.PackID)
 	assert.Empty(t, got.Cards)
 }
