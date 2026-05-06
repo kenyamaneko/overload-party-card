@@ -24,17 +24,19 @@ type Config struct {
 	Env          Env
 	DatabaseConn string
 
-	PubsubProjectID             string
-	PlayerOnboardedSubscription string
+	PubsubProjectID                string
+	PlayerOnboardedSubscription    string
+	CardPackPurchasedSubscription  string
 }
 
 // FromEnv は環境変数から Config を構築します。
 // 未設定の必須環境変数があれば即エラーで返し、デフォルトへの暗黙 fallback は行いません。
 func FromEnv() (*Config, error) {
 	cfg := &Config{
-		DatabaseConn:                os.Getenv("DATABASE_CONN"),
-		PubsubProjectID:             os.Getenv("PUBSUB_PROJECT_ID"),
-		PlayerOnboardedSubscription: os.Getenv("PLAYER_ONBOARDED_SUBSCRIPTION"),
+		DatabaseConn:                  os.Getenv("DATABASE_CONN"),
+		PubsubProjectID:               os.Getenv("PUBSUB_PROJECT_ID"),
+		PlayerOnboardedSubscription:   os.Getenv("PLAYER_ONBOARDED_SUBSCRIPTION"),
+		CardPackPurchasedSubscription: os.Getenv("CARD_PACK_PURCHASED_SUBSCRIPTION"),
 	}
 
 	rawPort := os.Getenv("PORT")
@@ -62,10 +64,13 @@ func FromEnv() (*Config, error) {
 		return nil, fmt.Errorf("config: DATABASE_CONN is required")
 	}
 	if cfg.PubsubProjectID == "" {
-		return nil, fmt.Errorf("config: PUBSUB_PROJECT_ID is required (card subscribes to player-onboarded events)")
+		return nil, fmt.Errorf("config: PUBSUB_PROJECT_ID is required (card subscribes to player-onboarded / card-pack-purchased events)")
 	}
 	if cfg.PlayerOnboardedSubscription == "" {
 		return nil, fmt.Errorf("config: PLAYER_ONBOARDED_SUBSCRIPTION is required")
+	}
+	if cfg.CardPackPurchasedSubscription == "" {
+		return nil, fmt.Errorf("config: CARD_PACK_PURCHASED_SUBSCRIPTION is required")
 	}
 	return cfg, nil
 }

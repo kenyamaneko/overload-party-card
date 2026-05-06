@@ -76,7 +76,7 @@ GitFlow をベースに、環境とブランチを対応付けた運用を採用
    └─ push → stg 環境に自動デプロイ
 
 3. stg 環境で検証
-   └─ デッキ CRUD、パック配布、faction-purchased / player-onboarded イベント疎通確認など
+   └─ デッキ CRUD、パック配布、card-pack-purchased / player-onboarded イベント疎通確認など
    └─ バグ発見時は PR 経由で release ブランチに修正を入れる
 
 4. main にマージ

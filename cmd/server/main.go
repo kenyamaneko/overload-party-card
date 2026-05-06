@@ -80,7 +80,18 @@ func run() error {
 		}
 	}()
 
+	cardPackPurchasedStream, err := pubsubadapter.NewStream(ctx, cfg.PubsubProjectID, cfg.CardPackPurchasedSubscription)
+	if err != nil {
+		return fmt.Errorf("card-pack-purchased stream: %w", err)
+	}
+	defer func() {
+		if cerr := cardPackPurchasedStream.Close(); cerr != nil {
+			slog.Warn("card-pack-purchased stream close", "error", cerr)
+		}
+	}()
+
 	onboardedSub := pubsubadapter.NewPlayerOnboardedSubscriber(onboardedStream, grantInteractor, eventRepo)
+	cardPackPurchasedSub := pubsubadapter.NewCardPackPurchasedSubscriber(cardPackPurchasedStream, grantInteractor, eventRepo)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
@@ -94,12 +105,12 @@ func run() error {
 		"pubsub_project", cfg.PubsubProjectID,
 	)
 
-	return runHTTPAndSubscribers(ctx, srv, onboardedSub)
+	return runHTTPAndSubscribers(ctx, srv, onboardedSub, cardPackPurchasedSub)
 }
 
 // runHTTPAndSubscribers は HTTP server と Pub/Sub subscriber 群を並行起動し、
 // どれかの失敗・シグナル到来で全体を graceful に停止する。
-func runHTTPAndSubscribers(ctx context.Context, srv *http.Server, onboardedSub subscriber) error {
+func runHTTPAndSubscribers(ctx context.Context, srv *http.Server, subscribers ...subscriber) error {
 	g, gCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
@@ -109,12 +120,14 @@ func runHTTPAndSubscribers(ctx context.Context, srv *http.Server, onboardedSub s
 		return nil
 	})
 
-	g.Go(func() error {
-		if err := onboardedSub.Start(gCtx); err != nil && gCtx.Err() == nil {
-			return fmt.Errorf("player-onboarded subscriber: %w", err)
-		}
-		return nil
-	})
+	for _, sub := range subscribers {
+		g.Go(func() error {
+			if err := sub.Start(gCtx); err != nil && gCtx.Err() == nil {
+				return fmt.Errorf("subscriber: %w", err)
+			}
+			return nil
+		})
+	}
 
 	g.Go(func() error {
 		<-gCtx.Done()

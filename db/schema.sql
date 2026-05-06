@@ -119,6 +119,6 @@ CREATE TABLE card.card_pack_cards (
 
 CREATE TABLE card.processed_events (
   event_id     UUID PRIMARY KEY,                     -- Pub/Sub EventID (publisher 生成の UUIDv4)
-  event_type   TEXT NOT NULL,                        -- イベント種別 (faction_purchased / player_onboarded) - ADR-022
+  event_type   TEXT NOT NULL,                        -- イベント種別 (card_pack_purchased / player_onboarded)
   processed_at TIMESTAMPTZ NOT NULL DEFAULT now()    -- 処理日時
 );

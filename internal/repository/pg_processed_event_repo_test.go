@@ -27,14 +27,14 @@ func TestInsert(t *testing.T) {
 			name:         "新規 event_id は inserted=true",
 			preInsert:    nil,
 			eventID:      "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-			eventType:    "faction_purchased",
+			eventType:    "card_pack_purchased",
 			wantInserted: true,
 		},
 		{
 			name:         "既存 event_id は inserted=false (重複適用抑止)",
 			preInsert:    []string{"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"},
 			eventID:      "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-			eventType:    "faction_purchased",
+			eventType:    "card_pack_purchased",
 			wantInserted: false,
 		},
 		{
@@ -53,7 +53,7 @@ func TestInsert(t *testing.T) {
 			ctx := context.Background()
 
 			for _, id := range tt.preInsert {
-				_, err := repo.Insert(ctx, id, "faction_purchased")
+				_, err := repo.Insert(ctx, id, "card_pack_purchased")
 				require.NoError(t, err)
 			}
 
