@@ -27,7 +27,8 @@ jobs:
           go-version-file: go.mod
       - name: Configure Go private modules
         run: |
-          git config --global url."https://x-access-token:${{ secrets.COMMON_GO_MODULES_FETCH }}@github.com/kenyamaneko/overload-party-common".insteadOf "https://github.com/kenyamaneko/overload-party-common"
+          # PAT (COMMON_GO_MODULES_FETCH) は kenyamaneko 組織全リポの read scope を持つ前提。
+          git config --global url."https://x-access-token:${{ secrets.COMMON_GO_MODULES_FETCH }}@github.com/kenyamaneko/".insteadOf "https://github.com/kenyamaneko/"
         env:
           GOPRIVATE: github.com/kenyamaneko/*
           GONOSUMDB: github.com/kenyamaneko/*
@@ -47,7 +48,8 @@ jobs:
           go-version-file: go.mod
       - name: Configure Go private modules
         run: |
-          git config --global url."https://x-access-token:${{ secrets.COMMON_GO_MODULES_FETCH }}@github.com/kenyamaneko/overload-party-common".insteadOf "https://github.com/kenyamaneko/overload-party-common"
+          # PAT (COMMON_GO_MODULES_FETCH) は kenyamaneko 組織全リポの read scope を持つ前提。
+          git config --global url."https://x-access-token:${{ secrets.COMMON_GO_MODULES_FETCH }}@github.com/kenyamaneko/".insteadOf "https://github.com/kenyamaneko/"
         env:
           GOPRIVATE: github.com/kenyamaneko/*
           GONOSUMDB: github.com/kenyamaneko/*
@@ -70,7 +72,8 @@ jobs:
         run: docker pull postgres:16-alpine
       - name: Configure Go private modules
         run: |
-          git config --global url."https://x-access-token:${{ secrets.COMMON_GO_MODULES_FETCH }}@github.com/kenyamaneko/overload-party-common".insteadOf "https://github.com/kenyamaneko/overload-party-common"
+          # PAT (COMMON_GO_MODULES_FETCH) は kenyamaneko 組織全リポの read scope を持つ前提。
+          git config --global url."https://x-access-token:${{ secrets.COMMON_GO_MODULES_FETCH }}@github.com/kenyamaneko/".insteadOf "https://github.com/kenyamaneko/"
         env:
           GOPRIVATE: github.com/kenyamaneko/*
           GONOSUMDB: github.com/kenyamaneko/*

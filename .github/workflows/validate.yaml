@@ -18,6 +18,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Configure private repo auth for pip git+ install
+        # pip install git+https://... は内部で git clone を呼ぶため insteadOf で token を挿入する。
+        run: |
+          git config --global url."https://x-access-token:${{ secrets.COMMON_GO_MODULES_FETCH }}@github.com/kenyamaneko/".insteadOf "https://github.com/kenyamaneko/"
+
       - name: Install dependencies
         run: |
           pip install pyyaml \
