@@ -2,7 +2,7 @@
 
 本ドキュメントは **コードを読んでも一見しては分からない設計意図** だけを残す。実装詳細（バリデーション順序・state 遷移の対応・エラー → HTTP ステータス変換・環境変数の一覧）は [FEATURE_SPEC.md](FEATURE_SPEC.md) と各ファイルの実装・コメントを一次情報とする。
 
-サービス概要・起動手順は [../README.md](../README.md)、エンドポイントは [API_REFERENCE.md](API_REFERENCE.md)、テーブル定義は [DATA_DESIGN.md](DATA_DESIGN.md) を参照。
+サービス概要・起動手順は [../README.md](../README.md)、エンドポイント契約は [data/openapi.yaml](../data/openapi.yaml) (SSoT)、テーブル定義は [DATA_DESIGN.md](DATA_DESIGN.md) を参照。
 
 ## Card の責務境界 (SSoT 契約)
 
@@ -200,9 +200,9 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 
 ### 型定義変更時
 
-1. `data/models.yaml` を編集
-2. `python3 scripts/generate_types.py` を実行
-3. `packages/api-card/*_gen.go` と `docs/API_REFERENCE.md` のマーカー間を更新
+1. `data/openapi.yaml` を編集 (SSoT)
+2. `scripts/generate_types.sh` を実行 (oapi-codegen が `packages/api-card/openapi_gen.go` を再生成)
+3. enum 追加・削除があれば `internal/domain/card_enum.go` も更新 (drift test が乖離を検知)
 4. コミット
 
 ### Pub/Sub トピックと subscriber

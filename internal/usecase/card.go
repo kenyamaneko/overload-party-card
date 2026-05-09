@@ -20,14 +20,8 @@ func NewCardInteractor(cardRepo port.CardRepo, playerCardRepo port.PlayerCardRep
 	return &CardInteractor{cardRepo: cardRepo, playerCardRepo: playerCardRepo}
 }
 
-// CardWithOwnership はカード定義にプレイヤーの所持状態を付与した型です。
-type CardWithOwnership struct {
-	*apicard.CardDefinition
-	IsOwned bool `json:"is_owned"`
-}
-
 // ListCardsWithOwnership は全カードにプレイヤーの所持状態を付与して返します。
-func (s *CardInteractor) ListCardsWithOwnership(ctx context.Context, playerID string) ([]*CardWithOwnership, error) {
+func (s *CardInteractor) ListCardsWithOwnership(ctx context.Context, playerID string) ([]*apicard.CardWithOwnership, error) {
 	cards, err := s.cardRepo.FindAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get all cards: %w", err)
@@ -43,12 +37,9 @@ func (s *CardInteractor) ListCardsWithOwnership(ctx context.Context, playerID st
 		owned[pc.CardID] = true
 	}
 
-	result := make([]*CardWithOwnership, len(cards))
+	result := make([]*apicard.CardWithOwnership, len(cards))
 	for i, card := range cards {
-		result[i] = &CardWithOwnership{
-			CardDefinition: presenter.ToCardDefinition(card),
-			IsOwned:        owned[card.CardID],
-		}
+		result[i] = presenter.ToCardWithOwnership(card, owned[card.CardID])
 	}
 	return result, nil
 }

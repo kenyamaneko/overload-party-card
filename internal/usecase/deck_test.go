@@ -390,7 +390,8 @@ func TestUpdateDeck(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Updated Full", updated.DeckName)
 	assert.True(t, updated.IsValid)
-	assert.Len(t, updated.DeckCards, 10)
+	require.NotNil(t, updated.DeckCards)
+	assert.Len(t, *updated.DeckCards, 10)
 }
 
 func TestDeleteDeck(t *testing.T) {

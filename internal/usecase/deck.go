@@ -106,7 +106,7 @@ func (s *DeckInteractor) GetDeck(ctx context.Context, playerID string, deckID in
 
 	apiCards := presenter.ToDeckCards(cards)
 	apiDeck := presenter.ToDeck(deck, cards, false)
-	apiDeck.DeckCards = apiCards
+	apiDeck.DeckCards = &apiCards
 	return apiDeck, apiCards, nil
 }
 
