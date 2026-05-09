@@ -17,8 +17,16 @@ func ToDeck(d *domain.Deck, cards []domain.DeckCard, isValid bool) *apicard.Deck
 		SleeveNo:  d.SleeveNo,
 		CreatedAt: d.CreatedAt,
 		UpdatedAt: d.UpdatedAt,
-		DeckCards: ToDeckCards(cards),
+		DeckCards: optionalDeckCards(ToDeckCards(cards)),
 	}
+}
+
+// optionalDeckCards は空 slice を nil ポインタに正規化し omitempty を機能させます。
+func optionalDeckCards(cards []apicard.DeckCard) *[]apicard.DeckCard {
+	if len(cards) == 0 {
+		return nil
+	}
+	return &cards
 }
 
 // ToDeckCards は domain.DeckCard slice を wire の DeckCard slice に詰め替えます。

@@ -1,0 +1,680 @@
+openapi: 3.0.3
+info:
+  title: overload-party-card
+  version: 0.1.0
+  description: |
+    Card service の REST 契約 (gateway / battle が card の internal API を呼ぶための契約)。
+    本ファイルが SSoT。`packages/api-card` の Go 型は oapi-codegen が本ファイルから生成する。
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: サービス死活監視 (ClusterIP 内部のみ)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /internal/v1/cards:
+    get:
+      operationId: listCards
+      summary: 全カード定義を返す (battle / gateway 起動時キャッシュロード用)
+      responses:
+        "200":
+          description: カード定義一覧
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CardDefinition"
+        "500":
+          description: DB 接続エラー
+
+  /internal/v1/players/{playerId}/cards:
+    get:
+      operationId: listPlayerCards
+      summary: プレイヤーの所持カード一覧を返す
+      parameters:
+        - $ref: "#/components/parameters/PlayerIdPath"
+      responses:
+        "200":
+          description: 所持カード一覧
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlayerCardWithDef"
+        "400":
+          description: playerId が空
+        "500":
+          description: DB 接続エラー
+
+  /internal/v1/players/{playerId}/cards/with-ownership:
+    get:
+      operationId: listCardsWithOwnership
+      summary: 全カード定義にプレイヤーの所持状態を付与して返す
+      parameters:
+        - $ref: "#/components/parameters/PlayerIdPath"
+      responses:
+        "200":
+          description: 所持状態付きカード一覧
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CardWithOwnership"
+        "400":
+          description: playerId が空
+        "500":
+          description: DB 接続エラー
+
+  /internal/v1/players/{playerId}/decks:
+    get:
+      operationId: listDecks
+      summary: プレイヤーのデッキ一覧を返す
+      parameters:
+        - $ref: "#/components/parameters/PlayerIdPath"
+      responses:
+        "200":
+          description: デッキ一覧
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Deck"
+        "400":
+          description: playerId が空
+        "404":
+          description: プレイヤーが存在しない
+        "500":
+          description: DB 接続エラー
+    post:
+      operationId: createDeck
+      summary: 新しいデッキを作成する
+      parameters:
+        - $ref: "#/components/parameters/PlayerIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeckCreateRequest"
+      responses:
+        "201":
+          description: 作成されたデッキ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deck"
+        "400":
+          description: リクエストボディ不正 / デッキバリデーション失敗
+        "403":
+          description: 未所持カードを含む
+        "500":
+          description: DB 接続エラー
+
+  /internal/v1/players/{playerId}/decks/{deckId}:
+    get:
+      operationId: getDeck
+      summary: 指定デッキの詳細 (カード構成を含む) を返す
+      parameters:
+        - $ref: "#/components/parameters/PlayerIdPath"
+        - $ref: "#/components/parameters/DeckIdPath"
+      responses:
+        "200":
+          description: デッキ詳細
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeckDetailResponse"
+        "400":
+          description: deckId が不正
+        "404":
+          description: デッキが存在しない
+        "500":
+          description: DB 接続エラー
+    put:
+      operationId: updateDeck
+      summary: 既存デッキを更新する
+      parameters:
+        - $ref: "#/components/parameters/PlayerIdPath"
+        - $ref: "#/components/parameters/DeckIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeckUpdateRequest"
+      responses:
+        "200":
+          description: 更新されたデッキ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deck"
+        "400":
+          description: deckId 不正 / リクエストボディ不正 / デッキバリデーション失敗 / 制限枚数超過
+        "403":
+          description: 未所持カードを含む
+        "404":
+          description: デッキが存在しない
+        "500":
+          description: DB 接続エラー
+    delete:
+      operationId: deleteDeck
+      summary: デッキを削除する
+      parameters:
+        - $ref: "#/components/parameters/PlayerIdPath"
+        - $ref: "#/components/parameters/DeckIdPath"
+      responses:
+        "204":
+          description: 削除成功 (ボディなし)
+        "400":
+          description: deckId が不正
+        "404":
+          description: デッキが存在しない
+        "500":
+          description: DB 接続エラー
+
+  /internal/v1/players/{playerId}/decks/{deckId}/validate-for-battle:
+    post:
+      operationId: validateDeckForBattle
+      summary: デッキがバトル使用可能か検証する (カード所持・制限・枚数チェック)
+      parameters:
+        - $ref: "#/components/parameters/PlayerIdPath"
+        - $ref: "#/components/parameters/DeckIdPath"
+      responses:
+        "200":
+          description: 検証成功 (ボディなし)
+        "400":
+          description: deckId 不正 / デッキバリデーション失敗 / 制限枚数超過
+        "403":
+          description: 未所持カードを含む
+        "404":
+          description: デッキが存在しない
+        "500":
+          description: DB 接続エラー
+
+components:
+  parameters:
+    PlayerIdPath:
+      name: playerId
+      in: path
+      required: true
+      schema:
+        type: string
+    DeckIdPath:
+      name: deckId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+  schemas:
+    # ─── Health ────────────────────────────────────────────────────────
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: ok
+
+    # ─── Card ──────────────────────────────────────────────────────────
+    CardDefinition:
+      type: object
+      required:
+        - card_id
+        - card_name
+        - resource_label
+        - faction
+        - card_type
+        - deploy_turns
+        - resizable
+        - elastic
+        - stats
+        - restriction
+        - is_active
+        - created_at
+        - updated_at
+      properties:
+        card_id:
+          type: string
+          x-go-name: CardID
+        card_name:
+          type: string
+        resource_label:
+          type: string
+        faction:
+          type: string
+          description: ファクション (`SHE` / `Tenki` / `Sugar` / `Tuners` / `Neutral`)
+        card_type:
+          type: string
+          description: カード種別
+        subtype:
+          type: string
+          description: サブタイプ (Compute/Data 配下のみ)
+        deploy_turns:
+          type: integer
+          format: int64
+          description: デプロイターン数 (0=即時)
+        resizable:
+          type: boolean
+          description: 手動スケール可能か
+        elastic:
+          type: boolean
+          description: 自動スケール対応か
+        elastic_increment:
+          type: integer
+          format: int64
+        free_tier:
+          type: integer
+          format: int64
+        cost_per_request:
+          type: integer
+          format: int64
+        stats:
+          description: スタッツ (ComputeStats または DataStats)
+          type: object
+          additionalProperties: true
+          x-go-type: json.RawMessage
+        effect_text:
+          type: string
+        effects:
+          description: エフェクト定義 JSON
+          type: object
+          additionalProperties: true
+          x-go-type: json.RawMessage
+        passive_effects:
+          type: array
+          items:
+            $ref: "#/components/schemas/PassiveEffect"
+        platform_effects:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlatformEffect"
+        attachment_effects:
+          type: array
+          items:
+            $ref: "#/components/schemas/AttachmentEffect"
+        restriction:
+          type: string
+          description: 制限区分 (`unlimited` / `semi_limited` / `limited` / `forbidden`)
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CardWithOwnership:
+      type: object
+      description: CardDefinition にプレイヤー所持状態を付与した型。
+      required:
+        - card_id
+        - card_name
+        - resource_label
+        - faction
+        - card_type
+        - deploy_turns
+        - resizable
+        - elastic
+        - stats
+        - restriction
+        - is_active
+        - created_at
+        - updated_at
+        - is_owned
+      properties:
+        card_id:
+          type: string
+          x-go-name: CardID
+        card_name:
+          type: string
+        resource_label:
+          type: string
+        faction:
+          type: string
+        card_type:
+          type: string
+        subtype:
+          type: string
+        deploy_turns:
+          type: integer
+          format: int64
+        resizable:
+          type: boolean
+        elastic:
+          type: boolean
+        elastic_increment:
+          type: integer
+          format: int64
+        free_tier:
+          type: integer
+          format: int64
+        cost_per_request:
+          type: integer
+          format: int64
+        stats:
+          type: object
+          additionalProperties: true
+          x-go-type: json.RawMessage
+        effect_text:
+          type: string
+        effects:
+          type: object
+          additionalProperties: true
+          x-go-type: json.RawMessage
+        passive_effects:
+          type: array
+          items:
+            $ref: "#/components/schemas/PassiveEffect"
+        platform_effects:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlatformEffect"
+        attachment_effects:
+          type: array
+          items:
+            $ref: "#/components/schemas/AttachmentEffect"
+        restriction:
+          type: string
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        is_owned:
+          type: boolean
+
+    PlayerCardWithDef:
+      type: object
+      description: プレイヤー所持カードにカード定義フィールドを付加した API レスポンス型。
+      required:
+        - card_id
+        - art_no
+        - count
+        - card_name
+        - resource_label
+        - faction
+        - card_type
+        - deploy_turns
+        - resizable
+        - elastic
+        - stats
+        - restriction
+      properties:
+        card_id:
+          type: string
+          x-go-name: CardID
+        art_no:
+          type: integer
+          format: int64
+        count:
+          type: integer
+          description: 所持枚数
+        card_name:
+          type: string
+        resource_label:
+          type: string
+        faction:
+          type: string
+        card_type:
+          type: string
+        subtype:
+          type: string
+        deploy_turns:
+          type: integer
+          format: int64
+        resizable:
+          type: boolean
+        elastic:
+          type: boolean
+        stats:
+          type: object
+          additionalProperties: true
+          x-go-type: json.RawMessage
+        effect_text:
+          type: string
+        restriction:
+          type: string
+
+    # ─── Card Stats (sub-schemas, embedded in stats JSON) ──────────────
+    ComputeStats:
+      type: object
+      description: Compute / Container / Orchestrator / Serverless / AI/ML カード用スタッツ。
+      required: [throughput, availability, maintenance_cost, sla_penalty]
+      properties:
+        throughput:
+          type: integer
+          format: int64
+        throughput_max:
+          type: integer
+          format: int64
+        availability:
+          type: integer
+          format: int64
+        maintenance_cost:
+          type: integer
+          format: int64
+        sla_penalty:
+          type: integer
+          format: int64
+          x-go-name: SLAPenalty
+
+    DataStats:
+      type: object
+      description: Database / ObjectStorage / CacheDB カード用スタッツ。
+      required: [yield, availability, maintenance_cost, sla_penalty]
+      properties:
+        yield:
+          type: integer
+          format: int64
+        yield_max:
+          type: integer
+          format: int64
+        availability:
+          type: integer
+          format: int64
+        maintenance_cost:
+          type: integer
+          format: int64
+        sla_penalty:
+          type: integer
+          format: int64
+          x-go-name: SLAPenalty
+
+    # ─── Effects ───────────────────────────────────────────────────────
+    PassiveEffect:
+      type: object
+      required: [type, params]
+      properties:
+        type:
+          $ref: "#/components/schemas/PassiveEffectType"
+        params:
+          type: object
+          additionalProperties: true
+
+    PlatformEffect:
+      type: object
+      required: [type, params]
+      properties:
+        type:
+          $ref: "#/components/schemas/PlatformEffectType"
+        params:
+          type: object
+          additionalProperties: true
+
+    AttachmentEffect:
+      type: object
+      required: [type, params]
+      properties:
+        type:
+          $ref: "#/components/schemas/AttachmentEffectType"
+        params:
+          type: object
+          additionalProperties: true
+
+    # ─── Deck ──────────────────────────────────────────────────────────
+    Deck:
+      type: object
+      description: プレイヤーのデッキ (カード構成オプショナル)。
+      required:
+        - player_id
+        - deck_id
+        - deck_name
+        - is_valid
+        - created_at
+        - updated_at
+      properties:
+        player_id:
+          type: string
+          x-go-name: PlayerID
+        deck_id:
+          type: integer
+          format: int64
+          x-go-name: DeckID
+          description: デッキ ID (自動採番)
+        deck_name:
+          type: string
+        is_valid:
+          type: boolean
+          description: バトル使用可能か (都度算出)
+        playmat_no:
+          type: integer
+          format: int64
+        sleeve_no:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        deck_cards:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeckCard"
+          description: デッキのカード構成 (API レスポンス時に populate)
+
+    DeckCard:
+      type: object
+      required: [player_id, deck_id, card_id, art_no, count]
+      properties:
+        player_id:
+          type: string
+          x-go-name: PlayerID
+        deck_id:
+          type: integer
+          format: int64
+          x-go-name: DeckID
+        card_id:
+          type: string
+          x-go-name: CardID
+        art_no:
+          type: integer
+          format: int64
+        count:
+          type: integer
+
+    DeckCardEntry:
+      type: object
+      description: デッキ作成・更新リクエスト内のカードエントリ。
+      required: [card_id, art_no, count]
+      properties:
+        card_id:
+          type: string
+          x-go-name: CardID
+        art_no:
+          type: integer
+          format: int64
+        count:
+          type: integer
+
+    DeckCreateRequest:
+      type: object
+      required: [deck_name, cards]
+      properties:
+        deck_name:
+          type: string
+        cards:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeckCardEntry"
+        playmat_no:
+          type: integer
+          format: int64
+        sleeve_no:
+          type: integer
+          format: int64
+
+    DeckUpdateRequest:
+      type: object
+      required: [deck_name, cards]
+      properties:
+        deck_name:
+          type: string
+        cards:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeckCardEntry"
+        playmat_no:
+          type: integer
+          format: int64
+        sleeve_no:
+          type: integer
+          format: int64
+
+    DeckDetailResponse:
+      type: object
+      description: GET /players/{playerId}/decks/{deckId} のレスポンス封筒。
+      required: [deck, cards]
+      properties:
+        deck:
+          $ref: "#/components/schemas/Deck"
+        cards:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeckCard"
+
+    # ─── Enums (流出するもの) ──────────────────────────────────────────
+    PassiveEffectType:
+      type: string
+      description: パッシブエフェクトの種別。
+      enum:
+        - tp_per_backend_db
+        - tp_per_backend_data
+        - tp_if_card_type_on_field
+        - dv_per_other_db
+        - dv_if_card_on_field
+        - av_bonus
+        - scale_cost_free
+
+    PlatformEffectType:
+      type: string
+      description: プラットフォームエフェクトの種別。
+      enum:
+        - tp_bonus
+        - yield_bonus
+        - av_bonus
+
+    AttachmentEffectType:
+      type: string
+      description: アタッチメントエフェクトの種別。
+      enum:
+        - stat_bonus
