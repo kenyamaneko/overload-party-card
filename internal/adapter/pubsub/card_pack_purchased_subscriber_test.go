@@ -11,6 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// topicCardPackPurchased は apishopfake.PublishCardPackPurchased が内部で
+// publish する topic 名と一致させる必要がある (raw bytes を投げる test ケースで利用)。
+const topicCardPackPurchased = "card-pack-purchased"
+
 // TestCardPackPurchasedSubscriber_Start は「shop 購入起因の card_pack 配布」を
 // Start() → stream.Consume → process の経路で固定する。
 //
@@ -69,7 +73,7 @@ func TestCardPackPurchasedSubscriber_Start(t *testing.T) {
 		{
 			name: "malformed JSON: Nack して DLQ 送り",
 			publish: func(_ context.Context, _ *apishopfake.Publisher, broker *apishopfake.Broker) {
-				broker.Publish(apishop.TopicCardPackPurchased, []byte("not-json"))
+				broker.Publish(topicCardPackPurchased, []byte("not-json"))
 			},
 			wantAck:   false,
 			wantPacks: nil,
@@ -77,7 +81,7 @@ func TestCardPackPurchasedSubscriber_Start(t *testing.T) {
 		{
 			name: "未知 event_type: Nack して DLQ で publisher バグ検出",
 			publish: func(_ context.Context, _ *apishopfake.Publisher, broker *apishopfake.Broker) {
-				broker.Publish(apishop.TopicCardPackPurchased, mustMarshal(t, apishop.CardPackPurchasedEvent{
+				broker.Publish(topicCardPackPurchased, mustMarshal(t, apishop.CardPackPurchasedEvent{
 					EventType:  "unknown",
 					EventID:    "evt-2",
 					PlayerID:   "player-1",
@@ -93,7 +97,7 @@ func TestCardPackPurchasedSubscriber_Start(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			broker := apishopfake.NewBroker()
 			pub := apishopfake.NewPublisher(broker)
-			stream := apishopfake.NewStream(apishopfake.NewSubscriber(broker), apishop.TopicCardPackPurchased)
+			stream := apishopfake.NewStream(apishopfake.NewSubscriber(broker), topicCardPackPurchased)
 
 			granter := &fakePackGranter{err: tt.granterErr}
 			repo := &fakeProcessedEventRepo{
