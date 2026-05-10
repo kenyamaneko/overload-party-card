@@ -89,6 +89,10 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Configure private repo auth
         # pip install で git+https://github.com/kenyamaneko/... を clone するために
         # token-based 認証 (insteadOf) を git config に注入する。

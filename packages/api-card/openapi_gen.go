@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+const (
+	InternalAuthScopes internalAuthContextKey = "InternalAuth.Scopes"
+)
+
 // Defines values for AttachmentEffectType.
 const (
 	AttachmentEffectTypeStatBonus AttachmentEffectType = "stat_bonus"
@@ -286,8 +290,8 @@ type PlayerCardWithDef struct {
 // DeckIdPath defines model for DeckIdPath.
 type DeckIdPath = int64
 
-// PlayerIdPath defines model for PlayerIdPath.
-type PlayerIdPath = string
+// internalAuthContextKey is the context key for InternalAuth security scheme
+type internalAuthContextKey string
 
 // CreateDeckJSONRequestBody defines body for CreateDeck for application/json ContentType.
 type CreateDeckJSONRequestBody = DeckCreateRequest

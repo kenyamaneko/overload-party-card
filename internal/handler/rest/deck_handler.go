@@ -22,11 +22,7 @@ func NewDeckHandler(deckInteractor *usecase.DeckInteractor) *DeckHandler {
 
 // GetDecks はプレイヤーのデッキ一覧を返します。
 func (h *DeckHandler) GetDecks(c *gin.Context) {
-	playerID := c.Param("playerId")
-	if playerID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "playerId is required"})
-		return
-	}
+	playerID := c.GetString(PlayerIDContextKey)
 
 	decks, err := h.deckInteractor.GetDecks(c.Request.Context(), playerID)
 	if err != nil {
@@ -38,7 +34,7 @@ func (h *DeckHandler) GetDecks(c *gin.Context) {
 
 // GetDeck は指定デッキの詳細を返します。
 func (h *DeckHandler) GetDeck(c *gin.Context) {
-	playerID := c.Param("playerId")
+	playerID := c.GetString(PlayerIDContextKey)
 	deckID, err := strconv.ParseInt(c.Param("deckId"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid deck_id"})
@@ -55,7 +51,7 @@ func (h *DeckHandler) GetDeck(c *gin.Context) {
 
 // CreateDeck は新しいデッキを作成します。
 func (h *DeckHandler) CreateDeck(c *gin.Context) {
-	playerID := c.Param("playerId")
+	playerID := c.GetString(PlayerIDContextKey)
 
 	var req apicard.DeckCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -73,7 +69,7 @@ func (h *DeckHandler) CreateDeck(c *gin.Context) {
 
 // UpdateDeck は既存デッキを更新します。
 func (h *DeckHandler) UpdateDeck(c *gin.Context) {
-	playerID := c.Param("playerId")
+	playerID := c.GetString(PlayerIDContextKey)
 	deckID, err := strconv.ParseInt(c.Param("deckId"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid deck_id"})
@@ -96,7 +92,7 @@ func (h *DeckHandler) UpdateDeck(c *gin.Context) {
 
 // DeleteDeck は指定デッキを削除します。
 func (h *DeckHandler) DeleteDeck(c *gin.Context) {
-	playerID := c.Param("playerId")
+	playerID := c.GetString(PlayerIDContextKey)
 	deckID, err := strconv.ParseInt(c.Param("deckId"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid deck_id"})
@@ -112,7 +108,7 @@ func (h *DeckHandler) DeleteDeck(c *gin.Context) {
 
 // ValidateDeckForBattle はデッキがバトル可能かを検証します。
 func (h *DeckHandler) ValidateDeckForBattle(c *gin.Context) {
-	playerID := c.Param("playerId")
+	playerID := c.GetString(PlayerIDContextKey)
 	deckID, err := strconv.ParseInt(c.Param("deckId"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid deck_id"})

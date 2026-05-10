@@ -56,8 +56,8 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 
 ### 3.1 取得 API
 
-1. `GET /internal/v1/players/{playerId}/cards` — 所持分のみ、カード定義付き形式 (`PlayerCardWithDef`)
-2. `GET /internal/v1/players/{playerId}/cards/with-ownership` — 全カード定義に所持フラグを付与
+1. `GET /api/v1/cards/cards` — 所持分のみ、カード定義付き形式 (`PlayerCardWithDef`)
+2. `GET /api/v1/cards/cards/with-ownership` — 全カード定義に所持フラグを付与
 
 どちらも CardCache を経由して定義情報を埋める。CardCache に存在しないカードを所持しているケースは内部エラー（データ整合性異常）として扱う。
 
@@ -101,7 +101,7 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 
 ### 4.4 `validate-for-battle` の契約
 
-`POST /internal/v1/players/{playerId}/decks/{deckId}/validate-for-battle` はバトル開始前のゲートキーパー。`is_valid=true` と同等のチェックを行い、不可の場合は具体的な理由をエラーで返す。gateway は matchmaking enqueue / NPC 対戦作成の前にこれを呼ぶ。
+`POST /api/v1/cards/decks/{deckId}/validate-for-battle` はバトル開始前のゲートキーパー。`is_valid=true` と同等のチェックを行い、不可の場合は具体的な理由をエラーで返す。gateway は matchmaking enqueue / NPC 対戦作成の前にこれを呼ぶ。
 
 チェック順序:
 
@@ -112,7 +112,7 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 
 ### 4.5 デッキ削除
 
-`DELETE /internal/v1/players/{playerId}/decks/{deckId}` は `decks` 行を削除する。`deck_cards` は FK の `ON DELETE CASCADE` で同時に削除される。
+`DELETE /api/v1/cards/decks/{deckId}` は `decks` 行を削除する。`deck_cards` は FK の `ON DELETE CASCADE` で同時に削除される。
 
 ---
 
