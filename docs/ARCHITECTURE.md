@@ -8,6 +8,8 @@
 
 card は **カードマスターデータそのもの** の single source of truth である。他サービスはカード定義を DB テーブル/seed として持たず、card の `GET /internal/v1/cards` を起動時に呼び出してインメモリに保持する read model を各自で構築する。
 
+エンドポイントは 2 系統に分かれる。`/internal/v1/cards` は battle / gateway が起動時に master データをロードする経路で player_id を要求しないため認証なし。`/api/v1/cards/...` は gateway 経由の player-scoped 操作 (デッキ管理・所持カード照会等) で `X-Internal-Auth` (HMAC JWT) を要求し、`sub` クレームから player_id を解決する (ADR-037)。
+
 この契約により:
 
 - カードマスターの複製が存在しないため、不整合が原理的に発生しない
@@ -181,6 +183,7 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 - **`PUBSUB_PROJECT_ID`**: card は `player-onboarded` / `card-pack-purchased` subscriber を持つため必須
 - **`PLAYER_ONBOARDED_SUBSCRIPTION`**: player-onboarded subscription 名。未設定で起動不可
 - **`CARD_PACK_PURCHASED_SUBSCRIPTION`**: card-pack-purchased subscription 名。未設定で起動不可
+- **`INTERNAL_AUTH_SECRET`**: gateway が発行する内部認証 JWT の検証鍵。未設定で起動不可。`/api/v1/cards` 配下の player-scoped API は本鍵で署名された `X-Internal-Auth` header を要求する
 
 ### カードデータ変更時
 
