@@ -10,11 +10,6 @@
 // cardclient が private に保持している deckWithCards wrapper は本パッケージで
 // 独立に定義しなおし (DeckWithCardsResponse)、テスト側が typed で組み立てられる
 // ようにする。
-//
-// 認証: 本 fake は X-Internal-Auth header の検証を行わない (テストダブルの責務外)。
-// player_id は URL path に含まれず JWT sub から解決されるが、fake は handler 引数から
-// playerID を取らない。テスト側が playerID 関連の挙動を確認したい場合は、リクエストの
-// X-Internal-Auth header を別途 inspect するか、cardclient の入力値を信頼する。
 package apicardserverfake
 
 import (
