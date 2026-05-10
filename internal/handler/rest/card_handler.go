@@ -31,11 +31,7 @@ func (h *CardHandler) ListAllRaw(c *gin.Context) {
 
 // ListForPlayer は指定プレイヤーの所持状態を付与した全カードを返します。
 func (h *CardHandler) ListForPlayer(c *gin.Context) {
-	playerID := c.Param("playerId")
-	if playerID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "playerId is required"})
-		return
-	}
+	playerID := c.GetString(PlayerIDContextKey)
 	cards, err := h.cardInteractor.ListCardsWithOwnership(c.Request.Context(), playerID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/kenyamaneko/overload-party-card/internal/adapter/internalauth"
 	pubsubadapter "github.com/kenyamaneko/overload-party-card/internal/adapter/pubsub"
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
 	"github.com/kenyamaneko/overload-party-card/internal/config"
@@ -68,7 +69,11 @@ func run() error {
 	deckH := rest.NewDeckHandler(deckInteractor)
 	playerCardH := rest.NewPlayerCardHandler(playerCardInteractor)
 
-	r := router.New(cardH, deckH, playerCardH)
+	authVerifier := internalauth.NewVerifier(
+		internalauth.StaticHS256Resolver([]byte(cfg.InternalAuthSecret), internalauth.DefaultKeyID),
+	)
+
+	r := router.New(cardH, deckH, playerCardH, authVerifier)
 
 	onboardedStream, err := pubsubadapter.NewStream(ctx, cfg.PubsubProjectID, cfg.PlayerOnboardedSubscription)
 	if err != nil {

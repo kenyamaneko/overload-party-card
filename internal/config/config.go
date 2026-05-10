@@ -27,6 +27,9 @@ type Config struct {
 	PubsubProjectID                string
 	PlayerOnboardedSubscription    string
 	CardPackPurchasedSubscription  string
+
+	// InternalAuthSecret は内部サービス間 JWT (HS256) 検証の共有秘密鍵。
+	InternalAuthSecret string
 }
 
 // FromEnv は環境変数から Config を構築します。
@@ -37,6 +40,7 @@ func FromEnv() (*Config, error) {
 		PubsubProjectID:               os.Getenv("PUBSUB_PROJECT_ID"),
 		PlayerOnboardedSubscription:   os.Getenv("PLAYER_ONBOARDED_SUBSCRIPTION"),
 		CardPackPurchasedSubscription: os.Getenv("CARD_PACK_PURCHASED_SUBSCRIPTION"),
+		InternalAuthSecret:            os.Getenv("INTERNAL_AUTH_SECRET"),
 	}
 
 	rawPort := os.Getenv("PORT")
@@ -71,6 +75,9 @@ func FromEnv() (*Config, error) {
 	}
 	if cfg.CardPackPurchasedSubscription == "" {
 		return nil, fmt.Errorf("config: CARD_PACK_PURCHASED_SUBSCRIPTION is required")
+	}
+	if cfg.InternalAuthSecret == "" {
+		return nil, fmt.Errorf("config: INTERNAL_AUTH_SECRET is required")
 	}
 	return cfg, nil
 }
