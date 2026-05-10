@@ -52,9 +52,8 @@ func TestNew_HealthEndpoint(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
-// /internal/v1/cards (master 配信) は battle 互換のため auth middleware を通らず、
-// handler が登録されている (Verify が呼ばれないこと自体が登録の証拠)。
-// nil 依存により 500 を返すが、auth middleware が走っていれば nullVerifier が panic する。
+// /internal/v1/cards (master 配信) は auth middleware を通らない。nullVerifier が
+// 呼ばれた場合 panic するため、NotPanics + 401 でないことの両方で確認する。
 func TestNew_InternalCardsRouteIsAuthFree(t *testing.T) {
 	r := newTestRouter(nullVerifier{})
 	w := httptest.NewRecorder()
