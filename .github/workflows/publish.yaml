@@ -1,19 +1,20 @@
-name: publish
+name: Publish
 
-# Tags and publishes the api-card Go module on push to main. Manual
-# dispatch supports minor/major bumps; default is patch. NEVER tag
-# manually — this workflow is the single writer of module tags.
+# api-card (Go module) と api-card-npm (Cloudsmith npm) を手動でタグ付け・公開する。
+# バージョンを上げるタイミングは人が判断して workflow_dispatch で実行する。
+# タグの手動打ちは禁止 — このワークフローがモジュールタグの唯一の発行元。
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "packages/api-card/**"
-      - "data/models.yaml"
-      - "scripts/generate_types.py"
-      - ".github/workflows/publish.yaml"
   workflow_dispatch:
     inputs:
+      target:
+        description: "Package to publish"
+        required: true
+        default: "api-card"
+        type: choice
+        options:
+          - api-card
+          - api-card-npm
       bump:
         description: "Version bump level"
         required: true
@@ -30,48 +31,11 @@ concurrency:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.25"
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install codegen dependencies
-        run: pip install pyyaml
-
-      - name: Verify codegen is in sync
-        run: |
-          python3 scripts/generate_types.py
-          if ! git diff --quiet -- packages/api-card docs/API_REFERENCE.md; then
-            echo "::error::Generated files are out of sync with data/models.yaml."
-            echo "Run 'python3 scripts/generate_types.py' and commit."
-            git diff -- packages/api-card docs/API_REFERENCE.md
-            exit 1
-          fi
-
-      - name: Vet api-card
-        run: go vet ./...
-        working-directory: packages/api-card
-
-      - name: Build api-card
-        run: go build ./...
-        working-directory: packages/api-card
-
   publish-api-card:
-    needs: check
+    if: inputs.target == 'api-card'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -83,39 +47,62 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25"
+          go-version-file: packages/api-card/go.mod
+
+      - name: Vet api-card
+        run: go vet ./...
+        working-directory: packages/api-card
+
+      - name: Build api-card
+        run: go build ./...
+        working-directory: packages/api-card
 
       - name: Determine next tag
         id: tag
         env:
-          BUMP: ${{ github.event.inputs.bump || 'patch' }}
-        run: |
-          set -euo pipefail
-          prefix="packages/api-card/v"
-          latest=$(git tag --list "${prefix}*" --sort=-v:refname | head -n1 || true)
-          if [ -z "${latest}" ]; then
-            next="${prefix}0.1.0"
-          else
-            ver="${latest#${prefix}}"
-            IFS='.' read -r major minor patch <<EOF
-          ${ver}
-          EOF
-            case "${BUMP}" in
-              patch) patch=$((patch + 1)) ;;
-              minor) minor=$((minor + 1)); patch=0 ;;
-              major) major=$((major + 1)); minor=0; patch=0 ;;
-              *) echo "unknown bump: ${BUMP}" >&2; exit 1 ;;
-            esac
-            next="${prefix}${major}.${minor}.${patch}"
-          fi
-          echo "tag=${next}" >> "${GITHUB_OUTPUT}"
+          PREFIX: packages/api-card/v
+          BUMP: ${{ inputs.bump }}
+        run: .github/scripts/publish/next-tag.sh
 
       - name: Tag and push
         env:
           TAG: ${{ steps.tag.outputs.tag }}
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag "${TAG}"
-          git push origin "${TAG}"
+        run: .github/scripts/publish/tag-and-push.sh
+
+  publish-api-card-npm:
+    if: inputs.target == 'api-card-npm'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Determine next tag
+        id: tag
+        env:
+          PREFIX: packages/api-card-npm/v
+          BUMP: ${{ inputs.bump }}
+        run: .github/scripts/publish/next-tag.sh
+
+      - name: Build & version npm package
+        working-directory: packages/api-card-npm
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: ../../.github/scripts/publish/build-npm.sh
+
+      - name: Publish to Cloudsmith
+        uses: kenyamaneko/overload-party-common/.github/actions/publish-to-cloudsmith@main
+        with:
+          format: npm
+          package-path: packages/api-card-npm
+
+      - name: Tag and push
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: .github/scripts/publish/tag-and-push.sh

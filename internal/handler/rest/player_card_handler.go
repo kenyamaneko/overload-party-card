@@ -20,11 +20,7 @@ func NewPlayerCardHandler(playerCardInteractor *usecase.PlayerCardInteractor) *P
 
 // GetPlayerCards はプレイヤーの所持カード一覧を返します。
 func (h *PlayerCardHandler) GetPlayerCards(c *gin.Context) {
-	playerID := c.Param("playerId")
-	if playerID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "playerId is required"})
-		return
-	}
+	playerID := c.GetString(PlayerIDContextKey)
 	cards, err := h.playerCardInteractor.GetPlayerCards(c.Request.Context(), playerID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

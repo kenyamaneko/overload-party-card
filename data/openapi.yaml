@@ -3,8 +3,11 @@ info:
   title: overload-party-card
   version: 0.1.0
   description: |
-    Card service の REST 契約 (gateway / battle が card の internal API を呼ぶための契約)。
-    本ファイルが SSoT。`packages/api-card` の Go 型は oapi-codegen が本ファイルから生成する。
+    Card service の REST 契約。`packages/api-card` (Go) と `packages/api-card-npm` (TypeScript) を本ファイルから生成する。
+
+    エンドポイント分類:
+    - `/internal/v1/cards`: master データ配信。battle / gateway 起動時のキャッシュロード用。認証なし
+    - `/api/v1/cards/...`: gateway 経由の player-scoped 操作。`X-Internal-Auth` (HMAC JWT) で認証し、player_id は sub クレームから解決する
 
 paths:
   /health:
@@ -35,12 +38,12 @@ paths:
         "500":
           description: DB 接続エラー
 
-  /internal/v1/players/{playerId}/cards:
+  /api/v1/cards/cards:
     get:
       operationId: listPlayerCards
       summary: プレイヤーの所持カード一覧を返す
-      parameters:
-        - $ref: "#/components/parameters/PlayerIdPath"
+      security:
+        - InternalAuth: []
       responses:
         "200":
           description: 所持カード一覧
@@ -50,17 +53,17 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/PlayerCardWithDef"
-        "400":
-          description: playerId が空
+        "401":
+          description: 認証失敗
         "500":
           description: DB 接続エラー
 
-  /internal/v1/players/{playerId}/cards/with-ownership:
+  /api/v1/cards/cards/with-ownership:
     get:
       operationId: listCardsWithOwnership
       summary: 全カード定義にプレイヤーの所持状態を付与して返す
-      parameters:
-        - $ref: "#/components/parameters/PlayerIdPath"
+      security:
+        - InternalAuth: []
       responses:
         "200":
           description: 所持状態付きカード一覧
@@ -70,17 +73,17 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/CardWithOwnership"
-        "400":
-          description: playerId が空
+        "401":
+          description: 認証失敗
         "500":
           description: DB 接続エラー
 
-  /internal/v1/players/{playerId}/decks:
+  /api/v1/cards/decks:
     get:
       operationId: listDecks
       summary: プレイヤーのデッキ一覧を返す
-      parameters:
-        - $ref: "#/components/parameters/PlayerIdPath"
+      security:
+        - InternalAuth: []
       responses:
         "200":
           description: デッキ一覧
@@ -90,8 +93,8 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Deck"
-        "400":
-          description: playerId が空
+        "401":
+          description: 認証失敗
         "404":
           description: プレイヤーが存在しない
         "500":
@@ -99,8 +102,8 @@ paths:
     post:
       operationId: createDeck
       summary: 新しいデッキを作成する
-      parameters:
-        - $ref: "#/components/parameters/PlayerIdPath"
+      security:
+        - InternalAuth: []
       requestBody:
         required: true
         content:
@@ -116,17 +119,20 @@ paths:
                 $ref: "#/components/schemas/Deck"
         "400":
           description: リクエストボディ不正 / デッキバリデーション失敗
+        "401":
+          description: 認証失敗
         "403":
           description: 未所持カードを含む
         "500":
           description: DB 接続エラー
 
-  /internal/v1/players/{playerId}/decks/{deckId}:
+  /api/v1/cards/decks/{deckId}:
     get:
       operationId: getDeck
       summary: 指定デッキの詳細 (カード構成を含む) を返す
+      security:
+        - InternalAuth: []
       parameters:
-        - $ref: "#/components/parameters/PlayerIdPath"
         - $ref: "#/components/parameters/DeckIdPath"
       responses:
         "200":
@@ -137,6 +143,8 @@ paths:
                 $ref: "#/components/schemas/DeckDetailResponse"
         "400":
           description: deckId が不正
+        "401":
+          description: 認証失敗
         "404":
           description: デッキが存在しない
         "500":
@@ -144,8 +152,9 @@ paths:
     put:
       operationId: updateDeck
       summary: 既存デッキを更新する
+      security:
+        - InternalAuth: []
       parameters:
-        - $ref: "#/components/parameters/PlayerIdPath"
         - $ref: "#/components/parameters/DeckIdPath"
       requestBody:
         required: true
@@ -162,6 +171,8 @@ paths:
                 $ref: "#/components/schemas/Deck"
         "400":
           description: deckId 不正 / リクエストボディ不正 / デッキバリデーション失敗 / 制限枚数超過
+        "401":
+          description: 認証失敗
         "403":
           description: 未所持カードを含む
         "404":
@@ -171,31 +182,37 @@ paths:
     delete:
       operationId: deleteDeck
       summary: デッキを削除する
+      security:
+        - InternalAuth: []
       parameters:
-        - $ref: "#/components/parameters/PlayerIdPath"
         - $ref: "#/components/parameters/DeckIdPath"
       responses:
         "204":
           description: 削除成功 (ボディなし)
         "400":
           description: deckId が不正
+        "401":
+          description: 認証失敗
         "404":
           description: デッキが存在しない
         "500":
           description: DB 接続エラー
 
-  /internal/v1/players/{playerId}/decks/{deckId}/validate-for-battle:
+  /api/v1/cards/decks/{deckId}/validate-for-battle:
     post:
       operationId: validateDeckForBattle
       summary: デッキがバトル使用可能か検証する (カード所持・制限・枚数チェック)
+      security:
+        - InternalAuth: []
       parameters:
-        - $ref: "#/components/parameters/PlayerIdPath"
         - $ref: "#/components/parameters/DeckIdPath"
       responses:
         "200":
           description: 検証成功 (ボディなし)
         "400":
           description: deckId 不正 / デッキバリデーション失敗 / 制限枚数超過
+        "401":
+          description: 認証失敗
         "403":
           description: 未所持カードを含む
         "404":
@@ -204,13 +221,14 @@ paths:
           description: DB 接続エラー
 
 components:
+  securitySchemes:
+    InternalAuth:
+      type: apiKey
+      in: header
+      name: X-Internal-Auth
+      description: gateway が発行する HS256 JWT。sub クレームに player_id を含む。
+
   parameters:
-    PlayerIdPath:
-      name: playerId
-      in: path
-      required: true
-      schema:
-        type: string
     DeckIdPath:
       name: deckId
       in: path
