@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/kenyamaneko/overload-party-card/internal/adapter/internalauth"
 	pubsubadapter "github.com/kenyamaneko/overload-party-card/internal/adapter/pubsub"
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
 	"github.com/kenyamaneko/overload-party-card/internal/config"
@@ -21,6 +20,8 @@ import (
 	"github.com/kenyamaneko/overload-party-card/internal/repository"
 	"github.com/kenyamaneko/overload-party-card/internal/router"
 	"github.com/kenyamaneko/overload-party-card/internal/usecase"
+
+	internalauth "github.com/kenyamaneko/overload-party-gateway/packages/internalauth-go"
 )
 
 func main() {
