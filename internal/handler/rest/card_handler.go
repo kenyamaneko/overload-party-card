@@ -6,6 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/kenyamaneko/overload-party-card/internal/usecase"
+
+	internalauth "github.com/kenyamaneko/overload-party-gateway/packages/internalauth-go"
 )
 
 // CardHandler はカードマスター関連の REST エンドポイントを処理します。
@@ -31,7 +33,7 @@ func (h *CardHandler) ListAllRaw(c *gin.Context) {
 
 // ListForPlayer は指定プレイヤーの所持状態を付与した全カードを返します。
 func (h *CardHandler) ListForPlayer(c *gin.Context) {
-	playerID := c.GetString(PlayerIDContextKey)
+	playerID := c.GetString(internalauth.PlayerIDContextKey)
 	cards, err := h.cardInteractor.ListCardsWithOwnership(c.Request.Context(), playerID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

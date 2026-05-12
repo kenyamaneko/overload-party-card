@@ -6,7 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/kenyamaneko/overload-party-card/internal/handler/rest"
-	"github.com/kenyamaneko/overload-party-card/internal/port"
+
+	internalauth "github.com/kenyamaneko/overload-party-gateway/packages/internalauth-go"
 )
 
 // New は card サービスの HTTP ルーターを構築します。
@@ -14,7 +15,7 @@ func New(
 	cardH *rest.CardHandler,
 	deckH *rest.DeckHandler,
 	playerCardH *rest.PlayerCardHandler,
-	authVerifier port.InternalAuthVerifier,
+	authVerifier internalauth.Verifier,
 ) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -33,7 +34,7 @@ func New(
 	// gateway 経由の player-scoped API。internalauth middleware が JWT 検証して
 	// sub クレームを context に注入し、handler は context 経由で player_id を取る。
 	api := r.Group("/api/v1/cards")
-	api.Use(rest.VerifyInternalAuth(authVerifier))
+	api.Use(internalauth.VerifyInternalAuth(authVerifier))
 	{
 		api.GET("/cards", playerCardH.GetPlayerCards)
 		api.GET("/cards/with-ownership", cardH.ListForPlayer)
