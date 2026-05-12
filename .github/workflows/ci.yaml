@@ -35,7 +35,7 @@ env:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     timeout-minutes: 10
     steps:
       - name: Checkout
@@ -59,7 +59,7 @@ jobs:
           GOPRIVATE: github.com/kenyamaneko/*
 
   test-unit:
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -81,7 +81,7 @@ jobs:
   test-integration:
     # ubuntu-latest には Docker がプリインストールされており、Testcontainers が
     # postgres:16-alpine を起動してリポジトリ層テストを実行する。
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -104,7 +104,7 @@ jobs:
           GOPRIVATE: github.com/kenyamaneko/*
 
   codegen-sync:
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     timeout-minutes: 10
     steps:
       - name: Checkout
@@ -144,7 +144,7 @@ jobs:
   build-and-push:
     needs: [lint, test-unit, test-integration]
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     timeout-minutes: 30
     steps:
       - name: Checkout
