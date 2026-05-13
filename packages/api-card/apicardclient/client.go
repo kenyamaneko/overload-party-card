@@ -1,8 +1,5 @@
-// Package apicardclient は overload-party-card REST API の sentinel-error converted client を提供する。
-//
-// 生成された apicard.ClientWithResponses をラップし、HTTP status code を sentinel error
-// (ErrNotFound 等) に変換して返す。consumer は port impl で委譲呼びするだけで status
-// code 解釈ロジックを書かずに済む。
+// Package apicardclient は consumer から wire 詳細 (REST path / HTTP status code) を
+// 隠蔽するため、生成 client を sentinel error 変換でラップする。
 package apicardclient
 
 import (

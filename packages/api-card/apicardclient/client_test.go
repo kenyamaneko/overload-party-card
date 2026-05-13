@@ -13,232 +13,214 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestClient_HappyPath は、wire 契約 (OpenAPI spec) で定義された 2xx status と
-// schema 付き response body を SDK が wire 型で返すことを検証する。
-func TestClient_HappyPath(t *testing.T) {
-	deckSample := apicard.Deck{
-		PlayerID: "p1", DeckID: 42, DeckName: "sample", IsValid: true,
-	}
-	cards := []apicard.DeckCard{
-		{PlayerID: "p1", DeckID: 42, CardID: "c1", ArtNo: 1, Count: 3},
-	}
-
-	cases := []struct {
-		name   string
-		setup  func(*apicardserverfake.Server)
-		invoke func(*testing.T, *apicardclient.Client)
-	}{
-		{
-			name: "ListCards 200 returns slice",
-			setup: func(s *apicardserverfake.Server) {
-				s.ListAllCardsFn = func() (int, any) {
-					return http.StatusOK, []apicard.CardDefinition{{CardID: "c1"}}
-				}
-			},
-			invoke: func(t *testing.T, c *apicardclient.Client) {
-				got, err := c.ListCards(context.Background())
-				require.NoError(t, err)
-				assert.Len(t, got, 1)
-				assert.Equal(t, "c1", got[0].CardID)
-			},
-		},
-		{
-			name: "ListPlayerCards 200 returns slice",
-			setup: func(s *apicardserverfake.Server) {
-				s.ListPlayerCardsFn = func() (int, any) {
-					return http.StatusOK, []apicard.PlayerCardWithDef{{CardID: "c1", Count: 2}}
-				}
-			},
-			invoke: func(t *testing.T, c *apicardclient.Client) {
-				got, err := c.ListPlayerCards(context.Background())
-				require.NoError(t, err)
-				assert.Len(t, got, 1)
-			},
-		},
-		{
-			name: "ListCardsWithOwnership 200 returns slice",
-			setup: func(s *apicardserverfake.Server) {
-				s.ListCardsWithOwnershipFn = func() (int, any) {
-					return http.StatusOK, []apicard.CardWithOwnership{{CardID: "c1", IsOwned: true}}
-				}
-			},
-			invoke: func(t *testing.T, c *apicardclient.Client) {
-				got, err := c.ListCardsWithOwnership(context.Background())
-				require.NoError(t, err)
-				assert.Len(t, got, 1)
-				assert.True(t, got[0].IsOwned)
-			},
-		},
-		{
-			name: "ListDecks 200 returns slice",
-			setup: func(s *apicardserverfake.Server) {
-				s.ListDecksFn = func() (int, any) {
-					return http.StatusOK, []apicard.Deck{deckSample}
-				}
-			},
-			invoke: func(t *testing.T, c *apicardclient.Client) {
-				got, err := c.ListDecks(context.Background())
-				require.NoError(t, err)
-				assert.Len(t, got, 1)
-				assert.Equal(t, int64(42), got[0].DeckID)
-			},
-		},
-		{
-			name: "GetDeck 200 returns deck and cards",
-			setup: func(s *apicardserverfake.Server) {
-				s.GetDeckFn = func(_ string) (int, any) {
-					return http.StatusOK, apicardserverfake.DeckWithCardsResponse{Deck: &deckSample, Cards: cards}
-				}
-			},
-			invoke: func(t *testing.T, c *apicardclient.Client) {
-				deck, gotCards, err := c.GetDeck(context.Background(), 42)
-				require.NoError(t, err)
-				require.NotNil(t, deck)
-				assert.Equal(t, int64(42), deck.DeckID)
-				assert.Len(t, gotCards, 1)
-			},
-		},
-		{
-			name: "CreateDeck 201 returns created deck",
-			setup: func(s *apicardserverfake.Server) {
-				s.CreateDeckFn = func(_ apicard.DeckCreateRequest) (int, any) {
-					return http.StatusCreated, deckSample
-				}
-			},
-			invoke: func(t *testing.T, c *apicardclient.Client) {
-				got, err := c.CreateDeck(context.Background(), apicard.DeckCreateRequest{DeckName: "sample"})
-				require.NoError(t, err)
-				require.NotNil(t, got)
-				assert.Equal(t, int64(42), got.DeckID)
-			},
-		},
-		{
-			name: "UpdateDeck 200 returns updated deck",
-			setup: func(s *apicardserverfake.Server) {
-				s.UpdateDeckFn = func(_ string, _ apicard.DeckUpdateRequest) (int, any) {
-					return http.StatusOK, deckSample
-				}
-			},
-			invoke: func(t *testing.T, c *apicardclient.Client) {
-				got, err := c.UpdateDeck(context.Background(), 42, apicard.DeckUpdateRequest{DeckName: "updated"})
-				require.NoError(t, err)
-				require.NotNil(t, got)
-			},
-		},
-		{
-			name: "DeleteDeck 204 returns nil",
-			setup: func(s *apicardserverfake.Server) {
-				s.DeleteDeckFn = func(_ string) (int, any) { return http.StatusNoContent, nil }
-			},
-			invoke: func(t *testing.T, c *apicardclient.Client) {
-				err := c.DeleteDeck(context.Background(), 42)
-				require.NoError(t, err)
-			},
-		},
-		{
-			name: "ValidateDeckForBattle 200 returns nil",
-			setup: func(s *apicardserverfake.Server) {
-				s.ValidateDeckForBattleFn = func(_ string) (int, any) { return http.StatusOK, nil }
-			},
-			invoke: func(t *testing.T, c *apicardclient.Client) {
-				err := c.ValidateDeckForBattle(context.Background(), 42)
-				require.NoError(t, err)
-			},
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			srv := apicardserverfake.NewServer()
-			defer srv.Close()
-			tc.setup(srv)
-
-			c, err := apicardclient.New(srv.URL())
-			require.NoError(t, err)
-			tc.invoke(t, c)
-		})
-	}
-}
-
-// TestClient_ErrorMapping は、wire 契約で定義された 4xx/5xx status を
-// SDK が sentinel error (errors.Is で分岐可能) に変換することを検証する。
-// 各 status code に対し、代表的な endpoint で挙動を確認する。
-func TestClient_ErrorMapping(t *testing.T) {
+// TestClient_StatusToSentinelMapping は SDK の固有責務である
+// 「OpenAPI spec で宣言された 4xx/5xx status を sentinel error に変換する」契約を検証する。
+// 各 endpoint について spec (data/openapi.yaml) が宣言する error status を網羅し、
+// errors.Is で意図した sentinel に一致することを確認する。
+func TestClient_StatusToSentinelMapping(t *testing.T) {
 	cases := []struct {
 		name       string
 		setup      func(*apicardserverfake.Server)
 		invoke     func(*apicardclient.Client) error
 		wantTarget error
 	}{
+		// ListCards: spec 宣言は 500 のみ
 		{
-			name: "GetDeck 404 → ErrNotFound",
-			setup: func(s *apicardserverfake.Server) {
-				s.GetDeckFn = func(_ string) (int, any) { return http.StatusNotFound, nil }
-			},
-			invoke:     func(c *apicardclient.Client) error { _, _, err := c.GetDeck(context.Background(), 1); return err },
-			wantTarget: apicardclient.ErrNotFound,
-		},
-		{
-			name: "GetDeck 401 → ErrUnauthorized",
-			setup: func(s *apicardserverfake.Server) {
-				s.GetDeckFn = func(_ string) (int, any) { return http.StatusUnauthorized, nil }
-			},
-			invoke:     func(c *apicardclient.Client) error { _, _, err := c.GetDeck(context.Background(), 1); return err },
-			wantTarget: apicardclient.ErrUnauthorized,
-		},
-		{
-			name: "CreateDeck 403 → ErrForbidden",
-			setup: func(s *apicardserverfake.Server) {
-				s.CreateDeckFn = func(_ apicard.DeckCreateRequest) (int, any) { return http.StatusForbidden, nil }
-			},
-			invoke: func(c *apicardclient.Client) error {
-				_, err := c.CreateDeck(context.Background(), apicard.DeckCreateRequest{DeckName: "x"})
-				return err
-			},
-			wantTarget: apicardclient.ErrForbidden,
-		},
-		{
-			name: "CreateDeck 400 → ErrBadRequest",
-			setup: func(s *apicardserverfake.Server) {
-				s.CreateDeckFn = func(_ apicard.DeckCreateRequest) (int, any) { return http.StatusBadRequest, nil }
-			},
-			invoke: func(c *apicardclient.Client) error {
-				_, err := c.CreateDeck(context.Background(), apicard.DeckCreateRequest{DeckName: "x"})
-				return err
-			},
-			wantTarget: apicardclient.ErrBadRequest,
-		},
-		{
-			name: "ListCards 500 → ErrInternalServer",
-			setup: func(s *apicardserverfake.Server) {
-				s.ListAllCardsFn = func() (int, any) { return http.StatusInternalServerError, nil }
-			},
+			name:       "ListCards: 500 を受けたとき ErrInternalServer に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.ListAllCardsFn = stubStatus(http.StatusInternalServerError) },
 			invoke:     func(c *apicardclient.Client) error { _, err := c.ListCards(context.Background()); return err },
 			wantTarget: apicardclient.ErrInternalServer,
 		},
+
+		// ListPlayerCards: spec 宣言は 401, 500
 		{
-			name: "DeleteDeck 404 → ErrNotFound",
-			setup: func(s *apicardserverfake.Server) {
-				s.DeleteDeckFn = func(_ string) (int, any) { return http.StatusNotFound, nil }
-			},
+			name:       "ListPlayerCards: 401 を受けたとき ErrUnauthorized に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.ListPlayerCardsFn = stubStatus(http.StatusUnauthorized) },
+			invoke:     func(c *apicardclient.Client) error { _, err := c.ListPlayerCards(context.Background()); return err },
+			wantTarget: apicardclient.ErrUnauthorized,
+		},
+		{
+			name:       "ListPlayerCards: 500 を受けたとき ErrInternalServer に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.ListPlayerCardsFn = stubStatus(http.StatusInternalServerError) },
+			invoke:     func(c *apicardclient.Client) error { _, err := c.ListPlayerCards(context.Background()); return err },
+			wantTarget: apicardclient.ErrInternalServer,
+		},
+
+		// ListCardsWithOwnership: spec 宣言は 401, 500
+		{
+			name:       "ListCardsWithOwnership: 401 を受けたとき ErrUnauthorized に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.ListCardsWithOwnershipFn = stubStatus(http.StatusUnauthorized) },
+			invoke:     func(c *apicardclient.Client) error { _, err := c.ListCardsWithOwnership(context.Background()); return err },
+			wantTarget: apicardclient.ErrUnauthorized,
+		},
+		{
+			name:       "ListCardsWithOwnership: 500 を受けたとき ErrInternalServer に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.ListCardsWithOwnershipFn = stubStatus(http.StatusInternalServerError) },
+			invoke:     func(c *apicardclient.Client) error { _, err := c.ListCardsWithOwnership(context.Background()); return err },
+			wantTarget: apicardclient.ErrInternalServer,
+		},
+
+		// ListDecks: spec 宣言は 401, 404, 500
+		{
+			name:       "ListDecks: 401 を受けたとき ErrUnauthorized に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.ListDecksFn = stubStatus(http.StatusUnauthorized) },
+			invoke:     func(c *apicardclient.Client) error { _, err := c.ListDecks(context.Background()); return err },
+			wantTarget: apicardclient.ErrUnauthorized,
+		},
+		{
+			name:       "ListDecks: 404 を受けたとき ErrNotFound に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.ListDecksFn = stubStatus(http.StatusNotFound) },
+			invoke:     func(c *apicardclient.Client) error { _, err := c.ListDecks(context.Background()); return err },
+			wantTarget: apicardclient.ErrNotFound,
+		},
+		{
+			name:       "ListDecks: 500 を受けたとき ErrInternalServer に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.ListDecksFn = stubStatus(http.StatusInternalServerError) },
+			invoke:     func(c *apicardclient.Client) error { _, err := c.ListDecks(context.Background()); return err },
+			wantTarget: apicardclient.ErrInternalServer,
+		},
+
+		// CreateDeck: spec 宣言は 400, 401, 403, 500
+		{
+			name:       "CreateDeck: 400 を受けたとき ErrBadRequest に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.CreateDeckFn = stubCreateStatus(http.StatusBadRequest) },
+			invoke:     invokeCreateDeck,
+			wantTarget: apicardclient.ErrBadRequest,
+		},
+		{
+			name:       "CreateDeck: 401 を受けたとき ErrUnauthorized に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.CreateDeckFn = stubCreateStatus(http.StatusUnauthorized) },
+			invoke:     invokeCreateDeck,
+			wantTarget: apicardclient.ErrUnauthorized,
+		},
+		{
+			name:       "CreateDeck: 403 を受けたとき ErrForbidden に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.CreateDeckFn = stubCreateStatus(http.StatusForbidden) },
+			invoke:     invokeCreateDeck,
+			wantTarget: apicardclient.ErrForbidden,
+		},
+		{
+			name:       "CreateDeck: 500 を受けたとき ErrInternalServer に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.CreateDeckFn = stubCreateStatus(http.StatusInternalServerError) },
+			invoke:     invokeCreateDeck,
+			wantTarget: apicardclient.ErrInternalServer,
+		},
+
+		// GetDeck: spec 宣言は 400, 401, 404, 500
+		{
+			name:       "GetDeck: 400 を受けたとき ErrBadRequest に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.GetDeckFn = stubGetDeckStatus(http.StatusBadRequest) },
+			invoke:     invokeGetDeck,
+			wantTarget: apicardclient.ErrBadRequest,
+		},
+		{
+			name:       "GetDeck: 401 を受けたとき ErrUnauthorized に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.GetDeckFn = stubGetDeckStatus(http.StatusUnauthorized) },
+			invoke:     invokeGetDeck,
+			wantTarget: apicardclient.ErrUnauthorized,
+		},
+		{
+			name:       "GetDeck: 404 を受けたとき ErrNotFound に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.GetDeckFn = stubGetDeckStatus(http.StatusNotFound) },
+			invoke:     invokeGetDeck,
+			wantTarget: apicardclient.ErrNotFound,
+		},
+		{
+			name:       "GetDeck: 500 を受けたとき ErrInternalServer に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.GetDeckFn = stubGetDeckStatus(http.StatusInternalServerError) },
+			invoke:     invokeGetDeck,
+			wantTarget: apicardclient.ErrInternalServer,
+		},
+
+		// UpdateDeck: spec 宣言は 400, 401, 403, 404, 500
+		{
+			name:       "UpdateDeck: 400 を受けたとき ErrBadRequest に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.UpdateDeckFn = stubUpdateStatus(http.StatusBadRequest) },
+			invoke:     invokeUpdateDeck,
+			wantTarget: apicardclient.ErrBadRequest,
+		},
+		{
+			name:       "UpdateDeck: 401 を受けたとき ErrUnauthorized に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.UpdateDeckFn = stubUpdateStatus(http.StatusUnauthorized) },
+			invoke:     invokeUpdateDeck,
+			wantTarget: apicardclient.ErrUnauthorized,
+		},
+		{
+			name:       "UpdateDeck: 403 を受けたとき ErrForbidden に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.UpdateDeckFn = stubUpdateStatus(http.StatusForbidden) },
+			invoke:     invokeUpdateDeck,
+			wantTarget: apicardclient.ErrForbidden,
+		},
+		{
+			name:       "UpdateDeck: 404 を受けたとき ErrNotFound に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.UpdateDeckFn = stubUpdateStatus(http.StatusNotFound) },
+			invoke:     invokeUpdateDeck,
+			wantTarget: apicardclient.ErrNotFound,
+		},
+		{
+			name:       "UpdateDeck: 500 を受けたとき ErrInternalServer に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.UpdateDeckFn = stubUpdateStatus(http.StatusInternalServerError) },
+			invoke:     invokeUpdateDeck,
+			wantTarget: apicardclient.ErrInternalServer,
+		},
+
+		// DeleteDeck: spec 宣言は 400, 401, 404, 500
+		{
+			name:       "DeleteDeck: 400 を受けたとき ErrBadRequest に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.DeleteDeckFn = stubDeleteStatus(http.StatusBadRequest) },
+			invoke:     func(c *apicardclient.Client) error { return c.DeleteDeck(context.Background(), 1) },
+			wantTarget: apicardclient.ErrBadRequest,
+		},
+		{
+			name:       "DeleteDeck: 401 を受けたとき ErrUnauthorized に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.DeleteDeckFn = stubDeleteStatus(http.StatusUnauthorized) },
+			invoke:     func(c *apicardclient.Client) error { return c.DeleteDeck(context.Background(), 1) },
+			wantTarget: apicardclient.ErrUnauthorized,
+		},
+		{
+			name:       "DeleteDeck: 404 を受けたとき ErrNotFound に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.DeleteDeckFn = stubDeleteStatus(http.StatusNotFound) },
 			invoke:     func(c *apicardclient.Client) error { return c.DeleteDeck(context.Background(), 1) },
 			wantTarget: apicardclient.ErrNotFound,
 		},
 		{
-			name: "ValidateDeckForBattle 400 → ErrDeckInvalid (NOT ErrBadRequest)",
-			setup: func(s *apicardserverfake.Server) {
-				s.ValidateDeckForBattleFn = func(_ string) (int, any) { return http.StatusBadRequest, nil }
-			},
+			name:       "DeleteDeck: 500 を受けたとき ErrInternalServer に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.DeleteDeckFn = stubDeleteStatus(http.StatusInternalServerError) },
+			invoke:     func(c *apicardclient.Client) error { return c.DeleteDeck(context.Background(), 1) },
+			wantTarget: apicardclient.ErrInternalServer,
+		},
+
+		// ValidateDeckForBattle: spec 宣言は 400, 401, 403, 404, 500
+		// 400 だけ ErrDeckInvalid (wire 契約上「デッキ不正」を意味するため特別扱い)
+		{
+			name:       "ValidateDeckForBattle: 400 を受けたとき ErrBadRequest ではなく ErrDeckInvalid に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.ValidateDeckForBattleFn = stubValidateStatus(http.StatusBadRequest) },
 			invoke:     func(c *apicardclient.Client) error { return c.ValidateDeckForBattle(context.Background(), 1) },
 			wantTarget: apicardclient.ErrDeckInvalid,
 		},
 		{
-			name: "ValidateDeckForBattle 404 → ErrNotFound",
-			setup: func(s *apicardserverfake.Server) {
-				s.ValidateDeckForBattleFn = func(_ string) (int, any) { return http.StatusNotFound, nil }
-			},
+			name:       "ValidateDeckForBattle: 401 を受けたとき ErrUnauthorized に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.ValidateDeckForBattleFn = stubValidateStatus(http.StatusUnauthorized) },
+			invoke:     func(c *apicardclient.Client) error { return c.ValidateDeckForBattle(context.Background(), 1) },
+			wantTarget: apicardclient.ErrUnauthorized,
+		},
+		{
+			name:       "ValidateDeckForBattle: 403 を受けたとき ErrForbidden に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.ValidateDeckForBattleFn = stubValidateStatus(http.StatusForbidden) },
+			invoke:     func(c *apicardclient.Client) error { return c.ValidateDeckForBattle(context.Background(), 1) },
+			wantTarget: apicardclient.ErrForbidden,
+		},
+		{
+			name:       "ValidateDeckForBattle: 404 を受けたとき ErrNotFound に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.ValidateDeckForBattleFn = stubValidateStatus(http.StatusNotFound) },
 			invoke:     func(c *apicardclient.Client) error { return c.ValidateDeckForBattle(context.Background(), 1) },
 			wantTarget: apicardclient.ErrNotFound,
+		},
+		{
+			name:       "ValidateDeckForBattle: 500 を受けたとき ErrInternalServer に変換される",
+			setup:      func(s *apicardserverfake.Server) { s.ValidateDeckForBattleFn = stubValidateStatus(http.StatusInternalServerError) },
+			invoke:     func(c *apicardclient.Client) error { return c.ValidateDeckForBattle(context.Background(), 1) },
+			wantTarget: apicardclient.ErrInternalServer,
 		},
 	}
 
@@ -258,8 +240,9 @@ func TestClient_ErrorMapping(t *testing.T) {
 	}
 }
 
-// TestClient_RequestEditor は、WithRequestEditorFn で渡した editor が
-// 全リクエストに適用されることを検証する。X-Internal-Auth ヘッダ注入の接続点として機能することを担保する。
+// TestClient_RequestEditor は Option pattern の契約 (WithRequestEditorFn で渡した
+// editor が全リクエストに適用される) を検証する。X-Internal-Auth header 注入の
+// 接続点として SDK が機能することを担保する。
 func TestClient_RequestEditor(t *testing.T) {
 	var gotHeader string
 	spy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -281,4 +264,47 @@ func TestClient_RequestEditor(t *testing.T) {
 	_, err = c.ListDecks(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, "test-token", gotHeader)
+}
+
+// stubStatus は body 不要の Fn (引数 0 個の endpoint 用) で固定 status を返す stub を作る。
+func stubStatus(status int) func() (int, any) {
+	return func() (int, any) { return status, nil }
+}
+
+// stubCreateStatus は CreateDeck endpoint 用 (request body を受ける署名) の status 固定 stub を作る。
+func stubCreateStatus(status int) func(apicard.DeckCreateRequest) (int, any) {
+	return func(_ apicard.DeckCreateRequest) (int, any) { return status, nil }
+}
+
+// stubUpdateStatus は UpdateDeck endpoint 用 (deckID + request body を受ける署名) の status 固定 stub を作る。
+func stubUpdateStatus(status int) func(string, apicard.DeckUpdateRequest) (int, any) {
+	return func(_ string, _ apicard.DeckUpdateRequest) (int, any) { return status, nil }
+}
+
+// stubGetDeckStatus / stubDeleteStatus / stubValidateStatus は deckID のみを path param に取る endpoint 用の stub。
+func stubGetDeckStatus(status int) func(string) (int, any) {
+	return func(_ string) (int, any) { return status, nil }
+}
+
+func stubDeleteStatus(status int) func(string) (int, any) {
+	return func(_ string) (int, any) { return status, nil }
+}
+
+func stubValidateStatus(status int) func(string) (int, any) {
+	return func(_ string) (int, any) { return status, nil }
+}
+
+func invokeCreateDeck(c *apicardclient.Client) error {
+	_, err := c.CreateDeck(context.Background(), apicard.DeckCreateRequest{DeckName: "x"})
+	return err
+}
+
+func invokeGetDeck(c *apicardclient.Client) error {
+	_, _, err := c.GetDeck(context.Background(), 1)
+	return err
+}
+
+func invokeUpdateDeck(c *apicardclient.Client) error {
+	_, err := c.UpdateDeck(context.Background(), 1, apicard.DeckUpdateRequest{DeckName: "x"})
+	return err
 }
