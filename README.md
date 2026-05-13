@@ -31,7 +31,7 @@ make vet   # go vet
 make fmt   # gofmt -s -w
 ```
 
-`ENV` (`dev` / `stg` / `prod`) / `DATABASE_URL` / `PUBSUB_PROJECT_ID` は未設定なら起動時に fail する（デフォルトへの暗黙 fallback を行わない）。`make run` は `ENV=dev` をインラインで設定するので、その他 2 つを export すればよい。
+`ENV` (`dev` / `stg` / `prod`) / `DATABASE_URL` / `GOOGLE_CLOUD_PROJECT_ID` は未設定なら起動時に fail する（デフォルトへの暗黙 fallback を行わない）。`make run` は `ENV=dev` をインラインで設定するので、その他 2 つを export すればよい。
 
 ## 公開パッケージ
 
