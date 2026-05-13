@@ -180,7 +180,7 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 - **`PORT`**: 起動ポート。未設定で起動不可
 - **`ENV`**: `dev` / `stg` / `prod` のいずれか。未設定で起動不可。`prod` / `stg` は Cloud Logging 互換の JSON slog、`dev` はテキスト slog にルーティングする
 - **`DATABASE_CONN`**: card スキーマへの接続文字列。未設定で起動不可
-- **`PUBSUB_PROJECT_ID`**: card は `player-onboarded` / `card-pack-purchased` subscriber を持つため必須
+- **`GOOGLE_CLOUD_PROJECT_ID`**: Google Cloud プロジェクト ID。card は `player-onboarded` / `card-pack-purchased` subscriber を持つため必須
 - **`PLAYER_ONBOARDED_SUBSCRIPTION`**: player-onboarded subscription 名。未設定で起動不可
 - **`CARD_PACK_PURCHASED_SUBSCRIPTION`**: card-pack-purchased subscription 名。未設定で起動不可
 - **`INTERNAL_AUTH_SECRET`**: gateway が発行する内部認証 JWT の検証鍵。未設定で起動不可。`/api/v1/cards` 配下の player-scoped API は本鍵で署名された `X-Internal-Auth` header を要求する

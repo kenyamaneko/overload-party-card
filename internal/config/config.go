@@ -24,9 +24,9 @@ type Config struct {
 	Env          Env
 	DatabaseConn string
 
-	PubsubProjectID                string
-	PlayerOnboardedSubscription    string
-	CardPackPurchasedSubscription  string
+	GoogleCloudProjectID          string
+	PlayerOnboardedSubscription   string
+	CardPackPurchasedSubscription string
 
 	// InternalAuthSecret は内部サービス間 JWT (HS256) 検証の共有秘密鍵。
 	InternalAuthSecret string
@@ -37,7 +37,7 @@ type Config struct {
 func FromEnv() (*Config, error) {
 	cfg := &Config{
 		DatabaseConn:                  os.Getenv("DATABASE_CONN"),
-		PubsubProjectID:               os.Getenv("PUBSUB_PROJECT_ID"),
+		GoogleCloudProjectID:          os.Getenv("GOOGLE_CLOUD_PROJECT_ID"),
 		PlayerOnboardedSubscription:   os.Getenv("PLAYER_ONBOARDED_SUBSCRIPTION"),
 		CardPackPurchasedSubscription: os.Getenv("CARD_PACK_PURCHASED_SUBSCRIPTION"),
 		InternalAuthSecret:            os.Getenv("INTERNAL_AUTH_SECRET"),
@@ -67,8 +67,8 @@ func FromEnv() (*Config, error) {
 	if cfg.DatabaseConn == "" {
 		return nil, fmt.Errorf("config: DATABASE_CONN is required")
 	}
-	if cfg.PubsubProjectID == "" {
-		return nil, fmt.Errorf("config: PUBSUB_PROJECT_ID is required (card subscribes to player-onboarded / card-pack-purchased events)")
+	if cfg.GoogleCloudProjectID == "" {
+		return nil, fmt.Errorf("config: GOOGLE_CLOUD_PROJECT_ID is required (card subscribes to player-onboarded / card-pack-purchased events)")
 	}
 	if cfg.PlayerOnboardedSubscription == "" {
 		return nil, fmt.Errorf("config: PLAYER_ONBOARDED_SUBSCRIPTION is required")

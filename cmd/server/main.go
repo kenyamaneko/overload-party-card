@@ -76,7 +76,7 @@ func run() error {
 
 	r := router.New(cardH, deckH, playerCardH, authVerifier)
 
-	onboardedStream, err := pubsubadapter.NewStream(ctx, cfg.PubsubProjectID, cfg.PlayerOnboardedSubscription)
+	onboardedStream, err := pubsubadapter.NewStream(ctx, cfg.GoogleCloudProjectID, cfg.PlayerOnboardedSubscription)
 	if err != nil {
 		return fmt.Errorf("player-onboarded stream: %w", err)
 	}
@@ -86,7 +86,7 @@ func run() error {
 		}
 	}()
 
-	cardPackPurchasedStream, err := pubsubadapter.NewStream(ctx, cfg.PubsubProjectID, cfg.CardPackPurchasedSubscription)
+	cardPackPurchasedStream, err := pubsubadapter.NewStream(ctx, cfg.GoogleCloudProjectID, cfg.CardPackPurchasedSubscription)
 	if err != nil {
 		return fmt.Errorf("card-pack-purchased stream: %w", err)
 	}
@@ -108,7 +108,7 @@ func run() error {
 	slog.Info("card starting",
 		"addr", srv.Addr,
 		"card_cache_size", cardCache.Count(),
-		"pubsub_project", cfg.PubsubProjectID,
+		"google_cloud_project", cfg.GoogleCloudProjectID,
 	)
 
 	return runHTTPAndSubscribers(ctx, srv, onboardedSub, cardPackPurchasedSub)

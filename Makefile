@@ -18,7 +18,7 @@ tidy: ## Tidy dependencies
 fmt: ## Format code
 	gofmt -s -w .
 
-run: ## Run card server locally (ENV=dev inline; PORT / DATABASE_CONN / PUBSUB_PROJECT_ID / PLAYER_ONBOARDED_SUBSCRIPTION / CARD_PACK_PURCHASED_SUBSCRIPTION must be exported)
+run: ## Run card server locally (ENV=dev inline; PORT / DATABASE_CONN / GOOGLE_CLOUD_PROJECT_ID / PLAYER_ONBOARDED_SUBSCRIPTION / CARD_PACK_PURCHASED_SUBSCRIPTION must be exported)
 	ENV=dev go run ./cmd/server
 
 help: ## Show this help
