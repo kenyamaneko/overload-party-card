@@ -5,9 +5,11 @@ package repository_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
@@ -106,12 +108,14 @@ func fetchPlayerCardCount(t *testing.T, playerID, cardID string, artNo int64) (i
 		`SELECT count FROM card.player_cards
 		   WHERE player_id = $1 AND card_id = $2 AND art_no = $3`,
 		playerID, cardID, artNo).Scan(&n)
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		return n, true
-	default:
+	case errors.Is(err, pgx.ErrNoRows):
 		return 0, false
 	}
+	t.Fatalf("fetchPlayerCardCount: unexpected error: %v", err)
+	return 0, false
 }
 
 // テスト用プレイヤー UUID。account スキーマとの cross-schema reference は
