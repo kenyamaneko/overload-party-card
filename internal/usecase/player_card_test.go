@@ -22,69 +22,42 @@ func cardCacheWith(cards ...*domain.Card) *cache.CardCache {
 	return cc
 }
 
-// TestPlayerCardInteractor_GetPlayerCards は所持カードに CardCache のカード定義を
-// 付与し、所持順を保ったまま返す仕様を検証する。
-func TestPlayerCardInteractor_GetPlayerCards(t *testing.T) {
-	effect := "対象を 1 体破壊する"
-
-	tests := []struct {
-		name  string
-		cache []*domain.Card
-		seed  []*domain.PlayerCard
-		want  []*apicard.PlayerCardWithDef
-	}{
-		{
-			name: "所持カードに定義フィールドが付与され、所持順で返る",
-			cache: []*domain.Card{
-				{
-					CardID: "SH-0001", CardName: "Fireball", ResourceLabel: "mana",
-					Faction: "SHE", CardType: "spell", Resizable: true, Elastic: false,
-					Stats: json.RawMessage(`{"atk":3}`), EffectText: &effect, Restriction: "limited",
-				},
-				{
-					CardID: "SH-0002", CardName: "Shield", ResourceLabel: "mana",
-					Faction: "SHE", CardType: "trap", Resizable: false, Elastic: true,
-					Stats: json.RawMessage(`{"def":5}`), Restriction: "unlimited",
-				},
-			},
-			seed: []*domain.PlayerCard{
-				{PlayerID: "player-1", CardID: "SH-0001", ArtNo: 1, Count: 3},
-				{PlayerID: "player-1", CardID: "SH-0002", ArtNo: 0, Count: 1},
-			},
-			want: []*apicard.PlayerCardWithDef{
-				{
-					CardID: "SH-0001", ArtNo: 1, Count: 3, CardName: "Fireball",
-					ResourceLabel: "mana", Faction: "SHE", CardType: "spell",
-					Resizable: true, Elastic: false, Stats: json.RawMessage(`{"atk":3}`),
-					EffectText: &effect, Restriction: "limited",
-				},
-				{
-					CardID: "SH-0002", ArtNo: 0, Count: 1, CardName: "Shield",
-					ResourceLabel: "mana", Faction: "SHE", CardType: "trap",
-					Resizable: false, Elastic: true, Stats: json.RawMessage(`{"def":5}`),
-					Restriction: "unlimited",
-				},
-			},
-		},
-		{
-			name:  "所持カード 0 件なら空スライス",
-			cache: nil,
-			seed:  nil,
-			want:  []*apicard.PlayerCardWithDef{},
-		},
+// TestPlayerCardInteractor_GetPlayerCards_MergesOwnershipAndDefinition は
+// 所持カードの応答が「所持枚数は player_cards 由来・カード定義は CardCache 由来」で
+// 構成される仕様 (FEATURE_SPEC §3.1) を検証する。
+func TestPlayerCardInteractor_GetPlayerCards_MergesOwnershipAndDefinition(t *testing.T) {
+	effectText := "対象を 1 体破壊する"
+	def := &domain.Card{
+		CardID: "SH-0001", CardName: "Fireball", ResourceLabel: "mana",
+		Faction: "SHE", CardType: "spell", Resizable: true, Elastic: false,
+		Stats: json.RawMessage(`{"atk":3}`), EffectText: &effectText, Restriction: "limited",
 	}
+	owned := &domain.PlayerCard{PlayerID: "player-1", CardID: def.CardID, ArtNo: 7, Count: 3}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pcRepo := newInMemoryPlayerCardRepo()
-			pcRepo.Seed("player-1", tt.seed)
-			svc := NewPlayerCardInteractor(pcRepo, cardCacheWith(tt.cache...))
+	repo := newInMemoryPlayerCardRepo()
+	repo.Seed(owned.PlayerID, []*domain.PlayerCard{owned})
+	svc := NewPlayerCardInteractor(repo, cardCacheWith(def))
 
-			got, err := svc.GetPlayerCards(context.Background(), "player-1")
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
-		})
-	}
+	got, err := svc.GetPlayerCards(context.Background(), owned.PlayerID)
+	require.NoError(t, err)
+
+	want := []*apicard.PlayerCardWithDef{{
+		CardID: owned.CardID, ArtNo: owned.ArtNo, Count: owned.Count,
+		CardName: def.CardName, ResourceLabel: def.ResourceLabel, Faction: def.Faction,
+		CardType: def.CardType, Resizable: def.Resizable, Elastic: def.Elastic,
+		Stats: def.Stats, EffectText: def.EffectText, Restriction: def.Restriction,
+	}}
+	assert.Equal(t, want, got)
+}
+
+// TestPlayerCardInteractor_GetPlayerCards_EmptyWhenNoneOwned は所持カードが
+// 無いプレイヤーに対し nil ではなく空スライスを返す仕様を検証する。
+func TestPlayerCardInteractor_GetPlayerCards_EmptyWhenNoneOwned(t *testing.T) {
+	svc := NewPlayerCardInteractor(newInMemoryPlayerCardRepo(), cardCacheWith())
+
+	got, err := svc.GetPlayerCards(context.Background(), "player-1")
+	require.NoError(t, err)
+	assert.Equal(t, []*apicard.PlayerCardWithDef{}, got)
 }
 
 // TestPlayerCardInteractor_GetPlayerCards_CacheMiss は CardCache に存在しない

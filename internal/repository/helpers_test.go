@@ -113,9 +113,10 @@ func fetchPlayerCardCount(t *testing.T, playerID, cardID string, artNo int64) (i
 		return n, true
 	case errors.Is(err, pgx.ErrNoRows):
 		return 0, false
+	default:
+		t.Fatalf("fetchPlayerCardCount: unexpected error: %v", err)
+		return 0, false
 	}
-	t.Fatalf("fetchPlayerCardCount: unexpected error: %v", err)
-	return 0, false
 }
 
 // テスト用プレイヤー UUID。account スキーマとの cross-schema reference は
