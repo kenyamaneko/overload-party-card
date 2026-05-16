@@ -73,35 +73,33 @@ func TestCreate(t *testing.T) {
 func TestFindByPlayerID(t *testing.T) {
 	tests := []struct {
 		name      string
-		setup     func(t *testing.T) []string // 戻り値: 期待される deck_name 順序 (player_A 視点、updated_at DESC)
+		setup     func(t *testing.T)
 		target    string
 		wantNames []string
 	}{
 		{
 			name: "複数デッキは updated_at 降順で返る",
-			setup: func(t *testing.T) []string {
+			setup: func(t *testing.T) {
 				// updated_at は now() デフォルト。手動で 3 件作って順序を制御する
 				insertDeckAt(t, playerA, "Old", time.Now().Add(-2*time.Hour))
 				insertDeckAt(t, playerA, "Middle", time.Now().Add(-1*time.Hour))
 				insertDeckAt(t, playerA, "New", time.Now())
-				return nil
 			},
 			target:    playerA,
 			wantNames: []string{"New", "Middle", "Old"},
 		},
 		{
 			name: "他プレイヤーのデッキは除外される",
-			setup: func(t *testing.T) []string {
+			setup: func(t *testing.T) {
 				insertDeck(t, playerA, "Mine")
 				insertDeck(t, playerB, "Theirs")
-				return nil
 			},
 			target:    playerA,
 			wantNames: []string{"Mine"},
 		},
 		{
 			name:      "デッキ 0 件なら空スライス",
-			setup:     func(t *testing.T) []string { return nil },
+			setup:     func(t *testing.T) {},
 			target:    playerA,
 			wantNames: nil,
 		},
