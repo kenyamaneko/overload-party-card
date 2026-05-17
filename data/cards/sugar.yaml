@@ -76,7 +76,7 @@ cards:
       maintenance_cost: 50
     effect_text: "**Scale to Zero:** 前のターン、このカードが攻撃していない場合に発動できる。このターン、このカードのリクエストコストは 0 になる。この効果は、このカードをデプロイしたターンは使用できない。"
     effects:
-      - trigger: activate
+      - trigger: ignition
         use_limit: once_per_turn
         custom: scale_to_zero
         meta:
@@ -106,7 +106,7 @@ cards:
       maintenance_cost: 100
     effect_text: "デプロイ時に「自動操縦」か「標準」を選択する。自動操縦: デプロイターンを 1 短縮する。標準: 維持費を -200 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         choice:
           autopilot:
             - reduce_deploy_turns: { amount: 1 }
@@ -241,7 +241,7 @@ cards:
       maintenance_cost: 100
     effect_text: "**完全同期:** このカードは Incident カードの効果を受けない。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
               selector: source
@@ -272,7 +272,7 @@ cards:
       maintenance_cost: 50
     effect_text: "**即時反映:** 自分が しゅがーらぼ Resource をデプロイした時に発動できる。自分の Insight を +200 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - gain_insight: { amount: 200 }
 
@@ -321,7 +321,7 @@ cards:
       maintenance_cost: 100
     effect_text: "**Cache Engine:** デプロイ時に、以下の効果のうち1つを選択して発動する。 — **Memcached:** 自分の Budget を +400 する / **Redis:** このカードの Yield を +200 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         choice:
           memcached:
             - gain_budget: { target: self, amount: 400 }
@@ -370,7 +370,7 @@ cards:
     stats:
     effect_text: "自分のフィールドの しゅがーらぼ リソースのスケールアップコストを -200 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
               selector: { owner: self, faction: Sugar }
@@ -392,7 +392,7 @@ cards:
     stats:
     effect_text: "自分のフィールドの全ての しゅがーらぼ コンピュート系リソースのスループットを +200 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
               selector: { owner: self, faction: Sugar, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless] }
@@ -434,7 +434,7 @@ cards:
     stats:
     effect_text: "自分の しゅがーらぼ コンピュート系リソースに装備できる。装備先のスループットを +200 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
               selector: source
@@ -476,7 +476,7 @@ cards:
     stats:
     effect_text: "自分の しゅがーらぼ DB系リソースに装備できる。装備先の Yield を +400 する。装備先の SLAペナルティを +100 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
               selector: source
@@ -503,14 +503,14 @@ cards:
     stats:
     effect_text: "自分の「しゅがーらぼ Compute - ジューシィ・いちご」にのみ装備できる。①装備先の可用性を +400 する。②自分のメインフェーズに発動できる。このカードを別の自分の「しゅがーらぼ Compute - ジューシィ・いちご」に付け替える。この効果は1ターン中に1回のみ使用できる。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
               selector: source
               buff: av
               amount: 400
               duration: while_on_field
-      - trigger: activate
+      - trigger: ignition
         use_limit: once_per_turn
         custom: reattach
         meta:
@@ -533,7 +533,7 @@ cards:
     stats:
     effect_text: "Budget 200 を払って発動できる。リポジトリから しゅがーらぼ リソース1枚を選択して手札に加える。"
     effects:
-      - trigger: activate
+      - trigger: ignition
         use_limit: once_per_turn
         ops:
           - search_repo: { faction: Sugar }
@@ -552,7 +552,7 @@ cards:
     stats:
     effect_text: "Budget 300 を払って発動できる。コンピュート系リソース1体を選択する。このターン、そのカードのスループットを2倍にする。"
     effects:
-      - trigger: activate
+      - trigger: ignition
         use_limit: once_per_turn
         ops:
           - apply_buff:
@@ -575,7 +575,7 @@ cards:
     stats:
     effect_text: "Budget 200 を払って発動できる。相手の Insight を 400 吸収する。さらに、相手のDB系リソースおよびオブジェクトストレージ1体につき相手の Insight を 200 吸収する。"
     effects:
-      - trigger: activate
+      - trigger: ignition
         use_limit: once_per_turn
         ops:
           - absorb_insight:
@@ -600,12 +600,13 @@ cards:
     restriction: unlimited
     is_active: true
     stats:
-    effect_text: "自分の しゅがーらぼ リソースが破壊される攻撃を受けた時に発動できる。その攻撃を無効化し、このターン中そのリソースは攻撃の対象にならない。ただし、次の自分のターン、そのリソースは攻撃できない。"
+    effect_text: "自分の しゅがーらぼ リソースが破壊される攻撃を受けた時に発動する。その攻撃を無効化し、このターン中そのリソースは攻撃の対象にならない。ただし、次の自分のターン、そのリソースは攻撃できない。"
     effects:
-      - trigger: reactive
+      - trigger: on_attack_declared
         guard:
           - match:
               selector: target
               faction: Sugar
+          - lethal: true
         ops:
           - survive_destruction: { av: 200 }
