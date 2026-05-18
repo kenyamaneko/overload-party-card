@@ -163,7 +163,7 @@ VALUES
   ('NT-0027', '気象異変', '', 'Neutral', 'Reactive', NULL,
    false, false, '{}'::jsonb,
    '相手の 天気使い リソースが攻撃した時に発動する。その攻撃を無効にし、2ターンの間、全ての 天気使い リソースは攻撃できない。',
-   '[{"trigger": "on_attack_declared", "guard": [{"attacker": {"owner": "opponent", "faction": "Tenki"}}], "ops": [{"cancel_action": {}}, {"apply_buff": {"selector": {"owner": "both", "faction": "Tenki"}, "buff": "cannot_attack", "amount": 1, "duration": "until_next_turn_end"}}]}]'::jsonb,
+   '[{"trigger": "on_attack_declared", "guard": [{"match": {"selector": "attacker", "owner": "opponent", "faction": "Tenki"}}], "ops": [{"cancel_action": {}}, {"apply_buff": {"selector": {"owner": "both", "faction": "Tenki"}, "buff": "cannot_attack", "amount": 1, "duration": "until_next_turn_end"}}]}]'::jsonb,
    'unlimited', true),
 
   ('NT-0028', '天気使いの更新', '', 'Neutral', 'Reactive', NULL,
@@ -291,7 +291,7 @@ VALUES
   ('SH-0014', 'SHE Firewall', '', 'SHE', 'Platform', NULL,
    false, false, '{}'::jsonb,
    '相手の DDoS Attack と Data Breach を無効化する。',
-   '[{"trigger": "on_incident", "guard": [{"event_owner": "opponent"}, {"incident": {"card_id": ["NT-0013", "NT-0014"]}}], "ops": [{"cancel_action": {}}]}]'::jsonb,
+   '[{"trigger": "on_incident", "guard": [{"event_owner": "opponent"}, {"match": {"selector": "event_card", "card_id": ["NT-0013", "NT-0014"]}}], "ops": [{"cancel_action": {}}]}]'::jsonb,
    'unlimited', true),
 
   ('SH-0015', 'SHE Queue', '', 'SHE', 'Attachment', NULL,
@@ -309,7 +309,7 @@ VALUES
   ('SH-0017', 'SHE Keys', '', 'SHE', 'Attachment', NULL,
    false, false, '{}'::jsonb,
    'バックエンドリソースに装備できる。装備したリソースは「データ流出」の効果を受けない。',
-   '[{"trigger": "on_incident", "guard": [{"event_owner": "opponent"}, {"incident": {"card_id": "NT-0014"}}, {"equip_host_is_target": true}], "ops": [{"cancel_action": {}}]}]'::jsonb,
+   '[{"trigger": "on_incident", "guard": [{"event_owner": "opponent"}, {"match": {"selector": "event_card", "card_id": "NT-0014"}}, {"same": {"a": "target", "b": "equip_host"}}], "ops": [{"cancel_action": {}}]}]'::jsonb,
    'unlimited', true),
 
   ('SH-0018', 'SHE Formation', '', 'SHE', 'Strategy', NULL,
@@ -587,7 +587,7 @@ VALUES
   ('TK-0014', '天気使い Protection', '', 'Tenki', 'Platform', NULL,
    false, false, '{}'::jsonb,
    '相手の「DDoS攻撃」と「データ流出」を無効化する。',
-   '[{"trigger": "on_incident", "guard": [{"event_owner": "opponent"}, {"incident": {"card_id": ["NT-0013", "NT-0014"]}}], "ops": [{"cancel_action": {}}]}]'::jsonb,
+   '[{"trigger": "on_incident", "guard": [{"event_owner": "opponent"}, {"match": {"selector": "event_card", "card_id": ["NT-0013", "NT-0014"]}}], "ops": [{"cancel_action": {}}]}]'::jsonb,
    'unlimited', true),
 
   ('TK-0015', '天気使い Backup', '', 'Tenki', 'Attachment', NULL,
@@ -605,7 +605,7 @@ VALUES
   ('TK-0017', '天気使い Vault', '', 'Tenki', 'Attachment', NULL,
    false, false, '{}'::jsonb,
    '自分のバックエンドリソースに装備できる。装備先は「データ流出」の効果を受けない。',
-   '[{"trigger": "on_incident", "guard": [{"event_owner": "opponent"}, {"incident": {"card_id": "NT-0014"}}, {"equip_host_is_target": true}], "ops": [{"cancel_action": {}}]}]'::jsonb,
+   '[{"trigger": "on_incident", "guard": [{"event_owner": "opponent"}, {"match": {"selector": "event_card", "card_id": "NT-0014"}}, {"same": {"a": "target", "b": "equip_host"}}], "ops": [{"cancel_action": {}}]}]'::jsonb,
    'unlimited', true),
 
   ('TK-0018', '天気使い Recovery', '', 'Tenki', 'Attachment', NULL,
@@ -731,7 +731,7 @@ VALUES
   ('TN-0013', '調律部 WAF', '', 'Tuners', 'Platform', NULL,
    false, false, '{}'::jsonb,
    '自分のフィールドの 調律部 リソースは相手の「DDoS攻撃」と「データ流出」の効果を受けない。',
-   '[{"trigger": "on_incident", "guard": [{"event_owner": "opponent"}, {"incident": {"card_id": ["NT-0013", "NT-0014"]}}, {"match": {"selector": "target", "faction": "Tuners"}}], "ops": [{"cancel_action": {}}]}]'::jsonb,
+   '[{"trigger": "on_incident", "guard": [{"event_owner": "opponent"}, {"match": {"selector": "event_card", "card_id": ["NT-0013", "NT-0014"]}}, {"match": {"selector": "target", "faction": "Tuners"}}], "ops": [{"cancel_action": {}}]}]'::jsonb,
    'unlimited', true),
 
   ('TN-0014', '調律部 ノーツガード', '', 'Tuners', 'Attachment', NULL,

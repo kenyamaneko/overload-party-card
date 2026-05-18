@@ -595,7 +595,8 @@ cards:
     effects:
       - trigger: on_attack_declared
         guard:
-          - attacker:
+          - match:
+              selector: attacker
               owner: opponent
               faction: Tenki
         ops:

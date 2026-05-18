@@ -359,7 +359,8 @@ cards:
       - trigger: on_incident
         guard:
           - event_owner: opponent
-          - incident:
+          - match:
+              selector: event_card
               card_id: [NT-0013, NT-0014]
         ops:
           - cancel_action: {}
@@ -428,9 +429,12 @@ cards:
       - trigger: on_incident
         guard:
           - event_owner: opponent
-          - incident:
+          - match:
+              selector: event_card
               card_id: NT-0014
-          - equip_host_is_target: true
+          - same:
+              a: target
+              b: equip_host
         ops:
           - cancel_action: {}
 
