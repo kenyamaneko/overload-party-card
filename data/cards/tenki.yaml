@@ -51,14 +51,14 @@ cards:
           - event_owner: opponent
         ops:
           - apply_buff:
-              selector: { owner: self }
+              selector: { owner: myself }
               buff: incident_reduction
               amount: 50
               mode: percent
               duration: this_turn
         meta:
           categories: [defensive]
-          target: self
+          target: myself
 
   - card_no: 25
     card_id: "TK-0003"
@@ -134,7 +134,7 @@ cards:
               amount:
                 base: 0
                 per:
-                  count: { owner: self, zone: backend, faction: Tenki, card_type: Data }
+                  count: { owner: myself, zone: backend, faction: Tenki, card_type: Data }
                   value: 200
               duration: this_turn
 
@@ -315,7 +315,7 @@ cards:
       - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: self, faction: Tenki }
+              selector: { owner: myself, faction: Tenki }
               buff: scale_cost_reduction
               amount: 200
               duration: while_on_field
@@ -337,7 +337,7 @@ cards:
       - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: self, faction: Tenki, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless] }
+              selector: { owner: myself, faction: Tenki, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless] }
               buff: tp
               amount: 200
               duration: while_on_field
@@ -617,7 +617,7 @@ cards:
       - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: self }
+              selector: { owner: myself }
               buff: incident_reduction
               amount: 300
               duration: while_on_field
