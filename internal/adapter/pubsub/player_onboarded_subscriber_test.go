@@ -11,6 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// topicPlayerOnboarded は apiscenariofake が PublishPlayerOnboarded /
+// ExpectPlayerOnboarded で内部的にハードコードしているルーティングキー。
+// raw bytes を broker.Publish するケース (不正 JSON / 未知 event_type) と
+// NewStream の subscribe topic を一致させる必要がある。
+const topicPlayerOnboarded = "player-onboarded"
+
 // fakePackGranter は packGranter のテスト用スタブです。
 // errOnPack に一致する pack_id だけエラーを返す形にすると、N 回呼びの中で
 // 何回目に失敗したかを直接表現できます。
@@ -107,7 +113,7 @@ func TestPlayerOnboardedSubscriber_Start(t *testing.T) {
 		{
 			name: "malformed JSON: Nack して DLQ 送り",
 			publish: func(_ context.Context, _ *apiscenariofake.Publisher, broker *apiscenariofake.Broker) {
-				broker.Publish(apiscenario.TopicPlayerOnboarded, []byte("not-json"))
+				broker.Publish(topicPlayerOnboarded, []byte("not-json"))
 			},
 			wantAck:   false,
 			wantPacks: nil,
@@ -115,7 +121,7 @@ func TestPlayerOnboardedSubscriber_Start(t *testing.T) {
 		{
 			name: "未知 event_type: Nack して DLQ で publisher バグ検出",
 			publish: func(_ context.Context, _ *apiscenariofake.Publisher, broker *apiscenariofake.Broker) {
-				broker.Publish(apiscenario.TopicPlayerOnboarded, mustMarshal(t, apiscenario.PlayerOnboardedEvent{
+				broker.Publish(topicPlayerOnboarded, mustMarshal(t, apiscenario.PlayerOnboardedEvent{
 					EventType:        "unknown",
 					EventID:          "evt-2",
 					PlayerID:         "player-1",
@@ -131,7 +137,7 @@ func TestPlayerOnboardedSubscriber_Start(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			broker := apiscenariofake.NewBroker()
 			pub := apiscenariofake.NewPublisher(broker)
-			stream := apiscenariofake.NewStream(apiscenariofake.NewSubscriber(broker), apiscenario.TopicPlayerOnboarded)
+			stream := apiscenariofake.NewStream(apiscenariofake.NewSubscriber(broker), topicPlayerOnboarded)
 
 			granter := &fakePackGranter{err: tt.granterErr, errOnPack: tt.granterErrOnPack}
 			repo := &fakeProcessedEventRepo{
