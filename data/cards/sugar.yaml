@@ -81,7 +81,7 @@ cards:
         custom: scale_to_zero
         meta:
           categories: [cost_reduction]
-          target: self
+          target: myself
 
   - card_no: 50
     card_id: "SL-0004"
@@ -192,9 +192,9 @@ cards:
       - trigger: on_destroy
         ops:
           - deal_damage:
-              selector: { owner: self, zone: backend }
+              selector: { owner: myself, zone: backend }
               amount: 400
-          - destroy_check: { target: self }
+          - destroy_check: { target: myself }
 
   # === Database / Data (5 cards) ===
 
@@ -324,7 +324,7 @@ cards:
       - trigger: on_deploy
         choice:
           memcached:
-            - gain_budget: { target: self, amount: 400 }
+            - gain_budget: { target: myself, amount: 400 }
           redis:
             - apply_buff:
                 selector: source
@@ -373,7 +373,7 @@ cards:
       - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: self, faction: Sugar }
+              selector: { owner: myself, faction: Sugar }
               buff: scale_cost_reduction
               amount: 200
               duration: while_on_field
@@ -395,7 +395,7 @@ cards:
       - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: self, faction: Sugar, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless] }
+              selector: { owner: myself, faction: Sugar, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless] }
               buff: tp
               amount: 200
               duration: while_on_field
@@ -460,7 +460,7 @@ cards:
         custom: chain_attack_bonus
         meta:
           categories: [single_damage]
-          target: self
+          target: myself
 
   - card_no: 64
     card_id: "SL-0019"
@@ -515,7 +515,7 @@ cards:
         custom: reattach
         meta:
           categories: [utility]
-          target: self
+          target: myself
 
   # === Strategy (3 cards) ===
 
@@ -556,7 +556,7 @@ cards:
         use_limit: once_per_turn
         ops:
           - apply_buff:
-              selector: { owner: self, zone: frontend, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless], pick: choice }
+              selector: { owner: myself, zone: frontend, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless], pick: choice }
               buff: tp
               amount: { ref: target.tp, multiply: 1 }
               duration: this_turn
@@ -582,7 +582,7 @@ cards:
               amount:
                 base: 400
                 per:
-                  count: { owner: self, zone: backend }
+                  count: { owner: myself, zone: backend }
                   value: 200
                 max: 600
 

@@ -108,7 +108,7 @@ cards:
       - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: self }
+              selector: { owner: myself }
               buff: incident_reduction
               amount: 200
               duration: while_on_field
@@ -130,7 +130,7 @@ cards:
       - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: self }
+              selector: { owner: myself }
               buff: sla_penalty_reduction
               amount: 100
               duration: while_on_field
@@ -214,7 +214,7 @@ cards:
       - trigger: ignition
         use_limit: once_per_turn
         ops:
-          - gain_budget: { target: self, amount: 400 }
+          - gain_budget: { target: myself, amount: 400 }
 
   - card_no: 102
     card_id: "NT-0011"
@@ -233,7 +233,7 @@ cards:
       - trigger: ignition
         use_limit: once_per_turn
         ops:
-          - gain_budget: { target: self, amount: 1000 }
+          - gain_budget: { target: myself, amount: 1000 }
 
   - card_no: 103
     card_id: "NT-0012"
@@ -409,7 +409,7 @@ cards:
               selector: { owner: opponent, zone: frontend, pick: choice }
               amount: 400
           - destroy_check: { target: opponent }
-          - gain_budget: { target: self, amount: 500 }
+          - gain_budget: { target: myself, amount: 500 }
 
   - card_no: 111
     card_id: "NT-0020"
@@ -453,9 +453,9 @@ cards:
         trigger: ignition
         use_limit: once_per_turn
         guard:
-          - stat: { selector: self, stat: budget, min: 200 }
+          - stat: { selector: myself, stat: budget, min: 200 }
         ops:
-          - lose_budget: { target: self, amount: 200 }
+          - lose_budget: { target: myself, amount: 200 }
           - lose_budget: { target: opponent, amount: 400 }
       - trigger: ignition
         after: audit
@@ -549,7 +549,7 @@ cards:
       - trigger: on_field_change
         guard:
           - count:
-              selector: { owner: self, card_type: ObjectStorage }
+              selector: { owner: myself, card_type: ObjectStorage }
               min: 1
         ops:
           - apply_buff:
@@ -575,9 +575,9 @@ cards:
       - trigger: ignition
         use_limit: once_per_turn
         guard:
-          - stat: { selector: self, stat: budget, max: 1000 }
+          - stat: { selector: myself, stat: budget, max: 1000 }
         ops:
-          - gain_budget: { target: self, amount: 900 }
+          - gain_budget: { target: myself, amount: 900 }
 
   - card_no: 122
     card_id: "NT-0027"

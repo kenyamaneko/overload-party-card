@@ -103,7 +103,7 @@ cards:
       - trigger: on_field_change
         guard:
           - count:
-              selector: { owner: self, faction: Tuners }
+              selector: { owner: myself, faction: Tuners }
               max: 3
         ops:
           - apply_buff:
@@ -164,7 +164,7 @@ cards:
       - trigger: on_field_change
         guard:
           - count:
-              selector: { owner: self, faction: Tuners, card_type: [Database, CacheDB] }
+              selector: { owner: myself, faction: Tuners, card_type: [Database, CacheDB] }
               min: 1
         ops:
           - apply_buff:
@@ -281,7 +281,7 @@ cards:
       - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: self, faction: Tuners }
+              selector: { owner: myself, faction: Tuners }
               buff: scale_cost_reduction
               amount: 300
               duration: while_on_field
@@ -303,7 +303,7 @@ cards:
       - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: self, faction: Tuners }
+              selector: { owner: myself, faction: Tuners }
               buff: incident_reduction
               amount: 200
               duration: while_on_field
@@ -432,7 +432,7 @@ cards:
         ops:
           - heal_damage:
               selector:
-                owner: self
+                owner: myself
                 zone: backend
                 faction: Tuners
                 card_type: Database

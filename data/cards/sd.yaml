@@ -116,7 +116,7 @@ cards:
       - trigger: on_field_change
         guard:
           - count:
-              selector: { owner: self, faction: SHE, card_type: ObjectStorage }
+              selector: { owner: myself, faction: SHE, card_type: ObjectStorage }
               min: 1
         ops:
           - apply_buff:
@@ -148,7 +148,7 @@ cards:
       - trigger: on_deploy
         choice:
           use:
-            - gain_budget: { target: self, amount: 200 }
+            - gain_budget: { target: myself, amount: 200 }
             - apply_buff:
                 selector: source
                 buff: reserved_instance
@@ -184,7 +184,7 @@ cards:
               amount:
                 base: 0
                 per:
-                  count: { owner: self, zone: backend, faction: SHE, card_type: Database, exclude: source }
+                  count: { owner: myself, zone: backend, faction: SHE, card_type: Database, exclude: source }
                   value: 200
               duration: this_turn
 
@@ -243,9 +243,9 @@ cards:
       - trigger: ignition
         use_limit: once_per_turn
         guard:
-          - stat: { selector: self, stat: budget, min: 400 }
+          - stat: { selector: myself, stat: budget, min: 400 }
         ops:
-          - lose_budget: { target: self, amount: 400 }
+          - lose_budget: { target: myself, amount: 400 }
           - apply_buff:
               selector: source
               buff: yield
@@ -275,7 +275,7 @@ cards:
       - trigger: on_deploy
         choice:
           memcached:
-            - gain_budget: { target: self, amount: 400 }
+            - gain_budget: { target: myself, amount: 400 }
           redis:
             - apply_buff:
                 selector: source
@@ -300,7 +300,7 @@ cards:
       - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: self, faction: SHE }
+              selector: { owner: myself, faction: SHE }
               buff: scale_cost_reduction
               amount: 200
               duration: while_on_field
@@ -322,7 +322,7 @@ cards:
       - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: self, faction: SHE, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless] }
+              selector: { owner: myself, faction: SHE, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless] }
               buff: tp
               amount: 200
               duration: while_on_field
@@ -477,10 +477,10 @@ cards:
         use_limit: once_per_turn
         guard:
           - count:
-              selector: { owner: self, faction: SHE }
+              selector: { owner: myself, faction: SHE }
               min: 3
         ops:
-          - gain_budget: { target: self, amount: 600 }
+          - gain_budget: { target: myself, amount: 600 }
 
   - card_no: 21
     card_id: "SH-0020"
@@ -500,7 +500,7 @@ cards:
         use_limit: once_per_turn
         ops:
           - apply_buff:
-              selector: { owner: self }
+              selector: { owner: myself }
               buff: deploy_discount
               amount: 200
               duration: this_turn
@@ -549,11 +549,11 @@ cards:
         use_limit: once_per_turn
         guard:
           - count:
-              selector: { owner: self, faction: SHE }
+              selector: { owner: myself, faction: SHE }
               min: 3
         ops:
           - apply_buff:
-              selector: { owner: self, zone: frontend, faction: SHE }
+              selector: { owner: myself, zone: frontend, faction: SHE }
               buff: tp
               amount: 200
               duration: this_turn
@@ -600,7 +600,7 @@ cards:
       - trigger: on_field_change
         ops:
           - apply_buff:
-              selector: { owner: self, card_id: SH-0009 }
+              selector: { owner: myself, card_id: SH-0009 }
               buff: yield
               amount: 200
               duration: this_turn

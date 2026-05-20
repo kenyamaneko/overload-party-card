@@ -31,13 +31,13 @@ VALUES
   ('NT-0005', 'ISMS認証', '', 'Neutral', 'Platform', NULL,
    false, false, '{}'::jsonb,
    'インシデントカードによる自分のリソースへのダメージを -200 する。',
-   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "self"}, "buff": "incident_reduction", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
+   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "myself"}, "buff": "incident_reduction", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
    'unlimited', true),
 
   ('NT-0006', 'SOC2認証', '', 'Neutral', 'Platform', NULL,
    false, false, '{}'::jsonb,
    '自分のリソースのSLAペナルティを -100 する。',
-   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "self"}, "buff": "sla_penalty_reduction", "amount": 100, "duration": "while_on_field"}}]}]'::jsonb,
+   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "myself"}, "buff": "sla_penalty_reduction", "amount": 100, "duration": "while_on_field"}}]}]'::jsonb,
    'unlimited', true),
 
   ('NT-0007', 'クラウドエンジニア', '', 'Neutral', 'Strategy', NULL,
@@ -61,13 +61,13 @@ VALUES
   ('NT-0010', 'プロジェクトマネージャー', '', 'Neutral', 'Strategy', NULL,
    false, false, '{}'::jsonb,
    '自分の Budget を +400 する。',
-   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"gain_budget": {"target": "self", "amount": 400}}]}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"gain_budget": {"target": "myself", "amount": 400}}]}]'::jsonb,
    'unlimited', true),
 
   ('NT-0011', 'クラウドファンディング', '', 'Neutral', 'Strategy', NULL,
    false, false, '{}'::jsonb,
    '自分の最初のターンのみ発動できる。自分の Budget を +1000 する。',
-   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"gain_budget": {"target": "self", "amount": 1000}}]}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"gain_budget": {"target": "myself", "amount": 1000}}]}]'::jsonb,
    'unlimited', true),
 
   ('NT-0012', 'オープンソースマイグレーション', '', 'Neutral', 'Strategy', NULL,
@@ -115,7 +115,7 @@ VALUES
   ('NT-0019', 'クリプトマイニング', '', 'Neutral', 'Incident', NULL,
    false, false, '{}'::jsonb,
    'Budget 200 を払って発動できる。相手のフロントエンドから選択した1体に 400 ダメージを与え、自分の Budget を +500 する',
-   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"deal_damage": {"selector": {"owner": "opponent", "zone": "frontend", "pick": "choice"}, "amount": 400}}, {"destroy_check": {"target": "opponent"}}, {"gain_budget": {"target": "self", "amount": 500}}]}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"deal_damage": {"selector": {"owner": "opponent", "zone": "frontend", "pick": "choice"}, "amount": 400}}, {"destroy_check": {"target": "opponent"}}, {"gain_budget": {"target": "myself", "amount": 500}}]}]'::jsonb,
    'unlimited', true),
 
   ('NT-0020', 'ランサムウェア', '', 'Neutral', 'Incident', NULL,
@@ -127,7 +127,7 @@ VALUES
   ('NT-0021', 'コンプライアンス監査', '', 'Neutral', 'Incident', NULL,
    false, false, '{}'::jsonb,
    'Budget 200 を払って発動できる。相手の Budget を -400 する。相手のフィールドに「ISMS認証」または「SOC2認証」がなければ、相手のBudgetをさらに -400 する。',
-   '[{"id": "audit", "trigger": "ignition", "use_limit": "once_per_turn", "guard": [{"stat": {"selector": "self", "stat": "budget", "min": 200}}], "ops": [{"lose_budget": {"target": "self", "amount": 200}}, {"lose_budget": {"target": "opponent", "amount": 400}}]}, {"trigger": "ignition", "after": "audit", "guard": [{"count": {"selector": {"owner": "opponent", "zone": "support", "card_id": ["NT-0005", "NT-0006"]}, "min": 1}, "negate": true}], "ops": [{"lose_budget": {"target": "opponent", "amount": 400}}]}]'::jsonb,
+   '[{"id": "audit", "trigger": "ignition", "use_limit": "once_per_turn", "guard": [{"stat": {"selector": "myself", "stat": "budget", "min": 200}}], "ops": [{"lose_budget": {"target": "myself", "amount": 200}}, {"lose_budget": {"target": "opponent", "amount": 400}}]}, {"trigger": "ignition", "after": "audit", "guard": [{"count": {"selector": {"owner": "opponent", "zone": "support", "card_id": ["NT-0005", "NT-0006"]}, "min": 1}, "negate": true}], "ops": [{"lose_budget": {"target": "opponent", "amount": 400}}]}]'::jsonb,
    'unlimited', true),
 
   ('NT-0022', 'レートリミット', '', 'Neutral', 'Reactive', NULL,
@@ -151,13 +151,13 @@ VALUES
   ('NT-0025', 'DB スナップショット', '', 'Neutral', 'Attachment', NULL,
    false, false, '{}'::jsonb,
    '自分の DB系リソースに装備できる。自分のフィールドにオブジェクトストレージがある場合、装備先への攻撃ダメージを -400 する。',
-   '[{"trigger": "on_field_change", "guard": [{"count": {"selector": {"owner": "self", "card_type": "ObjectStorage"}, "min": 1}}], "ops": [{"apply_buff": {"selector": "source", "buff": "attack_damage_reduction", "amount": 400, "duration": "this_turn"}}]}]'::jsonb,
+   '[{"trigger": "on_field_change", "guard": [{"count": {"selector": {"owner": "myself", "card_type": "ObjectStorage"}, "min": 1}}], "ops": [{"apply_buff": {"selector": "source", "buff": "attack_damage_reduction", "amount": 400, "duration": "this_turn"}}]}]'::jsonb,
    'unlimited', true),
 
   ('NT-0026', 'ベンチャーキャピタル', '', 'Neutral', 'Strategy', NULL,
    false, false, '{}'::jsonb,
    '自分の Budget が 1000 以下の時のみ使用できる。自分の Budget を +900 する。',
-   '[{"trigger": "ignition", "use_limit": "once_per_turn", "guard": [{"stat": {"selector": "self", "stat": "budget", "max": 1000}}], "ops": [{"gain_budget": {"target": "self", "amount": 900}}]}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_turn", "guard": [{"stat": {"selector": "myself", "stat": "budget", "max": 1000}}], "ops": [{"gain_budget": {"target": "myself", "amount": 900}}]}]'::jsonb,
    'unlimited', true),
 
   ('NT-0027', '気象異変', '', 'Neutral', 'Reactive', NULL,
@@ -237,19 +237,19 @@ VALUES
   ('SH-0005', 'むらた', 'Serverless', 'SHE', 'Compute', 'Serverless',
    false, true, '{"throughput": 500, "availability": 1200, "sla_penalty": 200, "maintenance_cost": 0}'::jsonb,
    '**えりり Trigger:** 自分のフィールドに「SHE Storage - えりり」がいる場合、このカードのスループットを +200 する',
-   '[{"trigger": "on_field_change", "guard": [{"count": {"selector": {"owner": "self", "faction": "SHE", "card_type": "ObjectStorage"}, "min": 1}}], "ops": [{"apply_buff": {"selector": "source", "buff": "tp", "amount": 200, "duration": "this_turn"}}]}]'::jsonb,
+   '[{"trigger": "on_field_change", "guard": [{"count": {"selector": {"owner": "myself", "faction": "SHE", "card_type": "ObjectStorage"}, "min": 1}}], "ops": [{"apply_buff": {"selector": "source", "buff": "tp", "amount": 200, "duration": "this_turn"}}]}]'::jsonb,
    'unlimited', true),
 
   ('SH-0006', 'アデリース', 'RDB', 'SHE', 'Data', 'Database',
    true, false, '{"yield": 500, "availability": 1300, "sla_penalty": 500, "maintenance_cost": 150}'::jsonb,
    '**予約契約:** このカードのデプロイ時に発動できる。デプロイ時のコストを -200 する。この効果を使用してデプロイした場合、他のリソースをデプロイするためにこのカードをトラッシュすることはできない。',
-   '[{"trigger": "on_deploy", "choice": {"use": [{"gain_budget": {"target": "self", "amount": 200}}, {"apply_buff": {"selector": "source", "buff": "reserved_instance", "amount": 1, "duration": "permanent"}}], "skip": []}}]'::jsonb,
+   '[{"trigger": "on_deploy", "choice": {"use": [{"gain_budget": {"target": "myself", "amount": 200}}, {"apply_buff": {"selector": "source", "buff": "reserved_instance", "amount": 1, "duration": "permanent"}}], "skip": []}}]'::jsonb,
    'unlimited', true),
 
   ('SH-0007', 'オオロバ', 'DistributedDB', 'SHE', 'Data', 'Database',
    true, false, '{"yield": 500, "availability": 1200, "sla_penalty": 500, "maintenance_cost": 200}'::jsonb,
    '**星の連鎖:** 自分のバックエンドのこのカード以外の SHEのDB系リソース1体につき、このカードの Yield を +200 する',
-   '[{"trigger": "on_field_change", "ops": [{"apply_buff": {"selector": "source", "buff": "yield", "amount": {"base": 0, "per": {"count": {"owner": "self", "zone": "backend", "faction": "SHE", "card_type": "Database", "exclude": "source"}, "value": 200}}, "duration": "this_turn"}}]}]'::jsonb,
+   '[{"trigger": "on_field_change", "ops": [{"apply_buff": {"selector": "source", "buff": "yield", "amount": {"base": 0, "per": {"count": {"owner": "myself", "zone": "backend", "faction": "SHE", "card_type": "Database", "exclude": "source"}, "value": 200}}, "duration": "this_turn"}}]}]'::jsonb,
    'unlimited', true),
 
   ('SH-0008', 'えりり', 'Storage', 'SHE', 'Data', 'ObjectStorage',
@@ -261,25 +261,25 @@ VALUES
   ('SH-0009', 'ダイノ', 'NoSQL', 'SHE', 'Data', 'Database',
    false, true, '{"yield": 300, "availability": 1600, "sla_penalty": 400, "maintenance_cost": 50}'::jsonb,
    '**On-Demand:** Budget 400 を払って発動できる。このターン、このカードの Yield を2倍にする。この効果は1ターン中に1回のみ使用できる',
-   '[{"trigger": "ignition", "use_limit": "once_per_turn", "guard": [{"stat": {"selector": "self", "stat": "budget", "min": 400}}], "ops": [{"lose_budget": {"target": "self", "amount": 400}}, {"apply_buff": {"selector": "source", "buff": "yield", "amount": {"ref": "source.yield", "multiply": 1}, "duration": "this_turn"}}]}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_turn", "guard": [{"stat": {"selector": "myself", "stat": "budget", "min": 400}}], "ops": [{"lose_budget": {"target": "myself", "amount": 400}}, {"apply_buff": {"selector": "source", "buff": "yield", "amount": {"ref": "source.yield", "multiply": 1}, "duration": "this_turn"}}]}]'::jsonb,
    'unlimited', true),
 
   ('SH-0010', 'メリーモ', 'Cache', 'SHE', 'Data', 'CacheDB',
    true, false, '{"yield": 200, "availability": 1100, "sla_penalty": 100, "maintenance_cost": 100}'::jsonb,
    '**Cache Engine:** デプロイ時に選択以下のいずれかの効果を選択する。**Memcached:** Budget を +400 する。**Redis:** このカードの Yield を +200 する',
-   '[{"trigger": "on_deploy", "choice": {"memcached": [{"gain_budget": {"target": "self", "amount": 400}}], "redis": [{"apply_buff": {"selector": "source", "buff": "yield", "amount": 200, "duration": "permanent"}}]}}]'::jsonb,
+   '[{"trigger": "on_deploy", "choice": {"memcached": [{"gain_budget": {"target": "myself", "amount": 400}}], "redis": [{"apply_buff": {"selector": "source", "buff": "yield", "amount": 200, "duration": "permanent"}}]}}]'::jsonb,
    'unlimited', true),
 
   ('SH-0011', 'SHE Pipeline', '', 'SHE', 'Platform', NULL,
    false, false, '{}'::jsonb,
    '自分のフィールドの SHE リソースのスケールアップのための開発コストを -200 する。',
-   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "self", "faction": "SHE"}, "buff": "scale_cost_reduction", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
+   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "myself", "faction": "SHE"}, "buff": "scale_cost_reduction", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
    'unlimited', true),
 
   ('SH-0012', 'SHE Front', '', 'SHE', 'Platform', NULL,
    false, false, '{}'::jsonb,
    '自分のフィールドの全ての SHE コンピュート系リソースのスループットを +200 する。',
-   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "self", "faction": "SHE", "card_type": ["Compute", "AI/ML", "Orchestrator", "Container", "Serverless"]}, "buff": "tp", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
+   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "myself", "faction": "SHE", "card_type": ["Compute", "AI/ML", "Orchestrator", "Container", "Serverless"]}, "buff": "tp", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
    'unlimited', true),
 
   ('SH-0013', 'SHE Guard', '', 'SHE', 'Platform', NULL,
@@ -321,13 +321,13 @@ VALUES
   ('SH-0019', 'SHE Marketplace', '', 'SHE', 'Strategy', NULL,
    false, false, '{}'::jsonb,
    '自分のフィールドに SHE カードが3枚以上ある時に発動できる。自分の Budget を +600 する。',
-   '[{"trigger": "ignition", "use_limit": "once_per_turn", "guard": [{"count": {"selector": {"owner": "self", "faction": "SHE"}, "min": 3}}], "ops": [{"gain_budget": {"target": "self", "amount": 600}}]}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_turn", "guard": [{"count": {"selector": {"owner": "myself", "faction": "SHE"}, "min": 3}}], "ops": [{"gain_budget": {"target": "myself", "amount": 600}}]}]'::jsonb,
    'unlimited', true),
 
   ('SH-0020', 'SHE 料金見積もり', '', 'SHE', 'Strategy', NULL,
    false, false, '{}'::jsonb,
    'このターン、自分の全ての SHE カードの開発コストを -200 する。',
-   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"apply_buff": {"selector": {"owner": "self"}, "buff": "deploy_discount", "amount": 200, "duration": "this_turn"}}]}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"apply_buff": {"selector": {"owner": "myself"}, "buff": "deploy_discount", "amount": 200, "duration": "this_turn"}}]}]'::jsonb,
    'unlimited', true),
 
   ('SH-0021', 'Smile Recovery', '', 'SHE', 'Reactive', NULL,
@@ -339,7 +339,7 @@ VALUES
   ('SH-0022', 'SHE Ecosystem', '', 'SHE', 'Strategy', NULL,
    false, false, '{}'::jsonb,
    '自分のフィールドに SHE カードが3枚以上ある時に使用できる。このターン、自分のフロントエンドの全ての SHE カードのスループットを +200 する。',
-   '[{"trigger": "ignition", "use_limit": "once_per_turn", "guard": [{"count": {"selector": {"owner": "self", "faction": "SHE"}, "min": 3}}], "ops": [{"apply_buff": {"selector": {"owner": "self", "zone": "frontend", "faction": "SHE"}, "buff": "tp", "amount": 200, "duration": "this_turn"}}]}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_turn", "guard": [{"count": {"selector": {"owner": "myself", "faction": "SHE"}, "min": 3}}], "ops": [{"apply_buff": {"selector": {"owner": "myself", "zone": "frontend", "faction": "SHE"}, "buff": "tp", "amount": 200, "duration": "this_turn"}}]}]'::jsonb,
    'unlimited', true),
 
   ('SH-0023', 'SHE Smile Horizon Express', '', 'SHE', 'Strategy', NULL,
@@ -351,7 +351,7 @@ VALUES
   ('SH-0024', 'だっくん', 'Cache', 'SHE', 'Data', 'CacheDB',
    true, false, '{"yield": 200, "availability": 1200, "sla_penalty": 100, "maintenance_cost": 100}'::jsonb,
    '**キャッシュブースト:** 自分のフィールドの全ての SHE NoSQL - ダイノの Yield を +200 する。',
-   '[{"trigger": "on_field_change", "ops": [{"apply_buff": {"selector": {"owner": "self", "card_id": "SH-0009"}, "buff": "yield", "amount": 200, "duration": "this_turn"}}]}]'::jsonb,
+   '[{"trigger": "on_field_change", "ops": [{"apply_buff": {"selector": {"owner": "myself", "card_id": "SH-0009"}, "buff": "yield", "amount": 200, "duration": "this_turn"}}]}]'::jsonb,
    'unlimited', true),
 
   ('SH-0025', 'SHE Block Storage', '', 'SHE', 'Attachment', NULL,
@@ -375,7 +375,7 @@ VALUES
   ('SL-0003', 'クラン', 'Container', 'Sugar', 'Compute', 'Container',
    false, true, '{"throughput": 700, "availability": 1200, "sla_penalty": 200, "maintenance_cost": 50}'::jsonb,
    '**Scale to Zero:** 前のターン、このカードが攻撃していない場合に発動できる。このターン、このカードのリクエストコストは 0 になる。この効果は、このカードをデプロイしたターンは使用できない。',
-   '[{"trigger": "ignition", "use_limit": "once_per_turn", "custom": "scale_to_zero", "meta": {"categories": ["cost_reduction"], "target": "self"}}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_turn", "custom": "scale_to_zero", "meta": {"categories": ["cost_reduction"], "target": "myself"}}]'::jsonb,
    'unlimited', true),
 
   ('SL-0004', 'クーヘンバウムティス', 'Orchestrator', 'Sugar', 'Compute', 'Orchestrator',
@@ -400,7 +400,7 @@ VALUES
    true, false, '{"throughput": 1700, "availability": 800, "sla_penalty": 800, "maintenance_cost": 300}'::jsonb,
    '**学習工程:** このカードが相手のバックエンドカードを攻撃した時に発動できる。攻撃対象のカードの Insight を 600 吸収する。
 **Cascade Failure:** このカードが破壊された時に発動する。自分の全てのバックエンドに 400 ダメージを与える。',
-   '[{"trigger": "on_attack", "ops": [{"absorb_insight": {"amount": 600}}]}, {"trigger": "on_destroy", "ops": [{"deal_damage": {"selector": {"owner": "self", "zone": "backend"}, "amount": 400}}, {"destroy_check": {"target": "self"}}]}]'::jsonb,
+   '[{"trigger": "on_attack", "ops": [{"absorb_insight": {"amount": 600}}]}, {"trigger": "on_destroy", "ops": [{"deal_damage": {"selector": {"owner": "myself", "zone": "backend"}, "amount": 400}}, {"destroy_check": {"target": "myself"}}]}]'::jsonb,
    'unlimited', true),
 
   ('SL-0008', 'エクレアーエル', 'RDB', 'Sugar', 'Data', 'Database',
@@ -430,7 +430,7 @@ VALUES
   ('SL-0012', 'メレンゲスト', 'Cache', 'Sugar', 'Data', 'CacheDB',
    true, false, '{"yield": 200, "availability": 1200, "sla_penalty": 100, "maintenance_cost": 100}'::jsonb,
    '**Cache Engine:** デプロイ時に、以下の効果のうち1つを選択して発動する。 — **Memcached:** 自分の Budget を +400 する / **Redis:** このカードの Yield を +200 する。',
-   '[{"trigger": "on_deploy", "choice": {"memcached": [{"gain_budget": {"target": "self", "amount": 400}}], "redis": [{"apply_buff": {"selector": "source", "buff": "yield", "amount": 200, "duration": "permanent"}}]}}]'::jsonb,
+   '[{"trigger": "on_deploy", "choice": {"memcached": [{"gain_budget": {"target": "myself", "amount": 400}}], "redis": [{"apply_buff": {"selector": "source", "buff": "yield", "amount": 200, "duration": "permanent"}}]}}]'::jsonb,
    'unlimited', true),
 
   ('SL-0013', 'シュトレーンジ', 'Storage', 'Sugar', 'Data', 'ObjectStorage',
@@ -442,13 +442,13 @@ VALUES
   ('SL-0014', 'しゅがーらぼ Build', '', 'Sugar', 'Platform', NULL,
    false, false, '{}'::jsonb,
    '自分のフィールドの しゅがーらぼ リソースのスケールアップコストを -200 する。',
-   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "self", "faction": "Sugar"}, "buff": "scale_cost_reduction", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
+   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "myself", "faction": "Sugar"}, "buff": "scale_cost_reduction", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
    'unlimited', true),
 
   ('SL-0015', 'しゅがーらぼ CDN', '', 'Sugar', 'Platform', NULL,
    false, false, '{}'::jsonb,
    '自分のフィールドの全ての しゅがーらぼ コンピュート系リソースのスループットを +200 する。',
-   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "self", "faction": "Sugar", "card_type": ["Compute", "AI/ML", "Orchestrator", "Container", "Serverless"]}, "buff": "tp", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
+   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "myself", "faction": "Sugar", "card_type": ["Compute", "AI/ML", "Orchestrator", "Container", "Serverless"]}, "buff": "tp", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
    'unlimited', true),
 
   ('SL-0016', 'しゅがーらぼ アイスクエリム Analytics', '', 'Sugar', 'Platform', NULL,
@@ -466,7 +466,7 @@ VALUES
   ('SL-0018', 'しゅがーらぼ ぱくぱくサブレ', '', 'Sugar', 'Attachment', NULL,
    false, false, '{}'::jsonb,
    '自分の しゅがーらぼ コンピュート系リソースに装備できる。装備先が攻撃した時に発動できる。選択した他の自分の しゅがーらぼ コンピュート系リソース1体は、このターン、リクエストコストなしで攻撃できる。',
-   '[{"trigger": "on_attack", "custom": "chain_attack_bonus", "meta": {"categories": ["single_damage"], "target": "self"}}]'::jsonb,
+   '[{"trigger": "on_attack", "custom": "chain_attack_bonus", "meta": {"categories": ["single_damage"], "target": "myself"}}]'::jsonb,
    'unlimited', true),
 
   ('SL-0019', 'しゅがーらぼ だんごフロー', '', 'Sugar', 'Attachment', NULL,
@@ -478,7 +478,7 @@ VALUES
   ('SL-0020', 'しゅがーらぼ ブロックストレージ', '', 'Sugar', 'Attachment', NULL,
    false, false, '{}'::jsonb,
    '自分の「しゅがーらぼ Compute - ジューシィ・いちご」にのみ装備できる。①装備先の可用性を +400 する。②自分のメインフェーズに発動できる。このカードを別の自分の「しゅがーらぼ Compute - ジューシィ・いちご」に付け替える。この効果は1ターン中に1回のみ使用できる。',
-   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": "source", "buff": "av", "amount": 400, "duration": "while_on_field"}}]}, {"trigger": "ignition", "use_limit": "once_per_turn", "custom": "reattach", "meta": {"categories": ["utility"], "target": "self"}}]'::jsonb,
+   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": "source", "buff": "av", "amount": 400, "duration": "while_on_field"}}]}, {"trigger": "ignition", "use_limit": "once_per_turn", "custom": "reattach", "meta": {"categories": ["utility"], "target": "myself"}}]'::jsonb,
    'unlimited', true),
 
   ('SL-0021', 'しゅがーらぼ Deployment', '', 'Sugar', 'Strategy', NULL,
@@ -490,13 +490,13 @@ VALUES
   ('SL-0022', 'しゅがーらぼ バター君 Batch', '', 'Sugar', 'Strategy', NULL,
    false, false, '{}'::jsonb,
    'Budget 300 を払って発動できる。コンピュート系リソース1体を選択する。このターン、そのカードのスループットを2倍にする。',
-   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"apply_buff": {"selector": {"owner": "self", "zone": "frontend", "card_type": ["Compute", "AI/ML", "Orchestrator", "Container", "Serverless"], "pick": "choice"}, "buff": "tp", "amount": {"ref": "target.tp", "multiply": 1}, "duration": "this_turn"}}]}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"apply_buff": {"selector": {"owner": "myself", "zone": "frontend", "card_type": ["Compute", "AI/ML", "Orchestrator", "Container", "Serverless"], "pick": "choice"}, "buff": "tp", "amount": {"ref": "target.tp", "multiply": 1}, "duration": "this_turn"}}]}]'::jsonb,
    'unlimited', true),
 
   ('SL-0023', 'しゅがーらぼ Knowledge', '', 'Sugar', 'Strategy', NULL,
    false, false, '{}'::jsonb,
    'Budget 200 を払って発動できる。相手の Insight を 400 吸収する。さらに、相手のDB系リソースおよびオブジェクトストレージ1体につき相手の Insight を 200 吸収する。',
-   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"absorb_insight": {"amount": {"base": 400, "per": {"count": {"owner": "self", "zone": "backend"}, "value": 200}, "max": 600}}}]}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"absorb_insight": {"amount": {"base": 400, "per": {"count": {"owner": "myself", "zone": "backend"}, "value": 200}, "max": 600}}}]}]'::jsonb,
    'unlimited', true),
 
   ('SL-0024', 'しゅがーらぼ Error Budget', '', 'Sugar', 'Reactive', NULL,
@@ -514,7 +514,7 @@ VALUES
   ('TK-0002', 'アサギリ', 'PaaS', 'Tenki', 'Compute', 'VM',
    true, false, '{"throughput": 400, "availability": 1500, "sla_penalty": 400, "maintenance_cost": 50}'::jsonb,
    '**Auto Patch:** 相手がインシデントカードを使った時に発動する。このカードが受けるダメージを半分にする。',
-   '[{"trigger": "on_incident", "guard": [{"event_owner": "opponent"}], "ops": [{"apply_buff": {"selector": {"owner": "self"}, "buff": "incident_reduction", "amount": 50, "mode": "percent", "duration": "this_turn"}}], "meta": {"categories": ["defensive"], "target": "self"}}]'::jsonb,
+   '[{"trigger": "on_incident", "guard": [{"event_owner": "opponent"}], "ops": [{"apply_buff": {"selector": {"owner": "myself"}, "buff": "incident_reduction", "amount": 50, "mode": "percent", "duration": "this_turn"}}], "meta": {"categories": ["defensive"], "target": "myself"}}]'::jsonb,
    'unlimited', true),
 
   ('TK-0003', 'コウテン', 'Container', 'Tenki', 'Compute', 'Container',
@@ -532,7 +532,7 @@ VALUES
   ('TK-0005', '智の解放者<オープナー>', 'AI', 'Tenki', 'Compute', 'AI/ML',
    true, false, '{"throughput": 900, "availability": 1200, "sla_penalty": 600, "maintenance_cost": 200}'::jsonb,
    '**データの泉:** 自分のバックエンドの 天気使い DB系リソースおよびオブジェクトストレージ1体につき、このカードのスループットを +200 する。',
-   '[{"trigger": "on_field_change", "ops": [{"apply_buff": {"selector": "source", "buff": "tp", "amount": {"base": 0, "per": {"count": {"owner": "self", "zone": "backend", "faction": "Tenki", "card_type": "Data"}, "value": 200}}, "duration": "this_turn"}}]}]'::jsonb,
+   '[{"trigger": "on_field_change", "ops": [{"apply_buff": {"selector": "source", "buff": "tp", "amount": {"base": 0, "per": {"count": {"owner": "myself", "zone": "backend", "faction": "Tenki", "card_type": "Data"}, "value": 200}}, "duration": "this_turn"}}]}]'::jsonb,
    'unlimited', true),
 
   ('TK-0006', 'ライ', 'Functions', 'Tenki', 'Compute', 'Serverless',
@@ -575,13 +575,13 @@ VALUES
   ('TK-0012', '天気使い DevOps', '', 'Tenki', 'Platform', NULL,
    false, false, '{}'::jsonb,
    '自分のフィールドの 天気使い リソースのスケールアップのコストを -200 する。',
-   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "self", "faction": "Tenki"}, "buff": "scale_cost_reduction", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
+   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "myself", "faction": "Tenki"}, "buff": "scale_cost_reduction", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
    'unlimited', true),
 
   ('TK-0013', '天気使い CDN', '', 'Tenki', 'Platform', NULL,
    false, false, '{}'::jsonb,
    '自分のフィールドの全ての 天気使い コンピュート系リソースのスループットを +200 する。',
-   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "self", "faction": "Tenki", "card_type": ["Compute", "AI/ML", "Orchestrator", "Container", "Serverless"]}, "buff": "tp", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
+   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "myself", "faction": "Tenki", "card_type": ["Compute", "AI/ML", "Orchestrator", "Container", "Serverless"]}, "buff": "tp", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
    'unlimited', true),
 
   ('TK-0014', '天気使い Protection', '', 'Tenki', 'Platform', NULL,
@@ -653,7 +653,7 @@ VALUES
   ('TK-0025', '天気使い ファンネル', '', 'Tenki', 'Reactive', NULL,
    false, false, '{}'::jsonb,
    '①デプロイ時、相手フィールドの裏向きリアクティブカードを1枚選び、確認する。②このカードがフィールドに存在する限り、インシデントカードによる自分のリソースへのダメージを300軽減する',
-   '[{"trigger": "on_deploy", "ops": [{"peek_reactive": {}}]}, {"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "self"}, "buff": "incident_reduction", "amount": 300, "duration": "while_on_field"}}]}]'::jsonb,
+   '[{"trigger": "on_deploy", "ops": [{"peek_reactive": {}}]}, {"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "myself"}, "buff": "incident_reduction", "amount": 300, "duration": "while_on_field"}}]}]'::jsonb,
    'unlimited', true),
 
   ('TN-0001', 'コンタータ', 'Compute', 'Tuners', 'Compute', 'VM',
@@ -677,7 +677,7 @@ VALUES
   ('TN-0004', 'コンダクティス', 'Orchestrator', 'Tuners', 'Compute', 'Orchestrator',
    true, true, '{"throughput": 600, "availability": 1600, "sla_penalty": 500, "maintenance_cost": 100}'::jsonb,
    '自分のフィールドの調律部リソースが3体以下の場合、このカードの維持費を -100 する。',
-   '[{"trigger": "on_field_change", "guard": [{"count": {"selector": {"owner": "self", "faction": "Tuners"}, "max": 3}}], "ops": [{"apply_buff": {"selector": "source", "buff": "maintenance_reduction", "amount": 100, "duration": "this_turn"}}]}]'::jsonb,
+   '[{"trigger": "on_field_change", "guard": [{"count": {"selector": {"owner": "myself", "faction": "Tuners"}, "max": 3}}], "ops": [{"apply_buff": {"selector": "source", "buff": "maintenance_reduction", "amount": 100, "duration": "this_turn"}}]}]'::jsonb,
    'unlimited', true),
 
   ('TN-0005', 'ファンファーレクション', 'Functions', 'Tuners', 'Compute', 'Serverless',
@@ -689,7 +689,7 @@ VALUES
   ('TN-0006', 'アピエッタ', 'Low-Code', 'Tuners', 'Compute', 'Serverless',
    false, true, '{"throughput": 300, "availability": 1400, "sla_penalty": 200, "maintenance_cost": 0}'::jsonb,
    '**Low-Code:** 自分のフィールドに 調律部 DB がある時、このカードのスループットを +400 する。',
-   '[{"trigger": "on_field_change", "guard": [{"count": {"selector": {"owner": "self", "faction": "Tuners", "card_type": ["Database", "CacheDB"]}, "min": 1}}], "ops": [{"apply_buff": {"selector": "source", "buff": "tp", "amount": 400, "duration": "this_turn"}}]}]'::jsonb,
+   '[{"trigger": "on_field_change", "guard": [{"count": {"selector": {"owner": "myself", "faction": "Tuners", "card_type": ["Database", "CacheDB"]}, "min": 1}}], "ops": [{"apply_buff": {"selector": "source", "buff": "tp", "amount": 400, "duration": "this_turn"}}]}]'::jsonb,
    'semi_limited', true),
 
   ('TN-0007', '音の魔術師〈マジシャン・オブ・ミュージック〉', 'DB', 'Tuners', 'Data', 'Database',
@@ -719,13 +719,13 @@ VALUES
   ('TN-0011', '調律部 DevOps', '', 'Tuners', 'Platform', NULL,
    false, false, '{}'::jsonb,
    '自分のフィールドの 調律部 リソースのスケールアップコストを -300 する。',
-   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "self", "faction": "Tuners"}, "buff": "scale_cost_reduction", "amount": 300, "duration": "while_on_field"}}]}]'::jsonb,
+   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "myself", "faction": "Tuners"}, "buff": "scale_cost_reduction", "amount": 300, "duration": "while_on_field"}}]}]'::jsonb,
    'unlimited', true),
 
   ('TN-0012', '調律部 Guard', '', 'Tuners', 'Platform', NULL,
    false, false, '{}'::jsonb,
    'インシデントカードによる自分の 調律部 リソースへのダメージを -200 する。',
-   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "self", "faction": "Tuners"}, "buff": "incident_reduction", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
+   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "myself", "faction": "Tuners"}, "buff": "incident_reduction", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
    'unlimited', true),
 
   ('TN-0013', '調律部 WAF', '', 'Tuners', 'Platform', NULL,
@@ -755,7 +755,7 @@ VALUES
   ('TN-0017', '調律部 License', '', 'Tuners', 'Strategy', NULL,
    false, false, '{}'::jsonb,
    'Budget 100 を払って発動できる。自分の 調律部 DB系リソース1体の可用性を最大値まで回復する。',
-   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"heal_damage": {"selector": {"owner": "self", "zone": "backend", "faction": "Tuners", "card_type": "Database", "pick": "choice"}, "amount": {"ref": "target.max_av", "multiply": 1}}}]}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"heal_damage": {"selector": {"owner": "myself", "zone": "backend", "faction": "Tuners", "card_type": "Database", "pick": "choice"}, "amount": {"ref": "target.max_av", "multiply": 1}}}]}]'::jsonb,
    'unlimited', true),
 
   ('TN-0018', '調律部 Failback', '', 'Tuners', 'Reactive', NULL,
