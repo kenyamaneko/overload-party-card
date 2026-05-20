@@ -465,8 +465,8 @@ VALUES
 
   ('SL-0018', 'しゅがーらぼ ぱくぱくサブレ', '', 'Sugar', 'Attachment', NULL,
    false, false, '{}'::jsonb,
-   '自分の しゅがーらぼ コンピュート系リソースに装備できる。装備先が攻撃した時に発動できる。選択した他の自分の しゅがーらぼ コンピュート系リソース1体は、このターン、リクエストコストなしで攻撃できる。',
-   '[{"trigger": "on_attack", "custom": "chain_attack_bonus", "meta": {"categories": ["single_damage"], "target": "myself"}}]'::jsonb,
+   '自分の しゅがーらぼ コンピュート系リソースに装備できる。装備先が攻撃した時、他に自分の しゅがーらぼ コンピュート系リソースが場にいれば、対象へ追加で 200 ダメージを与える。',
+   '[{"trigger": "on_attack", "custom": "chain_attack_bonus", "meta": {"categories": ["single_damage"], "target": "myself", "damage": 200}}]'::jsonb,
    'unlimited', true),
 
   ('SL-0019', 'しゅがーらぼ だんごフロー', '', 'Sugar', 'Attachment', NULL,
