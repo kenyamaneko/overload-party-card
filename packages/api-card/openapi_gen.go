@@ -140,7 +140,7 @@ type CardDefinition struct {
 	// Stats スタッツ (ComputeStats または DataStats)
 	Stats json.RawMessage `json:"stats"`
 
-	// Subtype サブタイプ (Compute/Data 配下のみ)
+	// Subtype サブタイプ (Compute/DataResource 配下のみ)
 	Subtype   *string   `json:"subtype,omitempty"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

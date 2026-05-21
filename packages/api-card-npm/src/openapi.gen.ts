@@ -142,7 +142,7 @@ export interface components {
             faction: string;
             /** @description カード種別 */
             card_type: string;
-            /** @description サブタイプ (Compute/Data 配下のみ) */
+            /** @description サブタイプ (Compute/DataResource 配下のみ) */
             subtype?: string;
             /**
              * Format: int64
