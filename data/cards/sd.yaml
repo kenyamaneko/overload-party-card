@@ -130,7 +130,7 @@ cards:
     card_name: "アデリース"
     resource_label: "RDB"
     const_name: SHERDBAdeliece
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 1
     resizable: true
@@ -161,7 +161,7 @@ cards:
     card_name: "オオロバ"
     resource_label: "DistributedDB"
     const_name: SHEDistributedDBOoroba
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 1
     resizable: true
@@ -184,7 +184,7 @@ cards:
               amount:
                 base: 0
                 per:
-                  count: { owner: myself, zone: backend, faction: SHE, card_type: Database, exclude: source }
+                  count: { owner: myself, zone: backend, faction: SHE, card_type: DataResourcease, exclude: source }
                   value: 200
               duration: this_turn
 
@@ -193,7 +193,7 @@ cards:
     card_name: "えりり"
     resource_label: "Storage"
     const_name: SHEStorageEris
-    card_type: Data
+    card_type: DataResource
     subtype: ObjectStorage
     deploy_turns: 0
     resizable: false
@@ -222,7 +222,7 @@ cards:
     card_name: "ダイノ"
     resource_label: "NoSQL"
     const_name: SHEDBDinosaur
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 0
     resizable: false
@@ -257,7 +257,7 @@ cards:
     card_name: "メリーモ"
     resource_label: "Cache"
     const_name: SHECacheMerry
-    card_type: Data
+    card_type: DataResource
     subtype: CacheDB
     deploy_turns: 0
     resizable: true
@@ -582,7 +582,7 @@ cards:
     card_name: "だっくん"
     resource_label: "Cache"
     const_name: SHECacheDakkun
-    card_type: Data
+    card_type: DataResource
     subtype: CacheDB
     deploy_turns: 0
     resizable: true
