@@ -1428,7 +1428,7 @@
                     "owner": "myself",
                     "zone": "backend",
                     "faction": "SHE",
-                    "card_type": "DataResourcease",
+                    "card_type": "Database",
                     "exclude": "source"
                   },
                   "value": 200
@@ -4349,7 +4349,7 @@
             "deploy_from_repo": {
               "filter": {
                 "faction": "Tuners",
-                "card_type": "DataResourcease"
+                "card_type": "Database"
               },
               "override_av": 200
             }
@@ -4465,7 +4465,7 @@
                 "owner": "myself",
                 "zone": "backend",
                 "faction": "Tuners",
-                "card_type": "DataResourcease",
+                "card_type": "Database",
                 "pick": "choice"
               },
               "amount": {
@@ -4502,7 +4502,7 @@
             "match": {
               "selector": "target",
               "faction": "Tuners",
-              "card_type": "DataResourcease"
+              "card_type": "Database"
             }
           }
         ],
@@ -4511,7 +4511,7 @@
             "deploy_from_hand": {
               "filter": {
                 "faction": "Tuners",
-                "card_type": "DataResourcease"
+                "card_type": "Database"
               }
             }
           }

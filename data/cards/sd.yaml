@@ -184,7 +184,7 @@ cards:
               amount:
                 base: 0
                 per:
-                  count: { owner: myself, zone: backend, faction: SHE, card_type: DataResourcease, exclude: source }
+                  count: { owner: myself, zone: backend, faction: SHE, card_type: Database, exclude: source }
                   value: 200
               duration: this_turn
 
