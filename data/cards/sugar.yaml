@@ -203,7 +203,7 @@ cards:
     card_name: "エクレアーエル"
     resource_label: "RDB"
     const_name: SugarRDBEclairL
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 1
     resizable: true
@@ -223,7 +223,7 @@ cards:
     card_name: "スーパーバナナ"
     resource_label: "DistributedDB"
     const_name: SugarDistributedDBPinapo
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 1
     resizable: false
@@ -254,7 +254,7 @@ cards:
     card_name: "トーストア"
     resource_label: "NoSQL"
     const_name: SugarDBToastoa
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 0
     resizable: false
@@ -281,7 +281,7 @@ cards:
     card_name: "アイスクエリム"
     resource_label: "Datawarehouse"
     const_name: SugarDWIcecream
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 1
     resizable: false
@@ -306,7 +306,7 @@ cards:
     card_name: "メレンゲスト"
     resource_label: "Cache"
     const_name: SugarCacheMeringue
-    card_type: Data
+    card_type: DataResource
     subtype: CacheDB
     deploy_turns: 0
     resizable: true
@@ -339,7 +339,7 @@ cards:
     card_name: "シュトレーンジ"
     resource_label: "Storage"
     const_name: SugarStorageSchtrenge
-    card_type: Data
+    card_type: DataResource
     subtype: ObjectStorage
     deploy_turns: 0
     resizable: false

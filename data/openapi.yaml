@@ -280,7 +280,7 @@ components:
           description: カード種別
         subtype:
           type: string
-          description: サブタイプ (Compute/Data 配下のみ)
+          description: サブタイプ (Compute/DataResource 配下のみ)
         deploy_turns:
           type: integer
           format: int64

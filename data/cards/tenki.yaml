@@ -134,7 +134,7 @@ cards:
               amount:
                 base: 0
                 per:
-                  count: { owner: myself, zone: backend, faction: Tenki, card_type: Data }
+                  count: { owner: myself, zone: backend, faction: Tenki, card_type: DataResource }
                   value: 200
               duration: this_turn
 
@@ -171,7 +171,7 @@ cards:
     card_name: "シグレ"
     resource_label: "RDB"
     const_name: TenkiRDBShigure
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 1
     resizable: true
@@ -191,7 +191,7 @@ cards:
     card_name: "ハヤテ"
     resource_label: "DB"
     const_name: TenkiDBHayate
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 1
     resizable: true
@@ -211,7 +211,7 @@ cards:
           - match:
               selector: target
               faction: Tenki
-              card_type: Data
+              card_type: DataResource
           - not_same: { a: source, b: target }
         ops:
           - apply_buff:
@@ -225,7 +225,7 @@ cards:
     card_name: "フブキ"
     resource_label: "Storage"
     const_name: TenkiStorageFubuki
-    card_type: Data
+    card_type: DataResource
     subtype: ObjectStorage
     deploy_turns: 0
     resizable: false
@@ -245,7 +245,7 @@ cards:
     card_name: "百花の天穹<コスモ>"
     resource_label: "NoSQL"
     const_name: TenkiDBCosmo
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 0
     resizable: false
@@ -281,7 +281,7 @@ cards:
     card_name: "シュウウ"
     resource_label: "Cache"
     const_name: TenkiCacheReiu
-    card_type: Data
+    card_type: DataResource
     subtype: CacheDB
     deploy_turns: 0
     resizable: true
