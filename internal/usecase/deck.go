@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	gamedesign "github.com/kenyamaneko/overload-party-common/packages/game-design-constants"
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
 	"github.com/kenyamaneko/overload-party-card/internal/constants"
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
@@ -217,9 +218,9 @@ func (s *DeckInteractor) validateDeckCards(deckCardEntries []domain.DeckCardEntr
 		if card == nil {
 			return fmt.Errorf("%w: card %s not found in card definitions", port.ErrInvalidDeck, cardID)
 		}
-		limit, err := constants.RestrictionCopyCount(card.Restriction)
-		if err != nil {
-			return fmt.Errorf("card %s: %w", cardID, err)
+		limit, ok := gamedesign.RestrictionCopyCount[card.Restriction]
+		if !ok {
+			return fmt.Errorf("card %s: unknown restriction %q", cardID, card.Restriction)
 		}
 		if total > limit {
 			return fmt.Errorf("%w: card %s (%s): exceeds restriction limit (%d/%d)",
