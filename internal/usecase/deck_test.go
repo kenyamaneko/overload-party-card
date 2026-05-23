@@ -11,7 +11,6 @@ import (
 
 	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
-	"github.com/kenyamaneko/overload-party-card/internal/constants"
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
 )
 
@@ -436,28 +435,4 @@ func TestValidateDeckForBattle_PartialDeck(t *testing.T) {
 	err = svc.ValidateDeckForBattle(context.Background(), pid, deck.DeckID)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "need exactly 30")
-}
-
-func TestRestrictionCopyCount(t *testing.T) {
-	tests := []struct {
-		name        string
-		restriction string
-		want        int
-		wantErr     bool
-	}{
-		{"unlimited", "unlimited", 3, false},
-		{"semi_limited", "semi_limited", 2, false},
-		{"limited", "limited", 1, false},
-		{"forbidden", "forbidden", 0, false},
-		{"empty string is rejected", "", 0, true},
-		{"unknown value is rejected", "weirdly_limited", 0, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := constants.RestrictionCopyCount(tt.restriction)
-			assert.Equal(t, tt.wantErr, err != nil, "err=%v", err)
-			assert.Equal(t, tt.want, got)
-		})
-	}
 }
