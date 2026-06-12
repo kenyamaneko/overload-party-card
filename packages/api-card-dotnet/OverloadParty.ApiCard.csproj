@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>OverloadParty.ApiCard</PackageId>
+    <Version>0.0.0</Version>
+    <Description>Overload Party card service の REST 契約 (.NET client + DTO)。data/openapi.yaml から NSwag で生成。battle が internal/v1/cards のカード定義ロードに使用する。</Description>
+    <RepositoryUrl>https://github.com/kenyamaneko/overload-party-card</RepositoryUrl>
+  </PropertyGroup>
+</Project>

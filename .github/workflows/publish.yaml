@@ -1,6 +1,7 @@
 name: Publish
 
-# api-card (Go module) と api-card-npm (Cloudsmith npm) を手動でタグ付け・公開する。
+# api-card (Go module) / api-card-npm (Cloudsmith npm) / api-card-dotnet (Cloudsmith NuGet)
+# を手動でタグ付け・公開する。
 # バージョンを上げるタイミングは人が判断して workflow_dispatch で実行する。
 # タグの手動打ちは禁止 — このワークフローがモジュールタグの唯一の発行元。
 
@@ -15,6 +16,7 @@ on:
         options:
           - api-card
           - api-card-npm
+          - api-card-dotnet
       bump:
         description: "Version bump level"
         required: true
@@ -63,6 +65,53 @@ jobs:
           PREFIX: packages/api-card/v
           BUMP: ${{ inputs.bump }}
         run: .github/scripts/publish/next-tag.sh
+
+      - name: Tag and push
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: .github/scripts/publish/tag-and-push.sh
+
+  publish-api-card-dotnet:
+    if: inputs.target == 'api-card-dotnet'
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Build api-card-dotnet
+        run: dotnet build OverloadParty.ApiCard.csproj -c Release --nologo
+        working-directory: packages/api-card-dotnet
+
+      - name: Determine next tag
+        id: tag
+        env:
+          PREFIX: packages/api-card-dotnet/v
+          BUMP: ${{ inputs.bump }}
+        run: .github/scripts/publish/next-tag.sh
+
+      - name: Extract version from tag
+        id: version
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: echo "version=${TAG#packages/api-card-dotnet/v}" >> "${GITHUB_OUTPUT}"
+
+      - name: Pack api-card-dotnet
+        working-directory: packages/api-card-dotnet
+        run: dotnet pack OverloadParty.ApiCard.csproj -c Release -p:Version=${{ steps.version.outputs.version }} -o ./nupkg
+
+      - name: Publish to Cloudsmith
+        uses: kenyamaneko/overload-party-common/.github/actions/publish-to-cloudsmith@main
+        with:
+          format: nuget
+          package-path: packages/api-card-dotnet/nupkg/OverloadParty.ApiCard.${{ steps.version.outputs.version }}.nupkg
 
       - name: Tag and push
         env:
