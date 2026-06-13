@@ -50,6 +50,7 @@ func TestCreate(t *testing.T) {
 			deck := domain.Deck{
 				PlayerID:  playerA,
 				DeckName:  "Starter",
+				Faction:   "SHE",
 				CreatedAt: now,
 				UpdatedAt: now,
 			}
@@ -133,6 +134,7 @@ func TestFindByID_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Target Deck", got.DeckName)
 	assert.Equal(t, playerA, got.PlayerID)
+	assert.Equal(t, "SHE", got.Faction)
 }
 
 // TestFindByID_NotFound は存在しない / 他プレイヤー配下の deck_id が
@@ -238,6 +240,7 @@ func TestUpdate(t *testing.T) {
 		PlayerID:  playerA,
 		DeckID:    deckID,
 		DeckName:  "Renamed",
+		Faction:   "Tenki",
 		PlaymatNo: &newPlaymat,
 		UpdatedAt: time.Now(),
 	}, []domain.DeckCardEntry{
@@ -248,6 +251,7 @@ func TestUpdate(t *testing.T) {
 	got, err := repo.FindByID(ctx, playerA, deckID)
 	require.NoError(t, err)
 	assert.Equal(t, "Renamed", got.DeckName)
+	assert.Equal(t, "Tenki", got.Faction)
 	require.NotNil(t, got.PlaymatNo)
 	assert.Equal(t, newPlaymat, *got.PlaymatNo)
 
@@ -316,8 +320,8 @@ func insertDeckAt(t *testing.T, playerID, deckName string, updatedAt time.Time) 
 	t.Helper()
 	var deckID int64
 	err := sharedPg.Pool.QueryRow(context.Background(),
-		`INSERT INTO card.decks (player_id, deck_name, created_at, updated_at)
-		 VALUES ($1, $2, $3, $3) RETURNING deck_id`,
+		`INSERT INTO card.decks (player_id, deck_name, faction, created_at, updated_at)
+		 VALUES ($1, $2, 'SHE', $3, $3) RETURNING deck_id`,
 		playerID, deckName, updatedAt).Scan(&deckID)
 	require.NoError(t, err)
 	return deckID

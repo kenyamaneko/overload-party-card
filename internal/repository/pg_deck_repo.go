@@ -36,10 +36,11 @@ func (r *PgDeckRepository) Create(ctx context.Context, deck domain.Deck, deckCar
 
 	var deckID int64
 	err = tx.QueryRow(ctx,
-		`INSERT INTO decks (player_id, deck_name, playmat_no, sleeve_no, created_at, updated_at)
-		 VALUES ($1,$2,$3,$4,$5,$6) RETURNING deck_id`,
+		`INSERT INTO decks (player_id, deck_name, faction, playmat_no, sleeve_no, created_at, updated_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING deck_id`,
 		deck.PlayerID,
 		deck.DeckName,
+		deck.Faction,
 		deck.PlaymatNo,
 		deck.SleeveNo,
 		deck.CreatedAt,
@@ -62,7 +63,7 @@ func (r *PgDeckRepository) Create(ctx context.Context, deck domain.Deck, deckCar
 // FindByPlayerID は指定プレイヤーの全デッキを返します。
 func (r *PgDeckRepository) FindByPlayerID(ctx context.Context, playerID string) ([]*domain.Deck, error) {
 	rows, err := r.pool.Query(ctx,
-		`SELECT player_id, deck_id, deck_name, playmat_no, sleeve_no, created_at, updated_at
+		`SELECT player_id, deck_id, deck_name, faction, playmat_no, sleeve_no, created_at, updated_at
 		 FROM decks WHERE player_id = $1 ORDER BY updated_at DESC`,
 		playerID,
 	)
@@ -88,7 +89,7 @@ func (r *PgDeckRepository) FindByPlayerID(ctx context.Context, playerID string) 
 // FindByID は指定プレイヤーの指定デッキを返します。
 func (r *PgDeckRepository) FindByID(ctx context.Context, playerID string, deckID int64) (*domain.Deck, error) {
 	row := r.pool.QueryRow(ctx,
-		`SELECT player_id, deck_id, deck_name, playmat_no, sleeve_no, created_at, updated_at
+		`SELECT player_id, deck_id, deck_name, faction, playmat_no, sleeve_no, created_at, updated_at
 		 FROM decks WHERE player_id = $1 AND deck_id = $2`,
 		playerID, deckID,
 	)
@@ -147,9 +148,10 @@ func (r *PgDeckRepository) Update(ctx context.Context, deck domain.Deck, deckCar
 	}
 
 	_, err = tx.Exec(ctx,
-		`UPDATE decks SET deck_name = $1, playmat_no = $2, sleeve_no = $3, updated_at = $4
-		 WHERE player_id = $5 AND deck_id = $6`,
+		`UPDATE decks SET deck_name = $1, faction = $2, playmat_no = $3, sleeve_no = $4, updated_at = $5
+		 WHERE player_id = $6 AND deck_id = $7`,
 		deck.DeckName,
+		deck.Faction,
 		deck.PlaymatNo,
 		deck.SleeveNo,
 		deck.UpdatedAt,
@@ -185,6 +187,7 @@ func scanDeck(row pgx.Row) (*domain.Deck, error) {
 		&d.PlayerID,
 		&d.DeckID,
 		&d.DeckName,
+		&d.Faction,
 		&d.PlaymatNo,
 		&d.SleeveNo,
 		&d.CreatedAt,

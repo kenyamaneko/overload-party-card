@@ -38,6 +38,38 @@ paths:
         "500":
           description: DB 接続エラー
 
+  /internal/v1/products:
+    get:
+      operationId: listProducts
+      summary: 全プロダクト定義を返す (battle 起動時キャッシュロード用)
+      responses:
+        "200":
+          description: プロダクト定義一覧
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /api/v1/cards/products:
+    get:
+      operationId: listProductsForPlayer
+      summary: 全プロダクト定義を返す (client のデッキ構築・プロダクト表示用)
+      security:
+        - InternalAuth: []
+      responses:
+        "200":
+          description: プロダクト定義一覧
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+        "401":
+          description: 認証失敗
+
   /api/v1/cards/cards:
     get:
       operationId: listPlayerCards
@@ -547,6 +579,53 @@ components:
           type: object
           additionalProperties: true
 
+    # ─── Product ───────────────────────────────────────────────────────
+    Product:
+      type: object
+      description: 陣営に 1:1 で紐づくプロダクト定義。デッキのメタ情報で、施策を規定する。
+      required: [product_id, faction, product_name, initiatives]
+      properties:
+        product_id:
+          type: string
+          x-go-name: ProductID
+          description: プロダクト識別子 (例 PD-0001)
+        faction:
+          type: string
+          description: 紐づく陣営 (SHE / Tenki / Sugar / Tuners)
+        product_name:
+          type: string
+        initiatives:
+          type: array
+          items:
+            $ref: "#/components/schemas/Initiative"
+
+    Initiative:
+      type: object
+      description: プロダクトの施策。ルーチン (1ターン1回) / スペシャル (1ゲーム1回)。
+      required: [kind, name, insight_cost, effect_text, effect]
+      properties:
+        kind:
+          $ref: "#/components/schemas/InitiativeKind"
+        name:
+          type: string
+        insight_cost:
+          type: integer
+          format: int64
+        effect_text:
+          type: string
+          description: 効果テキスト (表示用)
+        effect:
+          type: object
+          additionalProperties: true
+          description: battle エンジンの効果 DSL (ops / custom)
+
+    InitiativeKind:
+      type: string
+      description: 施策の区分。
+      enum:
+        - routine
+        - special
+
     # ─── Deck ──────────────────────────────────────────────────────────
     Deck:
       type: object
@@ -555,6 +634,7 @@ components:
         - player_id
         - deck_id
         - deck_name
+        - faction
         - is_valid
         - created_at
         - updated_at
@@ -569,6 +649,9 @@ components:
           description: デッキ ID (自動採番)
         deck_name:
           type: string
+        faction:
+          type: string
+          description: 宣言陣営。宣言陣営と Neutral のカードのみ投入できる
         is_valid:
           type: boolean
           description: バトル使用可能か (都度算出)
@@ -626,10 +709,13 @@ components:
 
     DeckCreateRequest:
       type: object
-      required: [deck_name, cards]
+      required: [deck_name, faction, cards]
       properties:
         deck_name:
           type: string
+        faction:
+          type: string
+          description: 宣言陣営 (SHE / Tenki / Sugar / Tuners)
         cards:
           type: array
           items:
@@ -643,10 +729,13 @@ components:
 
     DeckUpdateRequest:
       type: object
-      required: [deck_name, cards]
+      required: [deck_name, faction, cards]
       properties:
         deck_name:
           type: string
+        faction:
+          type: string
+          description: 宣言陣営 (SHE / Tenki / Sugar / Tuners)
         cards:
           type: array
           items:

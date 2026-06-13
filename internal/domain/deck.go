@@ -9,6 +9,7 @@ type Deck struct {
 	PlayerID  string
 	DeckID    int64
 	DeckName  string
+	Faction   string
 	PlaymatNo *int64
 	SleeveNo  *int64
 	CreatedAt time.Time

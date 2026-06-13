@@ -67,6 +67,7 @@ CREATE TABLE card.decks (
   player_id   UUID NOT NULL, -- 所有プレイヤー (cross-schema reference to account.players; app-level integrity, not enforced by FK)
   deck_id     BIGINT NOT NULL GENERATED ALWAYS AS IDENTITY, -- デッキID（自動採番）
   deck_name   VARCHAR(50) NOT NULL,                  -- デッキ名
+  faction     VARCHAR(20) NOT NULL,                  -- 宣言陣営（SHE / Tenki / Sugar / Tuners。プロダクトを規定する）
   playmat_no  BIGINT,                                -- プレイマット番号（NULL: デフォルト）
   sleeve_no   BIGINT,                                -- スリーブ番号（NULL: デフォルト）
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),    -- 作成日時

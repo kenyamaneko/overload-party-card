@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	gamedesign "github.com/kenyamaneko/overload-party-common/packages/game-design-constants"
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
 	"github.com/kenyamaneko/overload-party-card/internal/constants"
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
 	"github.com/kenyamaneko/overload-party-card/internal/port"
 	"github.com/kenyamaneko/overload-party-card/internal/presenter"
 	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
+	gamedesign "github.com/kenyamaneko/overload-party-common/packages/game-design-constants"
 )
 
 // ErrNotFound は port.ErrNotFound の re-export です。
@@ -37,7 +37,7 @@ func (s *DeckInteractor) CreateDeck(ctx context.Context, playerID string, req ap
 	}
 
 	deckCardEntries := presenter.DeckCardEntriesFromRequest(req.Cards)
-	if err := s.validateDeckCards(deckCardEntries, ownedCards); err != nil {
+	if err := s.validateDeckCards(req.Faction, deckCardEntries, ownedCards); err != nil {
 		return nil, err
 	}
 
@@ -50,6 +50,7 @@ func (s *DeckInteractor) CreateDeck(ctx context.Context, playerID string, req ap
 	deck := domain.Deck{
 		PlayerID:  playerID,
 		DeckName:  req.DeckName,
+		Faction:   req.Faction,
 		PlaymatNo: req.PlaymatNo,
 		SleeveNo:  req.SleeveNo,
 		CreatedAt: now,
@@ -88,7 +89,7 @@ func (s *DeckInteractor) GetDecks(ctx context.Context, playerID string) ([]*apic
 		if err != nil {
 			return nil, fmt.Errorf("get deck cards for deck %d: %w", d.DeckID, err)
 		}
-		result[i] = presenter.ToDeck(d, cards, s.computeIsValid(cards, ownedCards))
+		result[i] = presenter.ToDeck(d, cards, s.computeIsValid(d.Faction, cards, ownedCards))
 	}
 	return result, nil
 }
@@ -119,7 +120,7 @@ func (s *DeckInteractor) UpdateDeck(ctx context.Context, playerID string, deckID
 	}
 
 	deckCardEntries := presenter.DeckCardEntriesFromRequest(req.Cards)
-	if err := s.validateDeckCards(deckCardEntries, ownedCards); err != nil {
+	if err := s.validateDeckCards(req.Faction, deckCardEntries, ownedCards); err != nil {
 		return nil, err
 	}
 
@@ -132,6 +133,7 @@ func (s *DeckInteractor) UpdateDeck(ctx context.Context, playerID string, deckID
 		PlayerID:  playerID,
 		DeckID:    deckID,
 		DeckName:  req.DeckName,
+		Faction:   req.Faction,
 		PlaymatNo: req.PlaymatNo,
 		SleeveNo:  req.SleeveNo,
 		UpdatedAt: time.Now(),
@@ -154,8 +156,13 @@ func (s *DeckInteractor) DeleteDeck(ctx context.Context, playerID string, deckID
 }
 
 // ValidateDeckForBattle はデッキがバトル可能かを検証します。
-// DeckSize 枚ちょうど・全カード所持・制限枚数以内を確認します。
+// DeckSize 枚ちょうど・全カード所持・制限枚数以内・宣言陣営との整合を確認します。
 func (s *DeckInteractor) ValidateDeckForBattle(ctx context.Context, playerID string, deckID int64) error {
+	deck, err := s.deckRepo.FindByID(ctx, playerID, deckID)
+	if err != nil {
+		return fmt.Errorf("find deck: %w", err)
+	}
+
 	deckCards, err := s.deckRepo.GetDeckCards(ctx, playerID, deckID)
 	if err != nil {
 		return fmt.Errorf("get deck cards: %w", err)
@@ -176,13 +183,17 @@ func (s *DeckInteractor) ValidateDeckForBattle(ctx context.Context, playerID str
 		return fmt.Errorf("get owned cards: %w", err)
 	}
 
-	return s.validateDeckCards(deckCardEntries, ownedCards)
+	return s.validateDeckCards(deck.Faction, deckCardEntries, ownedCards)
 }
 
-func (s *DeckInteractor) validateDeckCards(deckCardEntries []domain.DeckCardEntry, ownedCards []*domain.PlayerCard) error {
+func (s *DeckInteractor) validateDeckCards(faction string, deckCardEntries []domain.DeckCardEntry, ownedCards []*domain.PlayerCard) error {
 	type ownedKey struct {
 		cardID string
 		artNo  int64
+	}
+
+	if !isSelectableFaction(faction) {
+		return fmt.Errorf("%w: faction %q is not selectable", port.ErrInvalidDeck, faction)
 	}
 
 	totalCards := 0
@@ -218,6 +229,10 @@ func (s *DeckInteractor) validateDeckCards(deckCardEntries []domain.DeckCardEntr
 		if card == nil {
 			return fmt.Errorf("%w: card %s not found in card definitions", port.ErrInvalidDeck, cardID)
 		}
+		if card.Faction != faction && card.Faction != gamedesign.FactionNeutral {
+			return fmt.Errorf("%w: card %s (%s): deck faction is %s, only %s and Neutral cards are allowed",
+				port.ErrInvalidDeck, cardID, card.Faction, faction, faction)
+		}
 		limit, ok := gamedesign.RestrictionCopyCount[card.Restriction]
 		if !ok {
 			return fmt.Errorf("card %s: unknown restriction %q", cardID, card.Restriction)
@@ -231,7 +246,7 @@ func (s *DeckInteractor) validateDeckCards(deckCardEntries []domain.DeckCardEntr
 	return nil
 }
 
-func (s *DeckInteractor) computeIsValid(deckCards []domain.DeckCard, ownedCards []*domain.PlayerCard) bool {
+func (s *DeckInteractor) computeIsValid(faction string, deckCards []domain.DeckCard, ownedCards []*domain.PlayerCard) bool {
 	totalCards := 0
 	for _, dc := range deckCards {
 		totalCards += dc.Count
@@ -241,5 +256,15 @@ func (s *DeckInteractor) computeIsValid(deckCards []domain.DeckCard, ownedCards 
 	}
 
 	deckCardEntries := domain.DeckCardEntriesFromCards(deckCards)
-	return s.validateDeckCards(deckCardEntries, ownedCards) == nil
+	return s.validateDeckCards(faction, deckCardEntries, ownedCards) == nil
+}
+
+// isSelectableFaction は faction がプレイヤーの選択可能な陣営かを判定します。
+func isSelectableFaction(faction string) bool {
+	for _, f := range gamedesign.SelectableFactions {
+		if f == faction {
+			return true
+		}
+	}
+	return false
 }

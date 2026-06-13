@@ -17,9 +17,10 @@ card は以下の機能ドメインを所有する。
 | 機能 | 主要な責務 |
 |---|---|
 | カードマスター配信 | 全カード定義を battle / gateway 向けに返す（SSoT） |
+| プロダクトマスター配信 | 陣営 1:1 のプロダクト定義（施策の効果 DSL 込み）を battle / client 向けに返す（SSoT） |
 | 所持カード照会 | プレイヤーの所持カード一覧・カード定義付き形式での返却 |
-| デッキ CRUD | プレイヤー単位のデッキ作成・更新・削除・一覧 |
-| デッキバリデーション | 枚数・所持・制限ルールの検証（都度算出） |
+| デッキ CRUD | プレイヤー単位のデッキ作成・更新・削除・一覧（陣営を宣言して構築） |
+| デッキバリデーション | 枚数・所持・制限・陣営整合ルールの検証（都度算出） |
 | バトル前検証 | `validate-for-battle` でバトル開始前のゲートキーパー |
 | カードパック配布 | 初回ファクション選択時・ショップ購入時のカード付与 |
 | Pub/Sub 消費 | `card-pack-purchased` / `player-onboarded` を購読しパック配布をイベント駆動で実行 |
@@ -48,6 +49,15 @@ card は **card スキーマの DB 行とカード定義 YAML (SSoT) を唯一�
 
 card 自身は `cache.CardCache` に起動時にロードし、以降はメモリから参照する。ロード失敗で card は起動しない（fail-fast）。
 
+### 2.3 プロダクトマスター
+
+- `data/products.yaml` がプロダクトデータの SSoT
+- `scripts/generate_products.py` が検証（選択可能な全陣営に 1:1、ルーチン / スペシャル網羅）と `data/cache/products_gen.json` の生成を行う
+- プロダクトは DB に持たず、embed 済み JSON を `cache.ProductCache` に起動時ロードして配信する（4 件の静的マスターで運用変更は YAML 更新 + デプロイで行うため）
+- `GET /internal/v1/products`（battle 起動時ロード用、認証なし）と `GET /api/v1/cards/products`（client 用、InternalAuth）で配信する
+
+プロダクトデータの意味定義は [PRODUCTS.md](PRODUCTS.md) を参照。
+
 ---
 
 ## 3. 所持カード (`player_cards`)
@@ -67,6 +77,8 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 
 ### 4.1 デッキ制約
 
+- デッキは陣営（`decks.faction`）を 1 つ宣言する。宣言できるのは選択可能な陣営（`SelectableFactions`）のみ
+- 構成カードは宣言陣営と Neutral のカードのみ（混成不可）
 - デッキ枚数: ちょうど `constants.DeckSize`（= 30）枚
 - 構成カード全てをプレイヤーが所持していること（`player_cards.count >= deck_cards.count`）
 - 各カードが `card_definitions.restriction` の上限枚数以内であること
@@ -90,10 +102,12 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 
 1. 所持カード取得
 2. `validateDeckCards`:
-   1. 各エントリの `count > 0` チェック（`ErrInvalidDeck`）
-   2. 総枚数 ≤ `DeckSize` チェック（`ErrInvalidDeck`）
-   3. 各 `(card_id, art_no)` について所持枚数 ≥ 要求枚数（`ErrUnowned`）
-   4. 各 `card_id` の合計枚数 ≤ restriction 上限（`ErrRestrictionExceeded`）
+   1. 宣言陣営が `SelectableFactions` に含まれること（`ErrInvalidDeck`）
+   2. 各エントリの `count > 0` チェック（`ErrInvalidDeck`）
+   3. 総枚数 ≤ `DeckSize` チェック（`ErrInvalidDeck`）
+   4. 各 `(card_id, art_no)` について所持枚数 ≥ 要求枚数（`ErrUnowned`）
+   5. 各カードの陣営が宣言陣営または Neutral であること（`ErrInvalidDeck`）
+   6. 各 `card_id` の合計枚数 ≤ restriction 上限（`ErrRestrictionExceeded`）
 3. 書き込み（デッキ行 + deck_cards）
 4. 返却時に DeckCards を populate
 
@@ -105,10 +119,11 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 
 チェック順序:
 
-1. `deck_cards` 取得
-2. 総枚数 == `DeckSize`（`ErrInvalidDeck`）
-3. 所持カード取得
-4. `validateDeckCards`（3.3 と同じ）
+1. デッキヘッダ取得（宣言陣営の解決）
+2. `deck_cards` 取得
+3. 総枚数 == `DeckSize`（`ErrInvalidDeck`）
+4. 所持カード取得
+5. `validateDeckCards`（4.3 と同じ）
 
 ### 4.5 デッキ削除
 

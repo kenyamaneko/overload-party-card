@@ -15,6 +15,7 @@ func New(
 	cardH *rest.CardHandler,
 	deckH *rest.DeckHandler,
 	playerCardH *rest.PlayerCardHandler,
+	productH *rest.ProductHandler,
 	authVerifier internalauth.Verifier,
 ) *gin.Engine {
 	r := gin.New()
@@ -29,6 +30,7 @@ func New(
 	internal := r.Group("/internal/v1")
 	{
 		internal.GET("/cards", cardH.ListAllRaw)
+		internal.GET("/products", productH.ListAll)
 	}
 
 	// gateway 経由の player-scoped API。internalauth middleware が JWT 検証して
@@ -38,6 +40,7 @@ func New(
 	{
 		api.GET("/cards", playerCardH.GetPlayerCards)
 		api.GET("/cards/with-ownership", cardH.ListForPlayer)
+		api.GET("/products", productH.ListAll)
 		api.GET("/decks", deckH.GetDecks)
 		api.GET("/decks/:deckId", deckH.GetDeck)
 		api.POST("/decks", deckH.CreateDeck)

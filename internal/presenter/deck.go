@@ -12,6 +12,7 @@ func ToDeck(d *domain.Deck, cards []domain.DeckCard, isValid bool) *apicard.Deck
 		PlayerID:  d.PlayerID,
 		DeckID:    d.DeckID,
 		DeckName:  d.DeckName,
+		Faction:   d.Faction,
 		IsValid:   isValid,
 		PlaymatNo: d.PlaymatNo,
 		SleeveNo:  d.SleeveNo,

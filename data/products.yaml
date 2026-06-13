@@ -1,0 +1,110 @@
+# Product master data (SSoT).
+#
+# プロダクトは陣営に 1:1 で紐づくデッキのメタ情報。カードではなく、デッキが宣言した
+# 陣営のプロダクトがルーチン (1ターン1回) / スペシャル (1ゲーム1回) の施策を規定する。
+#
+# Consumed by scripts/generate_products.py to generate:
+#   - data/cache/products_gen.json (Go embed; /internal/v1/products と /api/v1/cards/products で配信)
+#   - docs/PRODUCTS.md (human-readable product list)
+#
+# effect は battle エンジンの効果 DSL (ops / custom) で記述する。施策はプレイヤーの
+# use_initiative アクションで発動するため trigger は持たない。
+#
+# 台風の amount とお裾分けの insight_cost はシミュレーション前の暫定値。
+
+products:
+  - product_id: PD-0001
+    faction: SHE
+    product_name: ECサイト
+    initiatives:
+      - kind: routine
+        name: 物欲刺激
+        insight_cost: 400
+        effect_text: "相手の表向きリソース 1体につき、相手の Budget を -100 する。"
+        effect:
+          ops:
+            - lose_budget:
+                target: opponent
+                amount: 100
+                per_count: { owner: opponent }
+      - kind: special
+        name: 大感謝セール
+        insight_cost: 0
+        effect_text: "Insightプールの全 Insight を消費し、1.5倍の Budget に変換する。スループットによる変換上限を無視する。"
+        effect:
+          custom: convert_all_insight
+          params:
+            multiplier_percent: 150
+
+  - product_id: PD-0002
+    faction: Tenki
+    product_name: 天気予報アプリ
+    initiatives:
+      - kind: routine
+        name: 天候予測
+        insight_cost: 150
+        effect_text: "相手のサポートゾーンの伏せカード 1枚を選択して確認する。"
+        effect:
+          ops:
+            - peek_reactive: {}
+      - kind: special
+        name: 台風
+        insight_cost: 400
+        effect_text: "相手の表向きリソース全体に 300 ダメージを与える。"
+        effect:
+          ops:
+            - deal_damage:
+                selector: { owner: opponent }
+                amount: 300
+            - destroy_check: { target: opponent }
+
+  - product_id: PD-0003
+    faction: Sugar
+    product_name: レシピアプリ
+    initiatives:
+      - kind: routine
+        name: 焼きたてのお菓子
+        insight_cost: 300
+        effect_text: "味方リソース 1体の可用性を 300 回復する。可用性上限を超えない。"
+        effect:
+          ops:
+            - heal_damage:
+                selector: { owner: myself, pick: choice }
+                amount: 300
+      - kind: special
+        name: お裾分け
+        insight_cost: 600
+        effect_text: "相手の表向きリソース全体を休止にする。"
+        effect:
+          ops:
+            - apply_buff:
+                selector: { owner: opponent }
+                buff: dormant
+                amount: 1
+                duration: until_next_turn_end
+
+  - product_id: PD-0004
+    faction: Tuners
+    product_name: 音楽配信サイト
+    initiatives:
+      - kind: routine
+        name: BGM配信
+        insight_cost: 300
+        effect_text: "このターン、味方の表向きリソース全体のスループットを +200 する。"
+        effect:
+          ops:
+            - apply_buff:
+                selector: { owner: myself }
+                buff: tp
+                amount: 200
+                duration: this_turn
+      - kind: special
+        name: フェス開催
+        insight_cost: 500
+        effect_text: "自分の表向きリソース 1体につき、Budget を +150 する。"
+        effect:
+          ops:
+            - gain_budget:
+                target: myself
+                amount: 150
+                per_count: { owner: myself }

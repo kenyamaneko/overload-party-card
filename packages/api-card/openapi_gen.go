@@ -36,6 +36,24 @@ func (e AttachmentEffectType) Valid() bool {
 	}
 }
 
+// Defines values for InitiativeKind.
+const (
+	InitiativeKindRoutine InitiativeKind = "routine"
+	InitiativeKindSpecial InitiativeKind = "special"
+)
+
+// Valid indicates whether the value is a known member of the InitiativeKind enum.
+func (e InitiativeKind) Valid() bool {
+	switch e {
+	case InitiativeKindRoutine:
+		return true
+	case InitiativeKindSpecial:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PassiveEffectType.
 const (
 	PassiveEffectTypeAvBonus             PassiveEffectType = "av_bonus"
@@ -201,6 +219,9 @@ type Deck struct {
 	DeckID   int64  `json:"deck_id"`
 	DeckName string `json:"deck_name"`
 
+	// Faction 宣言陣営。宣言陣営と Neutral のカードのみ投入できる
+	Faction string `json:"faction"`
+
 	// IsValid バトル使用可能か (都度算出)
 	IsValid   bool      `json:"is_valid"`
 	PlayerID  string    `json:"player_id"`
@@ -227,10 +248,13 @@ type DeckCardEntry struct {
 
 // DeckCreateRequest defines model for DeckCreateRequest.
 type DeckCreateRequest struct {
-	Cards     []DeckCardEntry `json:"cards"`
-	DeckName  string          `json:"deck_name"`
-	PlaymatNo *int64          `json:"playmat_no,omitempty"`
-	SleeveNo  *int64          `json:"sleeve_no,omitempty"`
+	Cards    []DeckCardEntry `json:"cards"`
+	DeckName string          `json:"deck_name"`
+
+	// Faction 宣言陣営 (SHE / Tenki / Sugar / Tuners)
+	Faction   string `json:"faction"`
+	PlaymatNo *int64 `json:"playmat_no,omitempty"`
+	SleeveNo  *int64 `json:"sleeve_no,omitempty"`
 }
 
 // DeckDetailResponse GET /players/{playerId}/decks/{deckId} のレスポンス封筒。
@@ -243,16 +267,36 @@ type DeckDetailResponse struct {
 
 // DeckUpdateRequest defines model for DeckUpdateRequest.
 type DeckUpdateRequest struct {
-	Cards     []DeckCardEntry `json:"cards"`
-	DeckName  string          `json:"deck_name"`
-	PlaymatNo *int64          `json:"playmat_no,omitempty"`
-	SleeveNo  *int64          `json:"sleeve_no,omitempty"`
+	Cards    []DeckCardEntry `json:"cards"`
+	DeckName string          `json:"deck_name"`
+
+	// Faction 宣言陣営 (SHE / Tenki / Sugar / Tuners)
+	Faction   string `json:"faction"`
+	PlaymatNo *int64 `json:"playmat_no,omitempty"`
+	SleeveNo  *int64 `json:"sleeve_no,omitempty"`
 }
 
 // HealthResponse defines model for HealthResponse.
 type HealthResponse struct {
 	Status string `json:"status"`
 }
+
+// Initiative プロダクトの施策。ルーチン (1ターン1回) / スペシャル (1ゲーム1回)。
+type Initiative struct {
+	// Effect battle エンジンの効果 DSL (ops / custom)
+	Effect map[string]interface{} `json:"effect"`
+
+	// EffectText 効果テキスト (表示用)
+	EffectText  string `json:"effect_text"`
+	InsightCost int64  `json:"insight_cost"`
+
+	// Kind 施策の区分。
+	Kind InitiativeKind `json:"kind"`
+	Name string         `json:"name"`
+}
+
+// InitiativeKind 施策の区分。
+type InitiativeKind string
 
 // PassiveEffect defines model for PassiveEffect.
 type PassiveEffect struct {
@@ -294,6 +338,17 @@ type PlayerCardWithDef struct {
 	Restriction   string          `json:"restriction"`
 	Stats         json.RawMessage `json:"stats"`
 	Subtype       *string         `json:"subtype,omitempty"`
+}
+
+// Product 陣営に 1:1 で紐づくプロダクト定義。デッキのメタ情報で、施策を規定する。
+type Product struct {
+	// Faction 紐づく陣営 (SHE / Tenki / Sugar / Tuners)
+	Faction     string       `json:"faction"`
+	Initiatives []Initiative `json:"initiatives"`
+
+	// ProductID プロダクト識別子 (例 PD-0001)
+	ProductID   string `json:"product_id"`
+	ProductName string `json:"product_name"`
 }
 
 // DeckIdPath defines model for DeckIdPath.
@@ -409,11 +464,17 @@ type ClientInterface interface {
 	// ValidateDeckForBattle request
 	ValidateDeckForBattle(ctx context.Context, deckId DeckIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListProductsForPlayer request
+	ListProductsForPlayer(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetHealth request
 	GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListCards request
 	ListCards(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListProducts request
+	ListProducts(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) ListPlayerCards(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -536,6 +597,18 @@ func (c *Client) ValidateDeckForBattle(ctx context.Context, deckId DeckIdPath, r
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListProductsForPlayer(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListProductsForPlayerRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetHealthRequest(c.Server)
 	if err != nil {
@@ -550,6 +623,18 @@ func (c *Client) GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (
 
 func (c *Client) ListCards(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListCardsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListProducts(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListProductsRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -830,6 +915,33 @@ func NewValidateDeckForBattleRequest(server string, deckId DeckIdPath) (*http.Re
 	return req, nil
 }
 
+// NewListProductsForPlayerRequest generates requests for ListProductsForPlayer
+func NewListProductsForPlayerRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/cards/products")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetHealthRequest generates requests for GetHealth
 func NewGetHealthRequest(server string) (*http.Request, error) {
 	var err error
@@ -867,6 +979,33 @@ func NewListCardsRequest(server string) (*http.Request, error) {
 	}
 
 	operationPath := fmt.Sprintf("/internal/v1/cards")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListProductsRequest generates requests for ListProducts
+func NewListProductsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/v1/products")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -955,11 +1094,17 @@ type ClientWithResponsesInterface interface {
 	// ValidateDeckForBattleWithResponse request
 	ValidateDeckForBattleWithResponse(ctx context.Context, deckId DeckIdPath, reqEditors ...RequestEditorFn) (*ValidateDeckForBattleResponse, error)
 
+	// ListProductsForPlayerWithResponse request
+	ListProductsForPlayerWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListProductsForPlayerResponse, error)
+
 	// GetHealthWithResponse request
 	GetHealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetHealthResponse, error)
 
 	// ListCardsWithResponse request
 	ListCardsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCardsResponse, error)
+
+	// ListProductsWithResponse request
+	ListProductsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListProductsResponse, error)
 }
 
 type ListPlayerCardsResponse struct {
@@ -1200,6 +1345,36 @@ func (r ValidateDeckForBattleResponse) ContentType() string {
 	return ""
 }
 
+type ListProductsForPlayerResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]Product
+}
+
+// Status returns HTTPResponse.Status
+func (r ListProductsForPlayerResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListProductsForPlayerResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListProductsForPlayerResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetHealthResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1254,6 +1429,36 @@ func (r ListCardsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListCardsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListProductsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]Product
+}
+
+// Status returns HTTPResponse.Status
+func (r ListProductsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListProductsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListProductsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -1348,6 +1553,15 @@ func (c *ClientWithResponses) ValidateDeckForBattleWithResponse(ctx context.Cont
 	return ParseValidateDeckForBattleResponse(rsp)
 }
 
+// ListProductsForPlayerWithResponse request returning *ListProductsForPlayerResponse
+func (c *ClientWithResponses) ListProductsForPlayerWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListProductsForPlayerResponse, error) {
+	rsp, err := c.ListProductsForPlayer(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListProductsForPlayerResponse(rsp)
+}
+
 // GetHealthWithResponse request returning *GetHealthResponse
 func (c *ClientWithResponses) GetHealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetHealthResponse, error) {
 	rsp, err := c.GetHealth(ctx, reqEditors...)
@@ -1364,6 +1578,15 @@ func (c *ClientWithResponses) ListCardsWithResponse(ctx context.Context, reqEdit
 		return nil, err
 	}
 	return ParseListCardsResponse(rsp)
+}
+
+// ListProductsWithResponse request returning *ListProductsResponse
+func (c *ClientWithResponses) ListProductsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListProductsResponse, error) {
+	rsp, err := c.ListProducts(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListProductsResponse(rsp)
 }
 
 // ParseListPlayerCardsResponse parses an HTTP response from a ListPlayerCardsWithResponse call
@@ -1554,6 +1777,32 @@ func ParseValidateDeckForBattleResponse(rsp *http.Response) (*ValidateDeckForBat
 	return response, nil
 }
 
+// ParseListProductsForPlayerResponse parses an HTTP response from a ListProductsForPlayerWithResponse call
+func ParseListProductsForPlayerResponse(rsp *http.Response) (*ListProductsForPlayerResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListProductsForPlayerResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []Product
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetHealthResponse parses an HTTP response from a GetHealthWithResponse call
 func ParseGetHealthResponse(rsp *http.Response) (*GetHealthResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -1596,6 +1845,32 @@ func ParseListCardsResponse(rsp *http.Response) (*ListCardsResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest []CardDefinition
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListProductsResponse parses an HTTP response from a ListProductsWithResponse call
+func ParseListProductsResponse(rsp *http.Response) (*ListProductsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListProductsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []Product
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

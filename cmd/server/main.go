@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 
+	gencache "github.com/kenyamaneko/overload-party-card/data/cache"
 	pubsubadapter "github.com/kenyamaneko/overload-party-card/internal/adapter/pubsub"
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
 	"github.com/kenyamaneko/overload-party-card/internal/config"
@@ -61,6 +62,11 @@ func run() error {
 		return fmt.Errorf("load card cache: %w", err)
 	}
 
+	productCache := cache.NewProductCache()
+	if err := productCache.LoadFromBytes(gencache.ProductsJSON); err != nil {
+		return fmt.Errorf("load product cache: %w", err)
+	}
+
 	cardInteractor := usecase.NewCardInteractor(cardRepo, playerCardRepo)
 	deckInteractor := usecase.NewDeckInteractor(deckRepo, playerCardRepo, cardCache)
 	playerCardInteractor := usecase.NewPlayerCardInteractor(playerCardRepo, cardCache)
@@ -69,12 +75,13 @@ func run() error {
 	cardH := rest.NewCardHandler(cardInteractor)
 	deckH := rest.NewDeckHandler(deckInteractor)
 	playerCardH := rest.NewPlayerCardHandler(playerCardInteractor)
+	productH := rest.NewProductHandler(productCache)
 
 	authVerifier := internalauth.NewVerifier(
 		internalauth.StaticHS256Resolver([]byte(cfg.InternalAuthSecret), internalauth.DefaultKeyID),
 	)
 
-	r := router.New(cardH, deckH, playerCardH, authVerifier)
+	r := router.New(cardH, deckH, playerCardH, productH, authVerifier)
 
 	onboardedStream, err := pubsubadapter.NewStream(ctx, cfg.GoogleCloudProjectID, cfg.PlayerOnboardedSubscription)
 	if err != nil {
@@ -108,6 +115,7 @@ func run() error {
 	slog.Info("card starting",
 		"addr", srv.Addr,
 		"card_cache_size", cardCache.Count(),
+		"product_cache_size", productCache.Count(),
 		"google_cloud_project", cfg.GoogleCloudProjectID,
 	)
 

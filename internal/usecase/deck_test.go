@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
+	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 )
 
 type mockDeckRepo struct {
@@ -114,10 +114,11 @@ func setupDeckInteractor() (*DeckInteractor, *mockDeckRepo, *inMemoryPlayerCardR
 		{"C-004", "Strategy A", "SHE", "Strategy"},
 		{"C-005", "Incident A", "SHE", "Incident"},
 		{"C-006", "Platform A", "SHE", "Platform"},
-		{"C-007", "Compute C", "Tenki", "Compute"},
-		{"C-008", "Database B", "Tenki", "Database"},
-		{"C-009", "Strategy B", "Tenki", "Strategy"},
-		{"C-010", "Incident B", "Tenki", "Incident"},
+		{"C-007", "Compute C", "Neutral", "Compute"},
+		{"C-008", "Database B", "Neutral", "Database"},
+		{"C-009", "Strategy B", "Neutral", "Strategy"},
+		{"C-010", "Incident B", "Neutral", "Incident"},
+		{"C-011", "Compute D", "Tenki", "Compute"},
 	}
 	for _, c := range unlimitedCards {
 		cc.InjectForTest(c.id, &domain.Card{
@@ -225,12 +226,14 @@ func TestCreateDeck_Validity(t *testing.T) {
 
 			deck, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
 				DeckName: tt.deckName,
+				Faction:  "SHE",
 				Cards:    tt.entries,
 			})
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantValid, deck.IsValid)
 			assert.Equal(t, tt.deckName, deck.DeckName)
+			assert.Equal(t, "SHE", deck.Faction)
 		})
 	}
 }
@@ -238,12 +241,53 @@ func TestCreateDeck_Validity(t *testing.T) {
 func TestCreateDeck_ValidationErrors(t *testing.T) {
 	tests := []struct {
 		name       string
+		faction    string
 		grant      func(pcRepo *inMemoryPlayerCardRepo, pid string)
 		entries    []apicard.DeckCardEntry
 		wantErrMsg string
 	}{
 		{
-			name: "31 cards exceeds max",
+			name:    "faction missing",
+			faction: "",
+			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
+				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
+			},
+			entries:    makeEntries("C-001", 3),
+			wantErrMsg: `faction "" is not selectable`,
+		},
+		{
+			name:    "faction Neutral is not selectable",
+			faction: "Neutral",
+			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
+				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-007", ArtNo: 0, Count: 3})
+			},
+			entries:    makeEntries("C-007", 3),
+			wantErrMsg: `faction "Neutral" is not selectable`,
+		},
+		{
+			name:    "faction unknown",
+			faction: "Atlantis",
+			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
+				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
+			},
+			entries:    makeEntries("C-001", 3),
+			wantErrMsg: `faction "Atlantis" is not selectable`,
+		},
+		{
+			name:    "other-faction card in deck",
+			faction: "SHE",
+			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
+				grantCards(pcRepo, pid,
+					&domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3},
+					&domain.PlayerCard{CardID: "C-011", ArtNo: 0, Count: 1},
+				)
+			},
+			entries:    makeEntries("C-001", 3, "C-011", 1),
+			wantErrMsg: "only SHE and Neutral cards are allowed",
+		},
+		{
+			name:    "31 cards exceeds max",
+			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantUnlimited(pcRepo, pid, allTenCards...)
 				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-050", ArtNo: 0, Count: 1})
@@ -256,7 +300,8 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: "deck cannot exceed 30 cards",
 		},
 		{
-			name: "unowned card",
+			name:    "unowned card",
+			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
 			},
@@ -264,7 +309,8 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: "not enough owned",
 		},
 		{
-			name: "unlimited card 4 copies (max 3)",
+			name:    "unlimited card 4 copies (max 3)",
+			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 4})
 			},
@@ -272,7 +318,8 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: "exceeds restriction limit (4/3)",
 		},
 		{
-			name: "limited card 2 copies (max 1)",
+			name:    "limited card 2 copies (max 1)",
+			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-050", ArtNo: 0, Count: 2})
 			},
@@ -280,7 +327,8 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: "exceeds restriction limit (2/1)",
 		},
 		{
-			name: "semi_limited card 3 copies (max 2)",
+			name:    "semi_limited card 3 copies (max 2)",
+			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-060", ArtNo: 0, Count: 3})
 			},
@@ -288,7 +336,8 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: "exceeds restriction limit (3/2)",
 		},
 		{
-			name: "count = 0",
+			name:    "count = 0",
+			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
 			},
@@ -296,7 +345,8 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: "count must be positive",
 		},
 		{
-			name: "count = -1",
+			name:    "count = -1",
+			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
 			},
@@ -304,7 +354,8 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: "count must be positive",
 		},
 		{
-			name: "card not in definitions",
+			name:    "card not in definitions",
+			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-999", ArtNo: 0, Count: 3})
 			},
@@ -312,7 +363,8 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: "card C-999 not found in card definitions",
 		},
 		{
-			name: "cross-variant exceeds restriction",
+			name:    "cross-variant exceeds restriction",
+			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid,
 					&domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3},
@@ -335,6 +387,7 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 
 			_, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
 				DeckName: "Test",
+				Faction:  tt.faction,
 				Cards:    tt.entries,
 			})
 
@@ -363,6 +416,7 @@ func TestCreateDeck_RestrictionAtLimit(t *testing.T) {
 
 			_, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
 				DeckName: "OK Deck",
+				Faction:  "SHE",
 				Cards:    makeEntries(tt.cardID, tt.count),
 			})
 
@@ -377,13 +431,13 @@ func TestUpdateDeck(t *testing.T) {
 	grantUnlimited(pcRepo, pid, allTenCards...)
 
 	created, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-		DeckName: "Original", Cards: makeEntries("C-001", 3, "C-002", 3),
+		DeckName: "Original", Faction: "SHE", Cards: makeEntries("C-001", 3, "C-002", 3),
 	})
 	require.NoError(t, err)
 	assert.False(t, created.IsValid)
 
 	updated, err := svc.UpdateDeck(context.Background(), pid, created.DeckID, apicard.DeckUpdateRequest{
-		DeckName: "Updated Full", Cards: full30Entries(),
+		DeckName: "Updated Full", Faction: "SHE", Cards: full30Entries(),
 	})
 
 	require.NoError(t, err)
@@ -399,7 +453,7 @@ func TestDeleteDeck(t *testing.T) {
 	grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
 
 	created, _ := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-		DeckName: "To Delete", Cards: makeEntries("C-001", 3),
+		DeckName: "To Delete", Faction: "SHE", Cards: makeEntries("C-001", 3),
 	})
 
 	err := svc.DeleteDeck(context.Background(), pid, created.DeckID)
@@ -414,7 +468,7 @@ func TestValidateDeckForBattle_Full30Cards(t *testing.T) {
 	grantUnlimited(pcRepo, pid, allTenCards...)
 
 	deck, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-		DeckName: "Full Deck", Cards: full30Entries(),
+		DeckName: "Full Deck", Faction: "SHE", Cards: full30Entries(),
 	})
 	require.NoError(t, err)
 
@@ -428,7 +482,7 @@ func TestValidateDeckForBattle_PartialDeck(t *testing.T) {
 	grantUnlimited(pcRepo, pid, "C-001", "C-002")
 
 	deck, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-		DeckName: "Partial", Cards: makeEntries("C-001", 3, "C-002", 3),
+		DeckName: "Partial", Faction: "SHE", Cards: makeEntries("C-001", 3, "C-002", 3),
 	})
 	require.NoError(t, err)
 
