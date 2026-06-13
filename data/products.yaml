@@ -25,15 +25,18 @@ products:
           ops:
             - lose_budget:
                 target: opponent
-                amount: 100
-                per_count: { owner: opponent }
+                amount:
+                  base: 0
+                  per:
+                    count: { owner: opponent }
+                    value: 100
       - kind: special
         name: 大感謝セール
         insight_cost: 0
         effect_text: "Insightプールの全 Insight を消費し、1.5倍の Budget に変換する。スループットによる変換上限を無視する。"
         effect:
           custom: convert_all_insight
-          params:
+          meta:
             multiplier_percent: 150
 
   - product_id: PD-0002
@@ -106,5 +109,8 @@ products:
           ops:
             - gain_budget:
                 target: myself
-                amount: 150
-                per_count: { owner: myself }
+                amount:
+                  base: 0
+                  per:
+                    count: { owner: myself }
+                    value: 150
