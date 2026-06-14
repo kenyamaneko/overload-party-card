@@ -6,7 +6,8 @@
 #
 # Consumed by scripts/generate_products.py (initiatives.yaml と併せて読み込まれる) to generate:
 #   - data/cache/products_gen.json (Go embed; /internal/v1/products と /api/v1/cards/products で配信)
-#   - db/seed/products_seed.sql (PostgreSQL UPSERT seed)
+#   - db/seed/products_seed.sql (PostgreSQL UPSERT seed: products)
+#   - db/seed/initiatives_seed.sql (PostgreSQL UPSERT seed: initiatives)
 #   - docs/PRODUCTS.md (human-readable product list)
 
 products:

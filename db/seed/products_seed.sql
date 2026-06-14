@@ -11,31 +11,3 @@ ON CONFLICT (product_id) DO UPDATE SET
   product_name = EXCLUDED.product_name,
   updated_at   = now();
 
-INSERT INTO card.initiatives
-  (initiative_id, product_id, kind, name, insight_cost, effect_text, effect)
-VALUES
-  ('IN-0001', 'PD-0001', 'routine', '物欲刺激', 400, '相手の表向きリソース 1体につき、相手の Budget を -100 する。',
-   '{"ops": [{"lose_budget": {"target": "opponent", "amount": {"base": 0, "per": {"count": {"owner": "opponent"}, "value": 100}}}}]}'::jsonb),
-  ('IN-0002', 'PD-0001', 'special', '大感謝セール', 0, 'Insightプールの全 Insight を消費し、1.5倍の Budget に変換する。スループットによる変換上限を無視する。',
-   '{"custom": "convert_all_insight", "meta": {"multiplier_percent": 150}}'::jsonb),
-  ('IN-0003', 'PD-0002', 'routine', '天候予測', 150, '相手のサポートゾーンの伏せカード 1枚を選択して確認する。',
-   '{"ops": [{"peek_reactive": {}}]}'::jsonb),
-  ('IN-0004', 'PD-0002', 'special', '台風', 400, '相手の表向きリソース全体に 300 ダメージを与える。',
-   '{"ops": [{"deal_damage": {"selector": {"owner": "opponent"}, "amount": 300}}, {"destroy_check": {"target": "opponent"}}]}'::jsonb),
-  ('IN-0005', 'PD-0003', 'routine', '焼きたてのお菓子', 300, '味方リソース 1体の可用性を 300 回復する。可用性上限を超えない。',
-   '{"ops": [{"heal_damage": {"selector": {"owner": "myself", "pick": "choice"}, "amount": 300}}]}'::jsonb),
-  ('IN-0006', 'PD-0003', 'special', 'お裾分け', 600, '相手の表向きリソース全体を休止にする。',
-   '{"ops": [{"apply_buff": {"selector": {"owner": "opponent"}, "buff": "dormant", "amount": 1, "duration": "until_next_turn_end"}}]}'::jsonb),
-  ('IN-0007', 'PD-0004', 'routine', 'BGM配信', 300, 'このターン、味方の表向きリソース全体のスループットを +200 する。',
-   '{"ops": [{"apply_buff": {"selector": {"owner": "myself"}, "buff": "tp", "amount": 200, "duration": "this_turn"}}]}'::jsonb),
-  ('IN-0008', 'PD-0004', 'special', 'フェス開催', 500, '自分の表向きリソース 1体につき、Budget を +150 する。',
-   '{"ops": [{"gain_budget": {"target": "myself", "amount": {"base": 0, "per": {"count": {"owner": "myself"}, "value": 150}}}}]}'::jsonb)
-ON CONFLICT (initiative_id) DO UPDATE SET
-  product_id   = EXCLUDED.product_id,
-  kind         = EXCLUDED.kind,
-  name         = EXCLUDED.name,
-  insight_cost = EXCLUDED.insight_cost,
-  effect_text  = EXCLUDED.effect_text,
-  effect       = EXCLUDED.effect,
-  updated_at   = now();
-
