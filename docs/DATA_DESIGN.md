@@ -97,7 +97,10 @@ Platform / Attachment / Strategy / Incident / Reactive には `stats` フィー�
 | `player_id` | UUID | No | 所有プレイヤー (cross-schema reference to account.players; app-level integrity, not enforced by FK) |
 | `deck_id` | BIGINT (IDENTITY) | No | デッキID（自動採番） |
 | `deck_name` | VARCHAR(50) | No | デッキ名 |
-| `faction` | VARCHAR(20) | No | 宣言陣営（SHE / Tenki / Sugar / Tuners。プロダクトを規定する） |
+| `faction` | VARCHAR(20) | No | 宣言陣営（SHE / Tenki / Sugar / Tuners） |
+| `product_id` | VARCHAR(10) | No | 選択したプロダクトの ID（宣言陣営に属する） |
+| `routine_id` | VARCHAR(10) | No | セットしたルーチン施策の ID（選択プロダクトに属する） |
+| `special_id` | VARCHAR(10) | No | セットしたスペシャル施策の ID（選択プロダクトに属する） |
 | `playmat_no` | BIGINT | Yes | プレイマット番号（NULL: デフォルト） |
 | `sleeve_no` | BIGINT | Yes | スリーブ番号（NULL: デフォルト） |
 | `created_at` | TIMESTAMPTZ | No | 作成日時 |

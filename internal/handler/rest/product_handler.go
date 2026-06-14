@@ -19,7 +19,6 @@ func NewProductHandler(products *cache.ProductCache) *ProductHandler {
 }
 
 // ListAll はプロダクト定義全件を返します。
-// battle 起動時のキャッシュロードと client のプロダクト表示で使用されます。
 func (h *ProductHandler) ListAll(c *gin.Context) {
 	c.JSON(http.StatusOK, h.products.All())
 }

@@ -51,6 +51,9 @@ func TestCreate(t *testing.T) {
 				PlayerID:  playerA,
 				DeckName:  "Starter",
 				Faction:   "SHE",
+				ProductID: "PD-TST",
+				RoutineID: "IN-TST-R",
+				SpecialID: "IN-TST-S",
 				CreatedAt: now,
 				UpdatedAt: now,
 			}
@@ -241,6 +244,9 @@ func TestUpdate(t *testing.T) {
 		DeckID:    deckID,
 		DeckName:  "Renamed",
 		Faction:   "Tenki",
+		ProductID: "PD-TST2",
+		RoutineID: "IN-TST-R2",
+		SpecialID: "IN-TST-S2",
 		PlaymatNo: &newPlaymat,
 		UpdatedAt: time.Now(),
 	}, []domain.DeckCardEntry{
@@ -265,12 +271,12 @@ func TestUpdate(t *testing.T) {
 // 他プレイヤーのデッキには影響しない PK スコープを検証する。
 func TestDelete(t *testing.T) {
 	tests := []struct {
-		name            string
-		setup           func(t *testing.T) (int64, int64) // target deck_id, other deck_id
-		deletePID       string
-		deleteDID       func(targetID int64) int64
-		wantDecksAfter  int
-		wantCardsAfter  int
+		name           string
+		setup          func(t *testing.T) (int64, int64) // target deck_id, other deck_id
+		deletePID      string
+		deleteDID      func(targetID int64) int64
+		wantDecksAfter int
+		wantCardsAfter int
 	}{
 		{
 			name: "自分のデッキは cards も CASCADE で削除される",
@@ -320,8 +326,8 @@ func insertDeckAt(t *testing.T, playerID, deckName string, updatedAt time.Time) 
 	t.Helper()
 	var deckID int64
 	err := sharedPg.Pool.QueryRow(context.Background(),
-		`INSERT INTO card.decks (player_id, deck_name, faction, created_at, updated_at)
-		 VALUES ($1, $2, 'SHE', $3, $3) RETURNING deck_id`,
+		`INSERT INTO card.decks (player_id, deck_name, faction, product_id, routine_id, special_id, created_at, updated_at)
+		 VALUES ($1, $2, 'SHE', 'PD-TST', 'IN-TST-R', 'IN-TST-S', $3, $3) RETURNING deck_id`,
 		playerID, deckName, updatedAt).Scan(&deckID)
 	require.NoError(t, err)
 	return deckID

@@ -315,7 +315,7 @@ export interface components {
                 [key: string]: unknown;
             };
         };
-        /** @description 陣営に 1:1 で紐づくプロダクト定義。デッキのメタ情報で、施策を規定する。 */
+        /** @description プロダクト定義 (陣営に N:1)。デッキのメタ情報で、施策を規定する。 */
         Product: {
             /** @description プロダクト識別子 (例 PD-0001) */
             product_id: string;
@@ -326,6 +326,8 @@ export interface components {
         };
         /** @description プロダクトの施策。ルーチン (1ターン1回) / スペシャル (1ゲーム1回)。 */
         Initiative: {
+            /** @description 施策識別子 (例 IN-0001) */
+            initiative_id: string;
             kind: components["schemas"]["InitiativeKind"];
             name: string;
             /** Format: int64 */
@@ -353,6 +355,12 @@ export interface components {
             deck_name: string;
             /** @description 宣言陣営。宣言陣営と Neutral のカードのみ投入できる */
             faction: string;
+            /** @description 選択したプロダクトの ID (宣言陣営に属する) */
+            product_id: string;
+            /** @description セットしたルーチン施策の ID */
+            routine_id: string;
+            /** @description セットしたスペシャル施策の ID */
+            special_id: string;
             /** @description バトル使用可能か (都度算出) */
             is_valid: boolean;
             /** Format: int64 */
@@ -386,6 +394,12 @@ export interface components {
             deck_name: string;
             /** @description 宣言陣営 (SHE / Tenki / Sugar / Tuners) */
             faction: string;
+            /** @description 選択するプロダクトの ID (宣言陣営に属する) */
+            product_id: string;
+            /** @description セットするルーチン施策の ID (選択プロダクトに属する) */
+            routine_id: string;
+            /** @description セットするスペシャル施策の ID (選択プロダクトに属する) */
+            special_id: string;
             cards: components["schemas"]["DeckCardEntry"][];
             /** Format: int64 */
             playmat_no?: number;
@@ -396,6 +410,12 @@ export interface components {
             deck_name: string;
             /** @description 宣言陣営 (SHE / Tenki / Sugar / Tuners) */
             faction: string;
+            /** @description 選択するプロダクトの ID (宣言陣営に属する) */
+            product_id: string;
+            /** @description セットするルーチン施策の ID (選択プロダクトに属する) */
+            routine_id: string;
+            /** @description セットするスペシャル施策の ID (選択プロダクトに属する) */
+            special_id: string;
             cards: components["schemas"]["DeckCardEntry"][];
             /** Format: int64 */
             playmat_no?: number;

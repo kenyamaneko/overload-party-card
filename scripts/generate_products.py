@@ -27,10 +27,10 @@ GO_JSON_OUT = ROOT / "data" / "cache" / "products_gen.json"
 MD_OUT = ROOT / "docs" / "PRODUCTS.md"
 
 # ─── Constants ──────────────────────────────────────────
-# プロダクトは collectible な陣営にちょうど 1 つずつ存在する (1:1)。
+# collectible な陣営は少なくとも 1 つのプロダクトを持つ (陣営:プロダクト = 1:N)。
 COLLECTIBLE_FACTIONS = {"SHE", "Tenki", "Sugar", "Tuners"}
 
-# 施策は kind ごとにちょうど 1 つ (ルーチン / スペシャル)。
+# 各プロダクトは区分ごとに 1 つ以上の施策を持つ (ルーチン / スペシャル)。
 INITIATIVE_KINDS = ["routine", "special"]
 
 KIND_DISPLAY = {"routine": "ルーチン（1ターン1回）", "special": "スペシャル（1ゲーム1回）"}
@@ -49,10 +49,16 @@ def load_products():
 
 # ─── Validate ──────────────────────────────────────────
 def _validate_initiative(initiative, label, errors):
-    for field in ("kind", "name", "insight_cost", "effect_text", "effect"):
+    for field in ("initiative_id", "kind", "name", "insight_cost", "effect_text", "effect"):
         if field not in initiative:
             errors.append(f"{label}: missing required field '{field}'")
             return
+
+    initiative_id = initiative["initiative_id"]
+    if not re.match(r"^IN-\d{4}$", initiative_id):
+        errors.append(f"{label}: initiative_id '{initiative_id}' must match IN-NNNN format")
+    if initiative["kind"] not in INITIATIVE_KINDS:
+        errors.append(f"{label}: invalid kind '{initiative['kind']}'")
 
     cost = initiative["insight_cost"]
     if not isinstance(cost, int) or cost < 0:
@@ -68,6 +74,7 @@ def validate(products):
     errors = []
     seen_factions = {}
     seen_product_ids = {}
+    seen_initiative_ids = {}
 
     for product in products:
         product_id = product.get("product_id", "???")
@@ -83,19 +90,27 @@ def validate(products):
             errors.append(f"{label}: duplicate product_id")
         seen_product_ids[product_id] = True
 
+        # 陣営はプロダクトを複数持てる (1:N)。重複は許容し、faction → product の存在のみ追跡する。
         faction = product.get("faction", "")
         if faction not in COLLECTIBLE_FACTIONS:
             errors.append(f"{label}: invalid faction '{faction}'")
-        if faction in seen_factions:
-            errors.append(f"{label}: duplicate faction '{faction}' (also used by {seen_factions[faction]})")
         seen_factions[faction] = product_id
 
         initiatives = product.get("initiatives", [])
-        kinds = [i.get("kind") for i in initiatives]
-        if sorted(kinds) != sorted(INITIATIVE_KINDS):
-            errors.append(f"{label}: initiatives must have exactly one of each kind {INITIATIVE_KINDS}, got {kinds}")
+        # 各プロダクトはルーチン・スペシャルをそれぞれ 1 つ以上持つ (数は区分ごとに異なってよい)。
+        # デッキはプロダクトを 1 つ選び、その中から各区分 1 つずつセットする。
+        kinds = {i.get("kind") for i in initiatives}
+        for required_kind in INITIATIVE_KINDS:
+            if required_kind not in kinds:
+                errors.append(f"{label}: initiatives must include at least one '{required_kind}'")
         for initiative in initiatives:
-            _validate_initiative(initiative, f"{label} / {initiative.get('name', '???')}", errors)
+            iid = initiative.get("initiative_id")
+            ilabel = f"{label} / {initiative.get('name', '???')}"
+            _validate_initiative(initiative, ilabel, errors)
+            if iid is not None:
+                if iid in seen_initiative_ids:
+                    errors.append(f"{ilabel}: duplicate initiative_id '{iid}' (also used by {seen_initiative_ids[iid]})")
+                seen_initiative_ids[iid] = product_id
 
     missing = COLLECTIBLE_FACTIONS - set(seen_factions)
     if missing:
@@ -115,6 +130,7 @@ def generate_json(products, *, out_path):
             "product_name": product["product_name"],
             "initiatives": [
                 {
+                    "initiative_id": i["initiative_id"],
                     "kind": i["kind"],
                     "name": i["name"],
                     "insight_cost": i["insight_cost"],
@@ -145,14 +161,14 @@ def generate_md(products, *, out_path):
     for product in sorted(products, key=lambda p: p["product_id"]):
         lines.append(f"## {product['product_name']}（{product['faction']}）— {product['product_id']}")
         lines.append("")
-        lines.append("| 区分 | 施策 | Insight コスト | 効果 |")
-        lines.append("|------|------|------|------|")
+        lines.append("| ID | 区分 | 施策 | Insight コスト | 効果 |")
+        lines.append("|------|------|------|------|------|")
         for kind in INITIATIVE_KINDS:
-            initiative = next(i for i in product["initiatives"] if i["kind"] == kind)
-            lines.append(
-                f"| {KIND_DISPLAY[kind]} | {initiative['name']} "
-                f"| {initiative['insight_cost']} | {initiative['effect_text']} |"
-            )
+            for initiative in [i for i in product["initiatives"] if i["kind"] == kind]:
+                lines.append(
+                    f"| {initiative['initiative_id']} | {KIND_DISPLAY[kind]} | {initiative['name']} "
+                    f"| {initiative['insight_cost']} | {initiative['effect_text']} |"
+                )
         lines.append("")
 
     out = Path(out_path)

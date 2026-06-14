@@ -66,7 +66,7 @@ func insertDeck(t *testing.T, playerID, deckName string) int64 {
 	t.Helper()
 	var deckID int64
 	err := sharedPg.Pool.QueryRow(context.Background(),
-		`INSERT INTO card.decks (player_id, deck_name, faction) VALUES ($1, $2, 'SHE') RETURNING deck_id`,
+		`INSERT INTO card.decks (player_id, deck_name, faction, product_id, routine_id, special_id) VALUES ($1, $2, 'SHE', 'PD-TST', 'IN-TST-R', 'IN-TST-S') RETURNING deck_id`,
 		playerID, deckName).Scan(&deckID)
 	require.NoError(t, err)
 	return deckID

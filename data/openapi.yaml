@@ -582,7 +582,7 @@ components:
     # ─── Product ───────────────────────────────────────────────────────
     Product:
       type: object
-      description: 陣営に 1:1 で紐づくプロダクト定義。デッキのメタ情報で、施策を規定する。
+      description: プロダクト定義 (陣営に N:1)。デッキのメタ情報で、施策を規定する。
       required: [product_id, faction, product_name, initiatives]
       properties:
         product_id:
@@ -602,8 +602,12 @@ components:
     Initiative:
       type: object
       description: プロダクトの施策。ルーチン (1ターン1回) / スペシャル (1ゲーム1回)。
-      required: [kind, name, insight_cost, effect_text, effect]
+      required: [initiative_id, kind, name, insight_cost, effect_text, effect]
       properties:
+        initiative_id:
+          type: string
+          x-go-name: InitiativeID
+          description: 施策識別子 (例 IN-0001)
         kind:
           $ref: "#/components/schemas/InitiativeKind"
         name:
@@ -635,6 +639,9 @@ components:
         - deck_id
         - deck_name
         - faction
+        - product_id
+        - routine_id
+        - special_id
         - is_valid
         - created_at
         - updated_at
@@ -652,6 +659,18 @@ components:
         faction:
           type: string
           description: 宣言陣営。宣言陣営と Neutral のカードのみ投入できる
+        product_id:
+          type: string
+          x-go-name: ProductID
+          description: 選択したプロダクトの ID (宣言陣営に属する)
+        routine_id:
+          type: string
+          x-go-name: RoutineID
+          description: セットしたルーチン施策の ID
+        special_id:
+          type: string
+          x-go-name: SpecialID
+          description: セットしたスペシャル施策の ID
         is_valid:
           type: boolean
           description: バトル使用可能か (都度算出)
@@ -709,13 +728,25 @@ components:
 
     DeckCreateRequest:
       type: object
-      required: [deck_name, faction, cards]
+      required: [deck_name, faction, product_id, routine_id, special_id, cards]
       properties:
         deck_name:
           type: string
         faction:
           type: string
           description: 宣言陣営 (SHE / Tenki / Sugar / Tuners)
+        product_id:
+          type: string
+          x-go-name: ProductID
+          description: 選択するプロダクトの ID (宣言陣営に属する)
+        routine_id:
+          type: string
+          x-go-name: RoutineID
+          description: セットするルーチン施策の ID (選択プロダクトに属する)
+        special_id:
+          type: string
+          x-go-name: SpecialID
+          description: セットするスペシャル施策の ID (選択プロダクトに属する)
         cards:
           type: array
           items:
@@ -729,13 +760,25 @@ components:
 
     DeckUpdateRequest:
       type: object
-      required: [deck_name, faction, cards]
+      required: [deck_name, faction, product_id, routine_id, special_id, cards]
       properties:
         deck_name:
           type: string
         faction:
           type: string
           description: 宣言陣営 (SHE / Tenki / Sugar / Tuners)
+        product_id:
+          type: string
+          x-go-name: ProductID
+          description: 選択するプロダクトの ID (宣言陣営に属する)
+        routine_id:
+          type: string
+          x-go-name: RoutineID
+          description: セットするルーチン施策の ID (選択プロダクトに属する)
+        special_id:
+          type: string
+          x-go-name: SpecialID
+          description: セットするスペシャル施策の ID (選択プロダクトに属する)
         cards:
           type: array
           items:

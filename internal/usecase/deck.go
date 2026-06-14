@@ -22,11 +22,12 @@ type DeckInteractor struct {
 	deckRepo       port.DeckRepo
 	playerCardRepo port.PlayerCardRepo
 	cardCache      *cache.CardCache
+	productCache   *cache.ProductCache
 }
 
 // NewDeckInteractor は DeckInteractor を生成します。
-func NewDeckInteractor(deckRepo port.DeckRepo, playerCardRepo port.PlayerCardRepo, cardCache *cache.CardCache) *DeckInteractor {
-	return &DeckInteractor{deckRepo: deckRepo, playerCardRepo: playerCardRepo, cardCache: cardCache}
+func NewDeckInteractor(deckRepo port.DeckRepo, playerCardRepo port.PlayerCardRepo, cardCache *cache.CardCache, productCache *cache.ProductCache) *DeckInteractor {
+	return &DeckInteractor{deckRepo: deckRepo, playerCardRepo: playerCardRepo, cardCache: cardCache, productCache: productCache}
 }
 
 // CreateDeck は新しいデッキを作成します。所持カードと制限をバリデーションします。
@@ -40,6 +41,9 @@ func (s *DeckInteractor) CreateDeck(ctx context.Context, playerID string, req ap
 	if err := s.validateDeckCards(req.Faction, deckCardEntries, ownedCards); err != nil {
 		return nil, err
 	}
+	if err := s.validateInitiatives(req.Faction, req.ProductID, req.RoutineID, req.SpecialID); err != nil {
+		return nil, err
+	}
 
 	totalCards := 0
 	for _, e := range deckCardEntries {
@@ -51,6 +55,9 @@ func (s *DeckInteractor) CreateDeck(ctx context.Context, playerID string, req ap
 		PlayerID:  playerID,
 		DeckName:  req.DeckName,
 		Faction:   req.Faction,
+		ProductID: req.ProductID,
+		RoutineID: req.RoutineID,
+		SpecialID: req.SpecialID,
 		PlaymatNo: req.PlaymatNo,
 		SleeveNo:  req.SleeveNo,
 		CreatedAt: now,
@@ -89,7 +96,7 @@ func (s *DeckInteractor) GetDecks(ctx context.Context, playerID string) ([]*apic
 		if err != nil {
 			return nil, fmt.Errorf("get deck cards for deck %d: %w", d.DeckID, err)
 		}
-		result[i] = presenter.ToDeck(d, cards, s.computeIsValid(d.Faction, cards, ownedCards))
+		result[i] = presenter.ToDeck(d, cards, s.computeIsValid(d, cards, ownedCards))
 	}
 	return result, nil
 }
@@ -123,6 +130,9 @@ func (s *DeckInteractor) UpdateDeck(ctx context.Context, playerID string, deckID
 	if err := s.validateDeckCards(req.Faction, deckCardEntries, ownedCards); err != nil {
 		return nil, err
 	}
+	if err := s.validateInitiatives(req.Faction, req.ProductID, req.RoutineID, req.SpecialID); err != nil {
+		return nil, err
+	}
 
 	totalCards := 0
 	for _, e := range deckCardEntries {
@@ -134,6 +144,9 @@ func (s *DeckInteractor) UpdateDeck(ctx context.Context, playerID string, deckID
 		DeckID:    deckID,
 		DeckName:  req.DeckName,
 		Faction:   req.Faction,
+		ProductID: req.ProductID,
+		RoutineID: req.RoutineID,
+		SpecialID: req.SpecialID,
 		PlaymatNo: req.PlaymatNo,
 		SleeveNo:  req.SleeveNo,
 		UpdatedAt: time.Now(),
@@ -183,7 +196,29 @@ func (s *DeckInteractor) ValidateDeckForBattle(ctx context.Context, playerID str
 		return fmt.Errorf("get owned cards: %w", err)
 	}
 
-	return s.validateDeckCards(deck.Faction, deckCardEntries, ownedCards)
+	if err := s.validateDeckCards(deck.Faction, deckCardEntries, ownedCards); err != nil {
+		return err
+	}
+	return s.validateInitiatives(deck.Faction, deck.ProductID, deck.RoutineID, deck.SpecialID)
+}
+
+// validateInitiatives はセットした施策が選択プロダクト・宣言陣営と整合するか検証します。
+func (s *DeckInteractor) validateInitiatives(faction, productID, routineID, specialID string) error {
+	product := s.productCache.FindByID(productID)
+	if product == nil {
+		return fmt.Errorf("%w: product %q not found", port.ErrInvalidDeck, productID)
+	}
+	if product.Faction != faction {
+		return fmt.Errorf("%w: product %q belongs to faction %q, not deck faction %q",
+			port.ErrInvalidDeck, productID, product.Faction, faction)
+	}
+	if _, ok := product.FindInitiative(routineID, domain.InitiativeKindRoutine); !ok {
+		return fmt.Errorf("%w: routine %q is not a routine of product %q", port.ErrInvalidDeck, routineID, productID)
+	}
+	if _, ok := product.FindInitiative(specialID, domain.InitiativeKindSpecial); !ok {
+		return fmt.Errorf("%w: special %q is not a special of product %q", port.ErrInvalidDeck, specialID, productID)
+	}
+	return nil
 }
 
 func (s *DeckInteractor) validateDeckCards(faction string, deckCardEntries []domain.DeckCardEntry, ownedCards []*domain.PlayerCard) error {
@@ -246,7 +281,7 @@ func (s *DeckInteractor) validateDeckCards(faction string, deckCardEntries []dom
 	return nil
 }
 
-func (s *DeckInteractor) computeIsValid(faction string, deckCards []domain.DeckCard, ownedCards []*domain.PlayerCard) bool {
+func (s *DeckInteractor) computeIsValid(deck *domain.Deck, deckCards []domain.DeckCard, ownedCards []*domain.PlayerCard) bool {
 	totalCards := 0
 	for _, dc := range deckCards {
 		totalCards += dc.Count
@@ -256,7 +291,10 @@ func (s *DeckInteractor) computeIsValid(faction string, deckCards []domain.DeckC
 	}
 
 	deckCardEntries := domain.DeckCardEntriesFromCards(deckCards)
-	return s.validateDeckCards(faction, deckCardEntries, ownedCards) == nil
+	if s.validateDeckCards(deck.Faction, deckCardEntries, ownedCards) != nil {
+		return false
+	}
+	return s.validateInitiatives(deck.Faction, deck.ProductID, deck.RoutineID, deck.SpecialID) == nil
 }
 
 // isSelectableFaction は faction がプレイヤーの選択可能な陣営かを判定します。

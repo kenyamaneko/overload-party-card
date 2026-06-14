@@ -23,3 +23,9 @@ const (
 const (
 	AttachmentStatBonus = "stat_bonus"
 )
+
+// InitiativeKind は施策の区分。本パッケージが SSoT。
+const (
+	InitiativeKindRoutine = "routine"
+	InitiativeKindSpecial = "special"
+)

@@ -17,7 +17,7 @@ card は以下の機能ドメインを所有する。
 | 機能 | 主要な責務 |
 |---|---|
 | カードマスター配信 | 全カード定義を battle / gateway 向けに返す（SSoT） |
-| プロダクトマスター配信 | 陣営 1:1 のプロダクト定義（施策の効果 DSL 込み）を battle / client 向けに返す（SSoT） |
+| プロダクトマスター配信 | プロダクト定義（陣営に N:1、施策の効果 DSL 込み）を battle / client 向けに返す（SSoT） |
 | 所持カード照会 | プレイヤーの所持カード一覧・カード定義付き形式での返却 |
 | デッキ CRUD | プレイヤー単位のデッキ作成・更新・削除・一覧（陣営を宣言して構築） |
 | デッキバリデーション | 枚数・所持・制限・陣営整合ルールの検証（都度算出） |
@@ -78,6 +78,8 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 ### 4.1 デッキ制約
 
 - デッキは陣営（`decks.faction`）を 1 つ宣言する。宣言できるのは選択可能な陣営（`SelectableFactions`）のみ
+- デッキは宣言陣営に属するプロダクト（`decks.product_id`）を 1 つ選ぶ。陣営はプロダクトを複数持てる（陣営:プロダクト = 1:N）
+- 選んだプロダクトの施策から、ルーチン（`decks.routine_id`）とスペシャル（`decks.special_id`）をそれぞれ 1 つずつセットする。プロダクトは各区分の施策を複数持てる（数は区分ごとに異なってよい）。プロダクトを跨いだ施策の組み合わせは不可
 - 構成カードは宣言陣営と Neutral のカードのみ（混成不可）
 - デッキ枚数: ちょうど `constants.DeckSize`（= 30）枚
 - 構成カード全てをプレイヤーが所持していること（`player_cards.count >= deck_cards.count`）
@@ -108,8 +110,9 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
    4. 各 `(card_id, art_no)` について所持枚数 ≥ 要求枚数（`ErrUnowned`）
    5. 各カードの陣営が宣言陣営または Neutral であること（`ErrInvalidDeck`）
    6. 各 `card_id` の合計枚数 ≤ restriction 上限（`ErrRestrictionExceeded`）
-3. 書き込み（デッキ行 + deck_cards）
-4. 返却時に DeckCards を populate
+3. `validateInitiatives`: `product_id` が宣言陣営のプロダクトであり、`routine_id` / `special_id` がそのプロダクトの該当区分の施策であること（`ErrInvalidDeck`）
+4. 書き込み（デッキ行 + deck_cards）
+5. 返却時に DeckCards を populate
 
 **作成時の `is_valid`**: 総枚数 == `DeckSize` かつ validateDeckCards を通った場合のみ `true`。30 枚未満のドラフト状態でも保存はできるが `is_valid=false` になる。
 
@@ -124,6 +127,7 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 3. 総枚数 == `DeckSize`（`ErrInvalidDeck`）
 4. 所持カード取得
 5. `validateDeckCards`（4.3 と同じ）
+6. `validateInitiatives`（セットした施策が宣言陣営のものか）
 
 ### 4.5 デッキ削除
 

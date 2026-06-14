@@ -98,7 +98,8 @@ func (m *mockDeckRepo) Delete(_ context.Context, playerID string, deckID int64) 
 	return nil
 }
 
-func setupDeckInteractor() (*DeckInteractor, *mockDeckRepo, *inMemoryPlayerCardRepo, *cache.CardCache) {
+func setupDeckInteractor(t *testing.T) (*DeckInteractor, *mockDeckRepo, *inMemoryPlayerCardRepo, *cache.CardCache) {
+	t.Helper()
 	repo := newMockDeckRepo()
 	cc := cache.NewCardCache()
 
@@ -140,10 +141,31 @@ func setupDeckInteractor() (*DeckInteractor, *mockDeckRepo, *inMemoryPlayerCardR
 		Stats: json.RawMessage(`{}`),
 	})
 
+	pc := cache.NewProductCache()
+	require.NoError(t, pc.LoadFromBytes([]byte(testProductsJSON)))
+
 	pcRepo := newInMemoryPlayerCardRepo()
-	svc := NewDeckInteractor(repo, pcRepo, cc)
+	svc := NewDeckInteractor(repo, pcRepo, cc, pc)
 	return svc, repo, pcRepo, cc
 }
+
+// testProductsJSON は SHE プロダクト PD-TST (ルーチン IN-TST-R / スペシャル IN-TST-S) と、
+// 別陣営 (Tenki) のプロダクト PD-TST2 を持つテスト用定義。施策の effect は検証に使わないため最小限。
+const testProductID = "PD-TST"
+const testRoutineID = "IN-TST-R"
+const testSpecialID = "IN-TST-S"
+const testProductsJSON = `[
+  {"product_id":"PD-TST","faction":"SHE","product_name":"Test",
+   "initiatives":[
+     {"initiative_id":"IN-TST-R","kind":"routine","name":"R","insight_cost":100,"effect_text":"","effect":{"ops":[]}},
+     {"initiative_id":"IN-TST-S","kind":"special","name":"S","insight_cost":200,"effect_text":"","effect":{"ops":[]}}
+   ]},
+  {"product_id":"PD-TST2","faction":"Tenki","product_name":"Other",
+   "initiatives":[
+     {"initiative_id":"IN-TST-R2","kind":"routine","name":"R2","insight_cost":100,"effect_text":"","effect":{"ops":[]}},
+     {"initiative_id":"IN-TST-S2","kind":"special","name":"S2","insight_cost":200,"effect_text":"","effect":{"ops":[]}}
+   ]}
+]`
 
 func grantCards(repo *inMemoryPlayerCardRepo, playerID string, cards ...*domain.PlayerCard) {
 	for _, c := range cards {
@@ -220,14 +242,17 @@ func TestCreateDeck_Validity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc, _, pcRepo, _ := setupDeckInteractor()
+			svc, _, pcRepo, _ := setupDeckInteractor(t)
 			pid := "p1"
 			tt.grant(pcRepo, pid)
 
 			deck, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-				DeckName: tt.deckName,
-				Faction:  "SHE",
-				Cards:    tt.entries,
+				DeckName:  tt.deckName,
+				Faction:   "SHE",
+				ProductID: testProductID,
+				RoutineID: testRoutineID,
+				SpecialID: testSpecialID,
+				Cards:     tt.entries,
 			})
 
 			require.NoError(t, err)
@@ -381,14 +406,55 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc, _, pcRepo, _ := setupDeckInteractor()
+			svc, _, pcRepo, _ := setupDeckInteractor(t)
 			pid := "p1"
 			tt.grant(pcRepo, pid)
 
 			_, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-				DeckName: "Test",
-				Faction:  tt.faction,
-				Cards:    tt.entries,
+				DeckName:  "Test",
+				Faction:   tt.faction,
+				ProductID: testProductID,
+				RoutineID: testRoutineID,
+				SpecialID: testSpecialID,
+				Cards:     tt.entries,
+			})
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErrMsg)
+		})
+	}
+}
+
+func TestCreateDeck_InvalidInitiatives(t *testing.T) {
+	tests := []struct {
+		name       string
+		productID  string
+		routineID  string
+		specialID  string
+		wantErrMsg string
+	}{
+		{"unknown product", "PD-NOPE", testRoutineID, testSpecialID, "not found"},
+		{"product of other faction", "PD-TST2", testRoutineID, testSpecialID, "not deck faction"},
+		{"unknown routine", testProductID, "IN-NOPE", testSpecialID, "is not a routine"},
+		{"unknown special", testProductID, testRoutineID, "IN-NOPE", "is not a special"},
+		{"routine id used as special", testProductID, testRoutineID, testRoutineID, "is not a special"},
+		{"special id used as routine", testProductID, testSpecialID, testSpecialID, "is not a routine"},
+		{"routine from other product", testProductID, "IN-TST-R2", testSpecialID, "is not a routine"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, _, pcRepo, _ := setupDeckInteractor(t)
+			pid := "p1"
+			grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
+
+			_, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
+				DeckName:  "Test",
+				Faction:   "SHE",
+				ProductID: tt.productID,
+				RoutineID: tt.routineID,
+				SpecialID: tt.specialID,
+				Cards:     makeEntries("C-001", 3),
 			})
 
 			require.Error(t, err)
@@ -410,14 +476,17 @@ func TestCreateDeck_RestrictionAtLimit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc, _, pcRepo, _ := setupDeckInteractor()
+			svc, _, pcRepo, _ := setupDeckInteractor(t)
 			pid := "p1"
 			grantCards(pcRepo, pid, &domain.PlayerCard{CardID: tt.cardID, ArtNo: 0, Count: tt.count})
 
 			_, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-				DeckName: "OK Deck",
-				Faction:  "SHE",
-				Cards:    makeEntries(tt.cardID, tt.count),
+				DeckName:  "OK Deck",
+				Faction:   "SHE",
+				ProductID: testProductID,
+				RoutineID: testRoutineID,
+				SpecialID: testSpecialID,
+				Cards:     makeEntries(tt.cardID, tt.count),
 			})
 
 			require.NoError(t, err)
@@ -426,18 +495,20 @@ func TestCreateDeck_RestrictionAtLimit(t *testing.T) {
 }
 
 func TestUpdateDeck(t *testing.T) {
-	svc, _, pcRepo, _ := setupDeckInteractor()
+	svc, _, pcRepo, _ := setupDeckInteractor(t)
 	pid := "p1"
 	grantUnlimited(pcRepo, pid, allTenCards...)
 
 	created, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-		DeckName: "Original", Faction: "SHE", Cards: makeEntries("C-001", 3, "C-002", 3),
+		DeckName: "Original", Faction: "SHE", ProductID: testProductID,
+		RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: makeEntries("C-001", 3, "C-002", 3),
 	})
 	require.NoError(t, err)
 	assert.False(t, created.IsValid)
 
 	updated, err := svc.UpdateDeck(context.Background(), pid, created.DeckID, apicard.DeckUpdateRequest{
-		DeckName: "Updated Full", Faction: "SHE", Cards: full30Entries(),
+		DeckName: "Updated Full", Faction: "SHE", ProductID: testProductID,
+		RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: full30Entries(),
 	})
 
 	require.NoError(t, err)
@@ -448,12 +519,13 @@ func TestUpdateDeck(t *testing.T) {
 }
 
 func TestDeleteDeck(t *testing.T) {
-	svc, _, pcRepo, _ := setupDeckInteractor()
+	svc, _, pcRepo, _ := setupDeckInteractor(t)
 	pid := "p1"
 	grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
 
 	created, _ := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-		DeckName: "To Delete", Faction: "SHE", Cards: makeEntries("C-001", 3),
+		DeckName: "To Delete", Faction: "SHE", ProductID: testProductID,
+		RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: makeEntries("C-001", 3),
 	})
 
 	err := svc.DeleteDeck(context.Background(), pid, created.DeckID)
@@ -463,12 +535,13 @@ func TestDeleteDeck(t *testing.T) {
 }
 
 func TestValidateDeckForBattle_Full30Cards(t *testing.T) {
-	svc, _, pcRepo, _ := setupDeckInteractor()
+	svc, _, pcRepo, _ := setupDeckInteractor(t)
 	pid := "p1"
 	grantUnlimited(pcRepo, pid, allTenCards...)
 
 	deck, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-		DeckName: "Full Deck", Faction: "SHE", Cards: full30Entries(),
+		DeckName: "Full Deck", Faction: "SHE", ProductID: testProductID,
+		RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: full30Entries(),
 	})
 	require.NoError(t, err)
 
@@ -477,12 +550,13 @@ func TestValidateDeckForBattle_Full30Cards(t *testing.T) {
 }
 
 func TestValidateDeckForBattle_PartialDeck(t *testing.T) {
-	svc, _, pcRepo, _ := setupDeckInteractor()
+	svc, _, pcRepo, _ := setupDeckInteractor(t)
 	pid := "p1"
 	grantUnlimited(pcRepo, pid, "C-001", "C-002")
 
 	deck, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-		DeckName: "Partial", Faction: "SHE", Cards: makeEntries("C-001", 3, "C-002", 3),
+		DeckName: "Partial", Faction: "SHE", ProductID: testProductID,
+		RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: makeEntries("C-001", 3, "C-002", 3),
 	})
 	require.NoError(t, err)
 

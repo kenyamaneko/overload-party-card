@@ -223,10 +223,19 @@ type Deck struct {
 	Faction string `json:"faction"`
 
 	// IsValid バトル使用可能か (都度算出)
-	IsValid   bool      `json:"is_valid"`
-	PlayerID  string    `json:"player_id"`
-	PlaymatNo *int64    `json:"playmat_no,omitempty"`
-	SleeveNo  *int64    `json:"sleeve_no,omitempty"`
+	IsValid   bool   `json:"is_valid"`
+	PlayerID  string `json:"player_id"`
+	PlaymatNo *int64 `json:"playmat_no,omitempty"`
+
+	// ProductID 選択したプロダクトの ID (宣言陣営に属する)
+	ProductID string `json:"product_id"`
+
+	// RoutineID セットしたルーチン施策の ID
+	RoutineID string `json:"routine_id"`
+	SleeveNo  *int64 `json:"sleeve_no,omitempty"`
+
+	// SpecialID セットしたスペシャル施策の ID
+	SpecialID string    `json:"special_id"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
@@ -254,7 +263,16 @@ type DeckCreateRequest struct {
 	// Faction 宣言陣営 (SHE / Tenki / Sugar / Tuners)
 	Faction   string `json:"faction"`
 	PlaymatNo *int64 `json:"playmat_no,omitempty"`
+
+	// ProductID 選択するプロダクトの ID (宣言陣営に属する)
+	ProductID string `json:"product_id"`
+
+	// RoutineID セットするルーチン施策の ID (選択プロダクトに属する)
+	RoutineID string `json:"routine_id"`
 	SleeveNo  *int64 `json:"sleeve_no,omitempty"`
+
+	// SpecialID セットするスペシャル施策の ID (選択プロダクトに属する)
+	SpecialID string `json:"special_id"`
 }
 
 // DeckDetailResponse GET /players/{playerId}/decks/{deckId} のレスポンス封筒。
@@ -273,7 +291,16 @@ type DeckUpdateRequest struct {
 	// Faction 宣言陣営 (SHE / Tenki / Sugar / Tuners)
 	Faction   string `json:"faction"`
 	PlaymatNo *int64 `json:"playmat_no,omitempty"`
+
+	// ProductID 選択するプロダクトの ID (宣言陣営に属する)
+	ProductID string `json:"product_id"`
+
+	// RoutineID セットするルーチン施策の ID (選択プロダクトに属する)
+	RoutineID string `json:"routine_id"`
 	SleeveNo  *int64 `json:"sleeve_no,omitempty"`
+
+	// SpecialID セットするスペシャル施策の ID (選択プロダクトに属する)
+	SpecialID string `json:"special_id"`
 }
 
 // HealthResponse defines model for HealthResponse.
@@ -287,8 +314,11 @@ type Initiative struct {
 	Effect map[string]interface{} `json:"effect"`
 
 	// EffectText 効果テキスト (表示用)
-	EffectText  string `json:"effect_text"`
-	InsightCost int64  `json:"insight_cost"`
+	EffectText string `json:"effect_text"`
+
+	// InitiativeID 施策識別子 (例 IN-0001)
+	InitiativeID string `json:"initiative_id"`
+	InsightCost  int64  `json:"insight_cost"`
 
 	// Kind 施策の区分。
 	Kind InitiativeKind `json:"kind"`
@@ -340,7 +370,7 @@ type PlayerCardWithDef struct {
 	Subtype       *string         `json:"subtype,omitempty"`
 }
 
-// Product 陣営に 1:1 で紐づくプロダクト定義。デッキのメタ情報で、施策を規定する。
+// Product プロダクト定義 (陣営に N:1)。デッキのメタ情報で、施策を規定する。
 type Product struct {
 	// Faction 紐づく陣営 (SHE / Tenki / Sugar / Tuners)
 	Faction     string       `json:"faction"`
