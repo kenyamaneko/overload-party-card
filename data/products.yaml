@@ -1,14 +1,6 @@
 # Product master data (SSoT).
 #
-# プロダクトはデッキのメタ情報。陣営はプロダクトを複数持てる (1:N)。デッキは陣営の
-# プロダクトを 1 つ選び、その中からルーチン (1ターン1回) / スペシャル (1ゲーム1回) を
-# 各 1 つセットする。施策 (Initiative) は data/initiatives.yaml で別管理する。
-#
-# Consumed by scripts/generate_products.py (initiatives.yaml と併せて読み込まれる) to generate:
-#   - data/cache/products_gen.json (Go embed; /internal/v1/products と /api/v1/cards/products で配信)
-#   - db/seed/products_seed.sql (PostgreSQL UPSERT seed: products)
-#   - db/seed/initiatives_seed.sql (PostgreSQL UPSERT seed: initiatives)
-#   - docs/PRODUCTS.md (human-readable product list)
+# 施策 (Initiative) は data/initiatives.yaml で別管理する。
 
 products:
   - product_id: PD-0001

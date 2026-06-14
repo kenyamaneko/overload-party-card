@@ -1,14 +1,5 @@
 # Initiative master data (SSoT).
 #
-# 施策はプロダクトに属する発動可能アクション。プロダクト:施策 = 1:N。各プロダクトは
-# ルーチン (1ターン1回) / スペシャル (1ゲーム1回) をそれぞれ 1 つ以上持つ。デッキは
-# 選択したプロダクトの中から各区分を 1 つずつセットする。product_id で親を参照する。
-#
-# Consumed by scripts/generate_products.py (products.yaml と併せて読み込まれる)。
-#
-# effect は battle エンジンの効果 DSL (ops / custom) で記述する。施策はプレイヤーの
-# use_initiative アクションで発動するため trigger は持たない。
-#
 # 台風の amount とお裾分けの insight_cost はシミュレーション前の暫定値。
 
 initiatives:

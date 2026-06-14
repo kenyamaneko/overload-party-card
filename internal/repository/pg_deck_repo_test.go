@@ -62,6 +62,13 @@ func TestCreate(t *testing.T) {
 			require.NoError(t, err)
 			assert.NotZero(t, deckID, "deck_id should be auto-assigned")
 
+			persisted, err := repo.FindByID(ctx, playerA, deckID)
+			require.NoError(t, err)
+			assert.Equal(t, "SHE", persisted.Faction)
+			assert.Equal(t, "PD-TST", persisted.ProductID)
+			assert.Equal(t, "IN-TST-R", persisted.RoutineID)
+			assert.Equal(t, "IN-TST-S", persisted.SpecialID)
+
 			got, err := repo.GetDeckCards(ctx, playerA, deckID)
 			require.NoError(t, err)
 			assert.Len(t, got, tt.wantCards)
@@ -138,6 +145,9 @@ func TestFindByID_Success(t *testing.T) {
 	assert.Equal(t, "Target Deck", got.DeckName)
 	assert.Equal(t, playerA, got.PlayerID)
 	assert.Equal(t, "SHE", got.Faction)
+	assert.Equal(t, "PD-TST", got.ProductID)
+	assert.Equal(t, "IN-TST-R", got.RoutineID)
+	assert.Equal(t, "IN-TST-S", got.SpecialID)
 }
 
 // TestFindByID_NotFound は存在しない / 他プレイヤー配下の deck_id が
@@ -258,6 +268,9 @@ func TestUpdate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Renamed", got.DeckName)
 	assert.Equal(t, "Tenki", got.Faction)
+	assert.Equal(t, "PD-TST2", got.ProductID, "product can be updated")
+	assert.Equal(t, "IN-TST-R2", got.RoutineID, "routine can be updated")
+	assert.Equal(t, "IN-TST-S2", got.SpecialID, "special can be updated")
 	require.NotNil(t, got.PlaymatNo)
 	assert.Equal(t, newPlaymat, *got.PlaymatNo)
 

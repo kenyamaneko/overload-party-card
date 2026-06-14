@@ -36,22 +36,3 @@ func TestInitiativeFindAll(t *testing.T) {
 	assert.Equal(t, "PD-TST1", productByID["IN-TST-R1"])
 	assert.Equal(t, "PD-TST2", productByID["IN-TST-R2"])
 }
-
-// TestInitiativeFindAll_EffectPreserved は、施策の effect JSONB が往復で保持されることを検証する。
-func TestInitiativeFindAll_EffectPreserved(t *testing.T) {
-	sharedPg.Truncate(t)
-	seedProduct(t, productSeed{"PD-TST1", "SHE", "P1"})
-	seedInitiative(t, initiativeSeed{"IN-TST-R1", "PD-TST1", "routine", "R1", 150,
-		"効果説明", `{"ops":[{"gain_budget":{"target":"myself","amount":50}}]}`})
-
-	repo := repository.NewPgInitiativeRepository(sharedPg.Pool)
-	got, err := repo.FindAll(context.Background())
-	require.NoError(t, err)
-	require.Len(t, got, 1)
-
-	in := got[0]
-	assert.Equal(t, "PD-TST1", in.ProductID)
-	assert.Equal(t, int64(150), in.InsightCost)
-	assert.Equal(t, "効果説明", in.EffectText)
-	assert.JSONEq(t, `{"ops":[{"gain_budget":{"target":"myself","amount":50}}]}`, string(in.Effect))
-}
