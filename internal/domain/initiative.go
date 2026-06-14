@@ -11,4 +11,5 @@ type Initiative struct {
 	InsightCost  int64           `json:"insight_cost"`
 	EffectText   string          `json:"effect_text"`
 	Effect       json.RawMessage `json:"effect"`
+	IsActive     bool            `json:"is_active"`
 }

@@ -2,21 +2,25 @@
   {
     "product_id": "PD-0001",
     "faction": "SHE",
-    "product_name": "ECサイト"
+    "product_name": "ECサイト",
+    "is_active": true
   },
   {
     "product_id": "PD-0002",
     "faction": "Tenki",
-    "product_name": "天気予報アプリ"
+    "product_name": "天気予報アプリ",
+    "is_active": true
   },
   {
     "product_id": "PD-0003",
     "faction": "Sugar",
-    "product_name": "レシピアプリ"
+    "product_name": "レシピアプリ",
+    "is_active": true
   },
   {
     "product_id": "PD-0004",
     "faction": "Tuners",
-    "product_name": "音楽配信サイト"
+    "product_name": "音楽配信サイト",
+    "is_active": true
   }
 ]

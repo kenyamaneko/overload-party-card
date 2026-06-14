@@ -66,6 +66,7 @@ CREATE TABLE card.products (
   product_id   VARCHAR(10) NOT NULL,               -- プロダクト識別子（例: PD-0001）
   faction      VARCHAR(20) NOT NULL CHECK (faction IN ('SHE', 'Tenki', 'Sugar', 'Tuners')), -- 所属陣営
   product_name VARCHAR(100) NOT NULL,              -- プロダクト名
+  is_active    BOOLEAN NOT NULL DEFAULT true,       -- 有効フラグ（論理削除）
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(), -- 作成日時
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(), -- 更新日時
   PRIMARY KEY (product_id)
@@ -82,6 +83,7 @@ CREATE TABLE card.initiatives (
   insight_cost  BIGINT NOT NULL CHECK (insight_cost >= 0), -- 発動 Insight コスト
   effect_text   VARCHAR(500) NOT NULL,             -- 効果テキスト（表示用）
   effect        JSONB NOT NULL,                    -- 効果定義（DSL）
+  is_active     BOOLEAN NOT NULL DEFAULT true,     -- 有効フラグ（論理削除）
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),-- 作成日時
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),-- 更新日時
   PRIMARY KEY (initiative_id),

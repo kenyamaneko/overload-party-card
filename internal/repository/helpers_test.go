@@ -81,6 +81,27 @@ func seedInitiative(t *testing.T, s initiativeSeed) {
 	require.NoError(t, err)
 }
 
+// seedInactiveProduct は is_active=false のプロダクトを挿入する (論理削除の除外検証用)。
+func seedInactiveProduct(t *testing.T, s productSeed) {
+	t.Helper()
+	_, err := sharedPg.Pool.Exec(context.Background(),
+		`INSERT INTO card.products (product_id, faction, product_name, is_active)
+		 VALUES ($1, $2, $3, false)`,
+		s.ProductID, s.Faction, s.ProductName)
+	require.NoError(t, err)
+}
+
+// seedInactiveInitiative は is_active=false の施策を挿入する (論理削除の除外検証用)。
+func seedInactiveInitiative(t *testing.T, s initiativeSeed) {
+	t.Helper()
+	_, err := sharedPg.Pool.Exec(context.Background(),
+		`INSERT INTO card.initiatives
+		   (initiative_id, product_id, kind, name, insight_cost, effect_text, effect, is_active)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, false)`,
+		s.InitiativeID, s.ProductID, s.Kind, s.Name, s.InsightCost, s.EffectText, json.RawMessage(s.Effect))
+	require.NoError(t, err)
+}
+
 type playerCardSeed struct {
 	PlayerID string
 	CardID   string

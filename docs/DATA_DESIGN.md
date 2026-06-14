@@ -80,6 +80,7 @@ Platform / Attachment / Strategy / Incident / Reactive には `stats` フィー�
 | `product_id` | VARCHAR(10) | No | プロダクト識別子（例: PD-0001） |
 | `faction` | VARCHAR(20) | No | 所属陣営 |
 | `product_name` | VARCHAR(100) | No | プロダクト名 |
+| `is_active` | BOOLEAN | No | 有効フラグ（論理削除） |
 | `created_at` | TIMESTAMPTZ | No | 作成日時 |
 | `updated_at` | TIMESTAMPTZ | No | 更新日時 |
 <!-- END GENERATED: products -->
@@ -103,6 +104,7 @@ Platform / Attachment / Strategy / Incident / Reactive には `stats` フィー�
 | `insight_cost` | BIGINT | No | 発動 Insight コスト |
 | `effect_text` | VARCHAR(500) | No | 効果テキスト（表示用） |
 | `effect` | JSONB | No | 効果定義（DSL） |
+| `is_active` | BOOLEAN | No | 有効フラグ（論理削除） |
 | `created_at` | TIMESTAMPTZ | No | 作成日時 |
 | `updated_at` | TIMESTAMPTZ | No | 更新日時 |
 <!-- END GENERATED: initiatives -->

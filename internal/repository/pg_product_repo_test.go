@@ -53,3 +53,17 @@ func TestProductFindAll(t *testing.T) {
 		})
 	}
 }
+
+// TestProductFindAll_ExcludesInactive は is_active=false のプロダクトが除外されることを検証する。
+func TestProductFindAll_ExcludesInactive(t *testing.T) {
+	sharedPg.Truncate(t)
+	seedProduct(t, productSeed{"PD-TST1", "SHE", "P1"})
+	seedInactiveProduct(t, productSeed{"PD-TST9", "SHE", "Retired"})
+
+	repo := repository.NewPgProductRepository(sharedPg.Pool)
+	got, err := repo.FindAll(context.Background())
+	require.NoError(t, err)
+
+	require.Len(t, got, 1)
+	assert.Equal(t, "PD-TST1", got[0].ProductID)
+}

@@ -583,7 +583,7 @@ components:
     Product:
       type: object
       description: プロダクト定義 (陣営に N:1)。デッキのメタ情報で、施策を規定する。
-      required: [product_id, faction, product_name, initiatives]
+      required: [product_id, faction, product_name, is_active, initiatives]
       properties:
         product_id:
           type: string
@@ -594,6 +594,9 @@ components:
           description: 紐づく陣営 (SHE / Tenki / Sugar / Tuners)
         product_name:
           type: string
+        is_active:
+          type: boolean
+          description: 有効フラグ (論理削除)
         initiatives:
           type: array
           items:
@@ -602,7 +605,7 @@ components:
     Initiative:
       type: object
       description: プロダクトの施策。ルーチン (1ターン1回) / スペシャル (1ゲーム1回)。
-      required: [initiative_id, product_id, kind, name, insight_cost, effect_text, effect]
+      required: [initiative_id, product_id, kind, name, insight_cost, effect_text, effect, is_active]
       properties:
         initiative_id:
           type: string
@@ -626,6 +629,9 @@ components:
           type: object
           additionalProperties: true
           description: battle エンジンの効果 DSL (ops / custom)
+        is_active:
+          type: boolean
+          description: 有効フラグ (論理削除)
 
     InitiativeKind:
       type: string

@@ -23,11 +23,11 @@ func NewPgInitiativeRepository(pool *pgxpool.Pool) *PgInitiativeRepository {
 	return &PgInitiativeRepository{pool: pool}
 }
 
-// FindAll は全施策定義を返します。
+// FindAll は有効な全施策定義を返します。
 func (r *PgInitiativeRepository) FindAll(ctx context.Context) ([]*domain.Initiative, error) {
 	rows, err := r.pool.Query(ctx,
-		`SELECT initiative_id, product_id, kind, name, insight_cost, effect_text, effect
-		 FROM initiatives ORDER BY initiative_id`,
+		`SELECT initiative_id, product_id, kind, name, insight_cost, effect_text, effect, is_active
+		 FROM initiatives WHERE is_active = true ORDER BY initiative_id`,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("query initiatives: %w", err)
@@ -41,7 +41,7 @@ func (r *PgInitiativeRepository) FindAll(ctx context.Context) ([]*domain.Initiat
 			effect json.RawMessage
 		)
 		if err := rows.Scan(&i.InitiativeID, &i.ProductID, &i.Kind, &i.Name,
-			&i.InsightCost, &i.EffectText, &effect); err != nil {
+			&i.InsightCost, &i.EffectText, &effect, &i.IsActive); err != nil {
 			return nil, fmt.Errorf("scan initiative: %w", err)
 		}
 		i.Effect = effect

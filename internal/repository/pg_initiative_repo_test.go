@@ -36,3 +36,18 @@ func TestInitiativeFindAll(t *testing.T) {
 	assert.Equal(t, "PD-TST1", productByID["IN-TST-R1"])
 	assert.Equal(t, "PD-TST2", productByID["IN-TST-R2"])
 }
+
+// TestInitiativeFindAll_ExcludesInactive は is_active=false の施策が除外されることを検証する。
+func TestInitiativeFindAll_ExcludesInactive(t *testing.T) {
+	sharedPg.Truncate(t)
+	seedProduct(t, productSeed{"PD-TST1", "SHE", "P1"})
+	seedInitiative(t, initiativeSeed{"IN-TST-R1", "PD-TST1", "routine", "R1", 100, "", `{"ops":[]}`})
+	seedInactiveInitiative(t, initiativeSeed{"IN-TST-S9", "PD-TST1", "special", "Retired", 0, "", `{"ops":[]}`})
+
+	repo := repository.NewPgInitiativeRepository(sharedPg.Pool)
+	got, err := repo.FindAll(context.Background())
+	require.NoError(t, err)
+
+	require.Len(t, got, 1)
+	assert.Equal(t, "IN-TST-R1", got[0].InitiativeID)
+}

@@ -320,6 +320,9 @@ type Initiative struct {
 	InitiativeID string `json:"initiative_id"`
 	InsightCost  int64  `json:"insight_cost"`
 
+	// IsActive 有効フラグ (論理削除)
+	IsActive bool `json:"is_active"`
+
 	// Kind 施策の区分。
 	Kind InitiativeKind `json:"kind"`
 	Name string         `json:"name"`
@@ -378,6 +381,9 @@ type Product struct {
 	// Faction 紐づく陣営 (SHE / Tenki / Sugar / Tuners)
 	Faction     string       `json:"faction"`
 	Initiatives []Initiative `json:"initiatives"`
+
+	// IsActive 有効フラグ (論理削除)
+	IsActive bool `json:"is_active"`
 
 	// ProductID プロダクト識別子 (例 PD-0001)
 	ProductID   string `json:"product_id"`

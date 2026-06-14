@@ -322,6 +322,8 @@ export interface components {
             /** @description 紐づく陣営 (SHE / Tenki / Sugar / Tuners) */
             faction: string;
             product_name: string;
+            /** @description 有効フラグ (論理削除) */
+            is_active: boolean;
             initiatives: components["schemas"]["Initiative"][];
         };
         /** @description プロダクトの施策。ルーチン (1ターン1回) / スペシャル (1ゲーム1回)。 */
@@ -340,6 +342,8 @@ export interface components {
             effect: {
                 [key: string]: unknown;
             };
+            /** @description 有効フラグ (論理削除) */
+            is_active: boolean;
         };
         /**
          * @description 施策の区分。

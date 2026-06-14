@@ -2016,6 +2016,12 @@ namespace OverloadParty.ApiCard
         [System.Text.Json.Serialization.JsonPropertyName("product_name")]
         public string Product_name { get; set; } = default!;
 
+        /// <summary>
+        /// 有効フラグ (論理削除)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("is_active")]
+        public bool Is_active { get; set; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("initiatives")]
         public System.Collections.Generic.List<Initiative> Initiatives { get; set; } = new System.Collections.Generic.List<Initiative>();
 
@@ -2070,6 +2076,12 @@ namespace OverloadParty.ApiCard
         /// </summary>
         [System.Text.Json.Serialization.JsonPropertyName("effect")]
         public System.Text.Json.JsonElement Effect { get; set; } = new System.Text.Json.JsonElement();
+
+        /// <summary>
+        /// 有効フラグ (論理削除)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("is_active")]
+        public bool Is_active { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 

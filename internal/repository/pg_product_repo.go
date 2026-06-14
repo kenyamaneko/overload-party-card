@@ -22,11 +22,11 @@ func NewPgProductRepository(pool *pgxpool.Pool) *PgProductRepository {
 	return &PgProductRepository{pool: pool}
 }
 
-// FindAll は全プロダクト定義を返します。
+// FindAll は有効な全プロダクト定義を返します。
 func (r *PgProductRepository) FindAll(ctx context.Context) ([]*domain.Product, error) {
 	rows, err := r.pool.Query(ctx,
-		`SELECT product_id, faction, product_name
-		 FROM products ORDER BY product_id`,
+		`SELECT product_id, faction, product_name, is_active
+		 FROM products WHERE is_active = true ORDER BY product_id`,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("query products: %w", err)
@@ -36,7 +36,7 @@ func (r *PgProductRepository) FindAll(ctx context.Context) ([]*domain.Product, e
 	var products []*domain.Product
 	for rows.Next() {
 		var p domain.Product
-		if err := rows.Scan(&p.ProductID, &p.Faction, &p.ProductName); err != nil {
+		if err := rows.Scan(&p.ProductID, &p.Faction, &p.ProductName, &p.IsActive); err != nil {
 			return nil, fmt.Errorf("scan product: %w", err)
 		}
 		products = append(products, &p)
