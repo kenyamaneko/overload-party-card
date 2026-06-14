@@ -123,6 +123,7 @@ func run() error {
 		"addr", srv.Addr,
 		"card_cache_size", cardCache.Count(),
 		"product_cache_size", productCache.Count(),
+		"initiative_cache_size", initiativeCache.Count(),
 		"google_cloud_project", cfg.GoogleCloudProjectID,
 	)
 

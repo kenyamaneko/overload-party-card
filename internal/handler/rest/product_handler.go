@@ -20,7 +20,7 @@ func NewProductHandler(products *cache.ProductCache, initiatives *cache.Initiati
 	return &ProductHandler{products: products, initiatives: initiatives}
 }
 
-// productWithInitiatives は client デッキ構築向けにプロダクトと施策を合成した表現です。
+// productWithInitiatives はプロダクトに施策を合成した表現です。
 type productWithInitiatives struct {
 	domain.Product
 	Initiatives []domain.Initiative `json:"initiatives"`
