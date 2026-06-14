@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 
-	gencache "github.com/kenyamaneko/overload-party-card/data/cache"
 	pubsubadapter "github.com/kenyamaneko/overload-party-card/internal/adapter/pubsub"
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
 	"github.com/kenyamaneko/overload-party-card/internal/config"
@@ -55,6 +54,7 @@ func run() error {
 	cardPackRepo := repository.NewPgCardPackRepository(pool)
 	playerCardRepo := repository.NewPgPlayerCardRepository(pool)
 	deckRepo := repository.NewPgDeckRepository(pool)
+	productRepo := repository.NewPgProductRepository(pool)
 	eventRepo := repository.NewPgProcessedEventRepository(pool)
 
 	cardCache := cache.NewCardCache()
@@ -63,7 +63,7 @@ func run() error {
 	}
 
 	productCache := cache.NewProductCache()
-	if err := productCache.LoadFromBytes(gencache.ProductsJSON); err != nil {
+	if err := productCache.Load(ctx, productRepo); err != nil {
 		return fmt.Errorf("load product cache: %w", err)
 	}
 

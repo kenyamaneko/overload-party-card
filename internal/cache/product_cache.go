@@ -1,10 +1,13 @@
 package cache
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
+	"github.com/kenyamaneko/overload-party-card/internal/port"
 )
 
 // ProductCache はプロダクト定義のインメモリキャッシュです。
@@ -15,6 +18,25 @@ type ProductCache struct {
 // NewProductCache は空の ProductCache を生成します。
 func NewProductCache() *ProductCache {
 	return &ProductCache{}
+}
+
+// Load は ProductRepo から全プロダクト定義を読み込みキャッシュに格納します。
+func (c *ProductCache) Load(ctx context.Context, repo port.ProductRepo) error {
+	products, err := repo.FindAll(ctx)
+	if err != nil {
+		return fmt.Errorf("load product cache: %w", err)
+	}
+	if len(products) == 0 {
+		return fmt.Errorf("product cache: 0 products loaded, check products table or YAML seed")
+	}
+
+	c.products = make([]domain.Product, len(products))
+	for i, p := range products {
+		c.products[i] = *p
+	}
+
+	slog.Info("product cache loaded", "products", len(c.products))
+	return nil
 }
 
 // LoadFromBytes は JSON バイト列からプロダクト定義をロードします。

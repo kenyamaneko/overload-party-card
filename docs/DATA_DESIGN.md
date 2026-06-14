@@ -66,6 +66,47 @@ DB系・オブジェクトストレージ:
 
 Platform / Attachment / Strategy / Incident / Reactive には `stats` フィールドなし。
 
+### products
+
+陣営に属するプロダクトマスター。陣営:プロダクト = 1:N。
+
+- **PK:** `product_id` (VARCHAR(10))
+- **INDEX:** `idx_products_faction` ON `(faction)`
+- **TRIGGER:** `updated_at` 自動更新
+
+<!-- BEGIN GENERATED: products -->
+| カラム名 | 型 | Nullable | 説明 |
+|---|---|---|---|
+| `product_id` | VARCHAR(10) | No | プロダクト識別子（例: PD-0001） |
+| `faction` | VARCHAR(20) | No | 所属陣営 |
+| `product_name` | VARCHAR(100) | No | プロダクト名 |
+| `created_at` | TIMESTAMPTZ | No | 作成日時 |
+| `updated_at` | TIMESTAMPTZ | No | 更新日時 |
+<!-- END GENERATED: products -->
+
+### initiatives
+
+プロダクトの施策マスター。プロダクト:施策 = 1:N。`kind` で routine（1ターン1回）/ special（1ゲーム1回）を区別する。
+
+- **PK:** `initiative_id` (VARCHAR(10))
+- **FK:** `product_id` → `card.products(product_id)` ON DELETE CASCADE
+- **INDEX:** `idx_initiatives_product` ON `(product_id)`
+- **TRIGGER:** `updated_at` 自動更新
+
+<!-- BEGIN GENERATED: initiatives -->
+| カラム名 | 型 | Nullable | 説明 |
+|---|---|---|---|
+| `initiative_id` | VARCHAR(10) | No | 施策識別子（例: IN-0001） |
+| `product_id` | VARCHAR(10) | No | 親プロダクト識別子 |
+| `kind` | VARCHAR(10) | No | 区分（routine: 1ターン1回 / special: 1ゲーム1回） |
+| `name` | VARCHAR(100) | No | 施策名 |
+| `insight_cost` | BIGINT | No | 発動 Insight コスト |
+| `effect_text` | VARCHAR(500) | No | 効果テキスト（表示用） |
+| `effect` | JSONB | No | 効果定義（DSL） |
+| `created_at` | TIMESTAMPTZ | No | 作成日時 |
+| `updated_at` | TIMESTAMPTZ | No | 更新日時 |
+<!-- END GENERATED: initiatives -->
+
 ### player_cards
 
 プレイヤーの所持カード。
@@ -153,6 +194,10 @@ Pub/Sub subscriber の冪等性を保証するテーブル。
 card_definitions (PK: card_id)
   （player_cards.card_id が参照するが FK は張らない — カード削除時に所持データが壊れないよう is_active で制御）
 
+products (PK: product_id)
+  └── 1:N ── initiatives (FK: product_id → products, CASCADE)
+  （decks.product_id / routine_id / special_id が参照するが FK は張らない — アプリ層整合性）
+
 [account.players] ─ ─ ─ (cross-schema, app-level)
   │
   ├── 1:N ── player_cards (PK: player_id, card_id, art_no)
@@ -171,4 +216,6 @@ processed_events (独立、FK なし)
 |---|---|---|
 | `idx_cards_faction` | `card_definitions(faction, card_type)` | 陣営別カード一覧取得。フィルタリング高速化 |
 | `idx_cards_type` | `card_definitions(card_type)` | タイプ別検索 |
+| `idx_products_faction` | `products(faction)` | 陣営別プロダクト一覧取得 |
+| `idx_initiatives_product` | `initiatives(product_id)` | プロダクトの施策一括取得 |
 | `idx_decks_player` | `decks(player_id, updated_at DESC)` | プレイヤーのデッキ一覧を更新日降順で取得 |

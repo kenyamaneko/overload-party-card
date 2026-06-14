@@ -44,6 +44,43 @@ func seedCards(t *testing.T, cards []cardSeed) {
 	}
 }
 
+// productSeed は card.products への最小シード入力。
+type productSeed struct {
+	ProductID   string
+	Faction     string
+	ProductName string
+}
+
+func seedProduct(t *testing.T, s productSeed) {
+	t.Helper()
+	_, err := sharedPg.Pool.Exec(context.Background(),
+		`INSERT INTO card.products (product_id, faction, product_name)
+		 VALUES ($1, $2, $3)`,
+		s.ProductID, s.Faction, s.ProductName)
+	require.NoError(t, err)
+}
+
+// initiativeSeed は card.initiatives への最小シード入力。Effect は JSON 文字列。
+type initiativeSeed struct {
+	InitiativeID string
+	ProductID    string
+	Kind         string
+	Name         string
+	InsightCost  int64
+	EffectText   string
+	Effect       string
+}
+
+func seedInitiative(t *testing.T, s initiativeSeed) {
+	t.Helper()
+	_, err := sharedPg.Pool.Exec(context.Background(),
+		`INSERT INTO card.initiatives
+		   (initiative_id, product_id, kind, name, insight_cost, effect_text, effect)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		s.InitiativeID, s.ProductID, s.Kind, s.Name, s.InsightCost, s.EffectText, json.RawMessage(s.Effect))
+	require.NoError(t, err)
+}
+
 type playerCardSeed struct {
 	PlayerID string
 	CardID   string

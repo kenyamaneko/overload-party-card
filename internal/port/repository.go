@@ -11,6 +11,11 @@ type CardRepo interface {
 	FindAll(ctx context.Context) ([]*domain.Card, error)
 }
 
+// ProductRepo はプロダクト定義 (施策を含む) の永続化を抽象化するインターフェースです。
+type ProductRepo interface {
+	FindAll(ctx context.Context) ([]*domain.Product, error)
+}
+
 // PlayerCardRepo はプレイヤー所持カードの永続化を抽象化するインターフェースです。
 type PlayerCardRepo interface {
 	GetPlayerCards(ctx context.Context, playerID string) ([]*domain.PlayerCard, error)

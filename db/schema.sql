@@ -2,6 +2,8 @@
 --
 -- Scope (ADR-014):
 --   card.card_definitions             - カードマスター
+--   card.products                     - プロダクトマスター
+--   card.initiatives                  - 施策マスター
 --   card.player_cards                 - プレイヤーの所持カード
 --   card.decks                        - プレイヤーのデッキヘッダー
 --   card.deck_cards                   - デッキ内カード構成
@@ -50,6 +52,44 @@ CREATE TABLE card.card_definitions (
 CREATE INDEX idx_cards_faction ON card.card_definitions(faction, card_type);
 CREATE INDEX idx_cards_type ON card.card_definitions(card_type);
 CREATE TRIGGER trg_card_definitions_updated_at BEFORE UPDATE ON card.card_definitions FOR EACH ROW EXECUTE FUNCTION card.update_updated_at();
+
+-- =============================================================================
+-- Product Master (schema: card)
+-- =============================================================================
+-- 陣営に属するプロダクトと、その施策 (ルーチン / スペシャル) の SSoT。
+-- 陣営:プロダクト = 1:N（陣営は products.faction 列で表現）、
+-- プロダクト:施策 = 1:N（initiatives.product_id で親を参照）。
+-- decks は product_id / routine_id / special_id を論理参照として持ち、整合性は
+-- アプリ層で担保する（card_id と同様、FK は張らない）。
+
+CREATE TABLE card.products (
+  product_id   VARCHAR(10) NOT NULL,               -- プロダクト識別子（例: PD-0001）
+  faction      VARCHAR(20) NOT NULL CHECK (faction IN ('SHE', 'Tenki', 'Sugar', 'Tuners')), -- 所属陣営
+  product_name VARCHAR(100) NOT NULL,              -- プロダクト名
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(), -- 作成日時
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(), -- 更新日時
+  PRIMARY KEY (product_id)
+);
+
+CREATE INDEX idx_products_faction ON card.products(faction);
+CREATE TRIGGER trg_products_updated_at BEFORE UPDATE ON card.products FOR EACH ROW EXECUTE FUNCTION card.update_updated_at();
+
+CREATE TABLE card.initiatives (
+  initiative_id VARCHAR(10) NOT NULL,              -- 施策識別子（例: IN-0001）
+  product_id    VARCHAR(10) NOT NULL,              -- 親プロダクト識別子
+  kind          VARCHAR(10) NOT NULL CHECK (kind IN ('routine', 'special')), -- 区分（routine: 1ターン1回 / special: 1ゲーム1回）
+  name          VARCHAR(100) NOT NULL,             -- 施策名
+  insight_cost  BIGINT NOT NULL CHECK (insight_cost >= 0), -- 発動 Insight コスト
+  effect_text   VARCHAR(500) NOT NULL,             -- 効果テキスト（表示用）
+  effect        JSONB NOT NULL,                    -- 効果定義（DSL）
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),-- 作成日時
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),-- 更新日時
+  PRIMARY KEY (initiative_id),
+  FOREIGN KEY (product_id) REFERENCES card.products(product_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_initiatives_product ON card.initiatives(product_id);
+CREATE TRIGGER trg_initiatives_updated_at BEFORE UPDATE ON card.initiatives FOR EACH ROW EXECUTE FUNCTION card.update_updated_at();
 
 -- =============================================================================
 -- Card & Deck Management (schema: card, children of players)

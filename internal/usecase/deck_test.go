@@ -210,7 +210,7 @@ func TestCreateDeck_Validity(t *testing.T) {
 		wantValid bool
 	}{
 		{
-			name:     "30 cards -> valid",
+			name:     "30枚ちょうどは有効",
 			deckName: "Full Deck",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantUnlimited(pcRepo, pid, allTenCards...)
@@ -219,7 +219,7 @@ func TestCreateDeck_Validity(t *testing.T) {
 			wantValid: true,
 		},
 		{
-			name:     "29 cards -> invalid",
+			name:     "29枚は無効",
 			deckName: "Almost Full",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantUnlimited(pcRepo, pid, "C-001", "C-002", "C-003", "C-004", "C-005", "C-006", "C-007", "C-008", "C-009")
@@ -232,7 +232,7 @@ func TestCreateDeck_Validity(t *testing.T) {
 			wantValid: false,
 		},
 		{
-			name:      "0 cards -> invalid",
+			name:      "0枚は無効",
 			deckName:  "Empty Deck",
 			grant:     func(pcRepo *inMemoryPlayerCardRepo, pid string) {},
 			entries:   []apicard.DeckCardEntry{},
@@ -272,7 +272,7 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 		wantErrMsg string
 	}{
 		{
-			name:    "faction missing",
+			name:    "陣営が空",
 			faction: "",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
@@ -281,7 +281,7 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: `faction "" is not selectable`,
 		},
 		{
-			name:    "faction Neutral is not selectable",
+			name:    "Neutral は選択不可",
 			faction: "Neutral",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-007", ArtNo: 0, Count: 3})
@@ -290,7 +290,7 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: `faction "Neutral" is not selectable`,
 		},
 		{
-			name:    "faction unknown",
+			name:    "未知の陣営",
 			faction: "Atlantis",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
@@ -299,7 +299,7 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: `faction "Atlantis" is not selectable`,
 		},
 		{
-			name:    "other-faction card in deck",
+			name:    "他陣営カードがデッキに含まれる",
 			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid,
@@ -311,7 +311,7 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: "only SHE and Neutral cards are allowed",
 		},
 		{
-			name:    "31 cards exceeds max",
+			name:    "31枚は上限超過",
 			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantUnlimited(pcRepo, pid, allTenCards...)
@@ -325,7 +325,7 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: "deck cannot exceed 30 cards",
 		},
 		{
-			name:    "unowned card",
+			name:    "未所持カード",
 			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
@@ -334,7 +334,7 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: "not enough owned",
 		},
 		{
-			name:    "unlimited card 4 copies (max 3)",
+			name:    "無制限カード4枚は上限3超過",
 			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 4})
@@ -343,7 +343,7 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: "exceeds restriction limit (4/3)",
 		},
 		{
-			name:    "limited card 2 copies (max 1)",
+			name:    "制限カード2枚は上限1超過",
 			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-050", ArtNo: 0, Count: 2})
@@ -352,7 +352,7 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: "exceeds restriction limit (2/1)",
 		},
 		{
-			name:    "semi_limited card 3 copies (max 2)",
+			name:    "準制限カード3枚は上限2超過",
 			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-060", ArtNo: 0, Count: 3})
@@ -361,7 +361,7 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: "exceeds restriction limit (3/2)",
 		},
 		{
-			name:    "count = 0",
+			name:    "枚数0は無効",
 			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
@@ -370,7 +370,7 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: "count must be positive",
 		},
 		{
-			name:    "count = -1",
+			name:    "枚数-1は無効",
 			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
@@ -379,7 +379,7 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: "count must be positive",
 		},
 		{
-			name:    "card not in definitions",
+			name:    "カード定義に存在しない",
 			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-999", ArtNo: 0, Count: 3})
@@ -388,7 +388,7 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: "card C-999 not found in card definitions",
 		},
 		{
-			name:    "cross-variant exceeds restriction",
+			name:    "アート違い合算で制限超過",
 			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 				grantCards(pcRepo, pid,
@@ -433,13 +433,55 @@ func TestCreateDeck_InvalidInitiatives(t *testing.T) {
 		specialID  string
 		wantErrMsg string
 	}{
-		{"unknown product", "PD-NOPE", testRoutineID, testSpecialID, "not found"},
-		{"product of other faction", "PD-TST2", testRoutineID, testSpecialID, "not deck faction"},
-		{"unknown routine", testProductID, "IN-NOPE", testSpecialID, "is not a routine"},
-		{"unknown special", testProductID, testRoutineID, "IN-NOPE", "is not a special"},
-		{"routine id used as special", testProductID, testRoutineID, testRoutineID, "is not a special"},
-		{"special id used as routine", testProductID, testSpecialID, testSpecialID, "is not a routine"},
-		{"routine from other product", testProductID, "IN-TST-R2", testSpecialID, "is not a routine"},
+		{
+			name:       "不明なプロダクト",
+			productID:  "PD-NOPE",
+			routineID:  testRoutineID,
+			specialID:  testSpecialID,
+			wantErrMsg: "not found",
+		},
+		{
+			name:       "他陣営のプロダクト",
+			productID:  "PD-TST2",
+			routineID:  testRoutineID,
+			specialID:  testSpecialID,
+			wantErrMsg: "not deck faction",
+		},
+		{
+			name:       "不明なルーチン",
+			productID:  testProductID,
+			routineID:  "IN-NOPE",
+			specialID:  testSpecialID,
+			wantErrMsg: "is not a routine",
+		},
+		{
+			name:       "不明なスペシャル",
+			productID:  testProductID,
+			routineID:  testRoutineID,
+			specialID:  "IN-NOPE",
+			wantErrMsg: "is not a special",
+		},
+		{
+			name:       "ルーチンIDをスペシャルに指定",
+			productID:  testProductID,
+			routineID:  testRoutineID,
+			specialID:  testRoutineID,
+			wantErrMsg: "is not a special",
+		},
+		{
+			name:       "スペシャルIDをルーチンに指定",
+			productID:  testProductID,
+			routineID:  testSpecialID,
+			specialID:  testSpecialID,
+			wantErrMsg: "is not a routine",
+		},
+		{
+			name:       "別プロダクトのルーチン",
+			productID:  testProductID,
+			routineID:  "IN-TST-R2",
+			specialID:  testSpecialID,
+			wantErrMsg: "is not a routine",
+		},
 	}
 
 	for _, tt := range tests {
@@ -469,9 +511,9 @@ func TestCreateDeck_RestrictionAtLimit(t *testing.T) {
 		cardID string
 		count  int
 	}{
-		{"limited 1 copy (max 1)", "C-050", 1},
-		{"semi_limited 2 copies (max 2)", "C-060", 2},
-		{"unlimited 3 copies (max 3)", "C-001", 3},
+		{"制限カード1枚は上限ちょうど", "C-050", 1},
+		{"準制限カード2枚は上限ちょうど", "C-060", 2},
+		{"無制限カード3枚は上限ちょうど", "C-001", 3},
 	}
 
 	for _, tt := range tests {
