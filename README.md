@@ -35,13 +35,13 @@ make fmt   # gofmt -s -w
 
 ## 公開パッケージ
 
-[packages/api-card/](packages/api-card/) に gateway が import する REST 契約型を公開している。[data/openapi.yaml](data/openapi.yaml) (SSoT) を編集後に以下で再生成する。
+[packages/api-card/](packages/api-card/) に gateway が import する REST 契約型 (Go)、[packages/api-card-dotnet/](packages/api-card-dotnet/) に battle が import する client + DTO (NuGet `OverloadParty.ApiCard`) を公開している。[data/openapi.yaml](data/openapi.yaml) (SSoT) を編集後に以下で再生成する。
 
 ```bash
 scripts/generate_types.sh
 ```
 
-`openapi_gen.go` は oapi-codegen の出力 — 直接編集しない。クライアント向け TypeScript 型は `@kenyamaneko/overload-party-api-gateway` に統合済み。
+`openapi_gen.go` は oapi-codegen、`ApiCard_gen.cs` は NSwag の出力 — 直接編集しない。クライアント向け TypeScript 型は `@kenyamaneko/overload-party-api-gateway` に統合済み。
 
 ## カードマスター変更
 
