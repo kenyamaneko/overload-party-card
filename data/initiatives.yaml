@@ -1,0 +1,119 @@
+# Initiative master data (SSoT).
+#
+# 施策はプロダクトに属する発動可能アクション。プロダクト:施策 = 1:N。各プロダクトは
+# ルーチン (1ターン1回) / スペシャル (1ゲーム1回) をそれぞれ 1 つ以上持つ。デッキは
+# 選択したプロダクトの中から各区分を 1 つずつセットする。product_id で親を参照する。
+#
+# Consumed by scripts/generate_products.py (products.yaml と併せて読み込まれる)。
+#
+# effect は battle エンジンの効果 DSL (ops / custom) で記述する。施策はプレイヤーの
+# use_initiative アクションで発動するため trigger は持たない。
+#
+# 台風の amount とお裾分けの insight_cost はシミュレーション前の暫定値。
+
+initiatives:
+  - initiative_id: IN-0001
+    product_id: PD-0001
+    kind: routine
+    name: 物欲刺激
+    insight_cost: 400
+    effect_text: "相手の表向きリソース 1体につき、相手の Budget を -100 する。"
+    effect:
+      ops:
+        - lose_budget:
+            target: opponent
+            amount:
+              base: 0
+              per:
+                count: { owner: opponent }
+                value: 100
+
+  - initiative_id: IN-0002
+    product_id: PD-0001
+    kind: special
+    name: 大感謝セール
+    insight_cost: 0
+    effect_text: "Insightプールの全 Insight を消費し、1.5倍の Budget に変換する。スループットによる変換上限を無視する。"
+    effect:
+      custom: convert_all_insight
+      meta:
+        multiplier_percent: 150
+
+  - initiative_id: IN-0003
+    product_id: PD-0002
+    kind: routine
+    name: 天候予測
+    insight_cost: 150
+    effect_text: "相手のサポートゾーンの伏せカード 1枚を選択して確認する。"
+    effect:
+      ops:
+        - peek_reactive: {}
+
+  - initiative_id: IN-0004
+    product_id: PD-0002
+    kind: special
+    name: 台風
+    insight_cost: 400
+    effect_text: "相手の表向きリソース全体に 300 ダメージを与える。"
+    effect:
+      ops:
+        - deal_damage:
+            selector: { owner: opponent }
+            amount: 300
+        - destroy_check: { target: opponent }
+
+  - initiative_id: IN-0005
+    product_id: PD-0003
+    kind: routine
+    name: 焼きたてのお菓子
+    insight_cost: 300
+    effect_text: "味方リソース 1体の可用性を 300 回復する。可用性上限を超えない。"
+    effect:
+      ops:
+        - heal_damage:
+            selector: { owner: myself, pick: choice }
+            amount: 300
+
+  - initiative_id: IN-0006
+    product_id: PD-0003
+    kind: special
+    name: お裾分け
+    insight_cost: 600
+    effect_text: "相手の表向きリソース全体を休止にする。"
+    effect:
+      ops:
+        - apply_buff:
+            selector: { owner: opponent }
+            buff: dormant
+            amount: 1
+            duration: until_next_turn_end
+
+  - initiative_id: IN-0007
+    product_id: PD-0004
+    kind: routine
+    name: BGM配信
+    insight_cost: 300
+    effect_text: "このターン、味方の表向きリソース全体のスループットを +200 する。"
+    effect:
+      ops:
+        - apply_buff:
+            selector: { owner: myself }
+            buff: tp
+            amount: 200
+            duration: this_turn
+
+  - initiative_id: IN-0008
+    product_id: PD-0004
+    kind: special
+    name: フェス開催
+    insight_cost: 500
+    effect_text: "自分の表向きリソース 1体につき、Budget を +150 する。"
+    effect:
+      ops:
+        - gain_budget:
+            target: myself
+            amount:
+              base: 0
+              per:
+                count: { owner: myself }
+                value: 150

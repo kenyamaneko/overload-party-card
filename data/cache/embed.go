@@ -2,7 +2,7 @@
 // and for tests that seed the in-memory caches without touching Postgres.
 //
 // The JSON files are produced by scripts/generate_cards.py (data/cards/*.yaml)
-// and scripts/generate_products.py (data/products.yaml).
+// and scripts/generate_products.py (data/products.yaml, data/initiatives.yaml).
 // This package is intentionally tiny so that the module path stays stable
 // even when the generators grow new outputs.
 package cache

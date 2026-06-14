@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Generate product data outputs from the YAML product definition.
+"""Generate product data outputs from the YAML product / initiative definitions.
+
+Inputs (SSoT, edited by humans):
+  - data/products.yaml      (products only)
+  - data/initiatives.yaml   (initiatives, referencing products by product_id)
 
 Outputs:
   - data/cache/products_gen.json   (Go embedded via data/cache/embed.go)
@@ -23,7 +27,8 @@ except ImportError:
 
 # ─── Paths ──────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parent.parent
-YAML_PATH = ROOT / "data" / "products.yaml"
+PRODUCTS_YAML_PATH = ROOT / "data" / "products.yaml"
+INITIATIVES_YAML_PATH = ROOT / "data" / "initiatives.yaml"
 GO_JSON_OUT = ROOT / "data" / "cache" / "products_gen.json"
 SEED_OUT = ROOT / "db" / "seed" / "products_seed.sql"
 MD_OUT = ROOT / "docs" / "PRODUCTS.md"
@@ -39,19 +44,29 @@ KIND_DISPLAY = {"routine": "ルーチン（1ターン1回）", "special": "ス�
 
 
 # ─── Load ───────────────────────────────────────────────
-def load_products():
-    """Load products from the YAML definition."""
-    if not YAML_PATH.exists():
-        print(f"ERROR: {YAML_PATH} not found", file=sys.stderr)
+def _load_yaml(path, key):
+    """Load a top-level list from a YAML file."""
+    if not path.exists():
+        print(f"ERROR: {path} not found", file=sys.stderr)
         sys.exit(1)
-    with open(YAML_PATH, "r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
-    return data.get("products", [])
+    return data.get(key, [])
+
+
+def load_products():
+    """Load products from data/products.yaml."""
+    return _load_yaml(PRODUCTS_YAML_PATH, "products")
+
+
+def load_initiatives():
+    """Load initiatives from data/initiatives.yaml."""
+    return _load_yaml(INITIATIVES_YAML_PATH, "initiatives")
 
 
 # ─── Validate ──────────────────────────────────────────
-def _validate_initiative(initiative, label, errors):
-    for field in ("initiative_id", "kind", "name", "insight_cost", "effect_text", "effect"):
+def _validate_initiative(initiative, label, product_ids, errors):
+    for field in ("initiative_id", "product_id", "kind", "name", "insight_cost", "effect_text", "effect"):
         if field not in initiative:
             errors.append(f"{label}: missing required field '{field}'")
             return
@@ -59,6 +74,8 @@ def _validate_initiative(initiative, label, errors):
     initiative_id = initiative["initiative_id"]
     if not re.match(r"^IN-\d{4}$", initiative_id):
         errors.append(f"{label}: initiative_id '{initiative_id}' must match IN-NNNN format")
+    if initiative["product_id"] not in product_ids:
+        errors.append(f"{label}: product_id '{initiative['product_id']}' does not reference a known product")
     if initiative["kind"] not in INITIATIVE_KINDS:
         errors.append(f"{label}: invalid kind '{initiative['kind']}'")
 
@@ -71,7 +88,7 @@ def _validate_initiative(initiative, label, errors):
         errors.append(f"{label}: effect must contain 'ops' or 'custom'")
 
 
-def validate(products):
+def validate(products, initiatives):
     """Run all validation checks. Returns list of error strings."""
     errors = []
     seen_factions = {}
@@ -82,7 +99,7 @@ def validate(products):
         product_id = product.get("product_id", "???")
         label = f"{product_id} {product.get('product_name', '???')}"
 
-        for field in ("product_id", "faction", "product_name", "initiatives"):
+        for field in ("product_id", "faction", "product_name"):
             if field not in product:
                 errors.append(f"{label}: missing required field '{field}'")
 
@@ -98,27 +115,43 @@ def validate(products):
             errors.append(f"{label}: invalid faction '{faction}'")
         seen_factions[faction] = product_id
 
-        initiatives = product.get("initiatives", [])
-        # 各プロダクトはルーチン・スペシャルをそれぞれ 1 つ以上持つ (数は区分ごとに異なってよい)。
-        # デッキはプロダクトを 1 つ選び、その中から各区分 1 つずつセットする。
-        kinds = {i.get("kind") for i in initiatives}
+    kinds_by_product = {pid: set() for pid in seen_product_ids}
+    for initiative in initiatives:
+        iid = initiative.get("initiative_id")
+        ilabel = f"{initiative.get('product_id', '???')} / {initiative.get('name', '???')}"
+        _validate_initiative(initiative, ilabel, seen_product_ids, errors)
+        if iid is not None:
+            if iid in seen_initiative_ids:
+                errors.append(f"{ilabel}: duplicate initiative_id '{iid}' (also used by {seen_initiative_ids[iid]})")
+            seen_initiative_ids[iid] = initiative.get("product_id")
+        pid = initiative.get("product_id")
+        if pid in kinds_by_product:
+            kinds_by_product[pid].add(initiative.get("kind"))
+
+    # 各プロダクトはルーチン・スペシャルをそれぞれ 1 つ以上持つ (数は区分ごとに異なってよい)。
+    for product_id, kinds in kinds_by_product.items():
         for required_kind in INITIATIVE_KINDS:
             if required_kind not in kinds:
-                errors.append(f"{label}: initiatives must include at least one '{required_kind}'")
-        for initiative in initiatives:
-            iid = initiative.get("initiative_id")
-            ilabel = f"{label} / {initiative.get('name', '???')}"
-            _validate_initiative(initiative, ilabel, errors)
-            if iid is not None:
-                if iid in seen_initiative_ids:
-                    errors.append(f"{ilabel}: duplicate initiative_id '{iid}' (also used by {seen_initiative_ids[iid]})")
-                seen_initiative_ids[iid] = product_id
+                errors.append(f"{product_id}: must have at least one '{required_kind}' initiative")
 
     missing = COLLECTIBLE_FACTIONS - set(seen_factions)
     if missing:
         errors.append(f"factions without a product: {sorted(missing)}")
 
     return errors
+
+
+# ─── Assemble ──────────────────────────────────────────
+def assemble(products, initiatives):
+    """Attach each product's initiatives (in file order) under an 'initiatives' key."""
+    by_product = {}
+    for initiative in initiatives:
+        by_product.setdefault(initiative["product_id"], []).append(initiative)
+
+    assembled = []
+    for product in products:
+        assembled.append({**product, "initiatives": by_product.get(product["product_id"], [])})
+    return assembled
 
 
 # ─── Generate JSON ─────────────────────────────────────
@@ -245,24 +278,30 @@ def generate_md(products, *, out_path):
 # ─── Main ──────────────────────────────────────────────
 def main():
     products = load_products()
+    initiatives = load_initiatives()
     if not products:
         print("ERROR: No products loaded from YAML", file=sys.stderr)
         sys.exit(1)
+    if not initiatives:
+        print("ERROR: No initiatives loaded from YAML", file=sys.stderr)
+        sys.exit(1)
 
-    errors = validate(products)
+    errors = validate(products, initiatives)
     if errors:
         print(f"Validation failed with {len(errors)} error(s):", file=sys.stderr)
         for err in errors:
             print(f"  - {err}", file=sys.stderr)
         sys.exit(1)
 
-    count = generate_json(products, out_path=GO_JSON_OUT)
+    assembled = assemble(products, initiatives)
+
+    count = generate_json(assembled, out_path=GO_JSON_OUT)
     print(f"Generated {count} products → {GO_JSON_OUT.relative_to(ROOT)}", file=sys.stderr)
 
-    count = generate_seed_sql(products, out_path=SEED_OUT)
+    count = generate_seed_sql(assembled, out_path=SEED_OUT)
     print(f"Generated {count} products → {SEED_OUT.relative_to(ROOT)}", file=sys.stderr)
 
-    count = generate_md(products, out_path=MD_OUT)
+    count = generate_md(assembled, out_path=MD_OUT)
     print(f"Generated {count} products → {MD_OUT.relative_to(ROOT)}", file=sys.stderr)
 
 
