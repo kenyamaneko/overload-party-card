@@ -19,15 +19,16 @@ var ErrNotFound = port.ErrNotFound
 
 // DeckInteractor はデッキの CRUD とバリデーションを提供します。
 type DeckInteractor struct {
-	deckRepo       port.DeckRepo
-	playerCardRepo port.PlayerCardRepo
-	cardCache      *cache.CardCache
-	productCache   *cache.ProductCache
+	deckRepo        port.DeckRepo
+	playerCardRepo  port.PlayerCardRepo
+	cardCache       *cache.CardCache
+	productCache    *cache.ProductCache
+	initiativeCache *cache.InitiativeCache
 }
 
 // NewDeckInteractor は DeckInteractor を生成します。
-func NewDeckInteractor(deckRepo port.DeckRepo, playerCardRepo port.PlayerCardRepo, cardCache *cache.CardCache, productCache *cache.ProductCache) *DeckInteractor {
-	return &DeckInteractor{deckRepo: deckRepo, playerCardRepo: playerCardRepo, cardCache: cardCache, productCache: productCache}
+func NewDeckInteractor(deckRepo port.DeckRepo, playerCardRepo port.PlayerCardRepo, cardCache *cache.CardCache, productCache *cache.ProductCache, initiativeCache *cache.InitiativeCache) *DeckInteractor {
+	return &DeckInteractor{deckRepo: deckRepo, playerCardRepo: playerCardRepo, cardCache: cardCache, productCache: productCache, initiativeCache: initiativeCache}
 }
 
 // CreateDeck は新しいデッキを作成します。所持カードと制限をバリデーションします。
@@ -212,11 +213,17 @@ func (s *DeckInteractor) validateInitiatives(faction, productID, routineID, spec
 		return fmt.Errorf("%w: product %q belongs to faction %q, not deck faction %q",
 			port.ErrInvalidDeck, productID, product.Faction, faction)
 	}
-	if _, ok := product.FindInitiative(routineID, domain.InitiativeKindRoutine); !ok {
-		return fmt.Errorf("%w: routine %q is not a routine of product %q", port.ErrInvalidDeck, routineID, productID)
+	if err := s.validateInitiative(productID, routineID, domain.InitiativeKindRoutine); err != nil {
+		return err
 	}
-	if _, ok := product.FindInitiative(specialID, domain.InitiativeKindSpecial); !ok {
-		return fmt.Errorf("%w: special %q is not a special of product %q", port.ErrInvalidDeck, specialID, productID)
+	return s.validateInitiative(productID, specialID, domain.InitiativeKindSpecial)
+}
+
+// validateInitiative は施策が指定プロダクトに属し、かつ指定区分かを検証します。
+func (s *DeckInteractor) validateInitiative(productID, initiativeID, kind string) error {
+	initiative := s.initiativeCache.FindByID(initiativeID)
+	if initiative == nil || initiative.ProductID != productID || initiative.Kind != kind {
+		return fmt.Errorf("%w: %q is not a %s of product %q", port.ErrInvalidDeck, initiativeID, kind, productID)
 	}
 	return nil
 }

@@ -143,28 +143,30 @@ func setupDeckInteractor(t *testing.T) (*DeckInteractor, *mockDeckRepo, *inMemor
 
 	pc := cache.NewProductCache()
 	require.NoError(t, pc.LoadFromBytes([]byte(testProductsJSON)))
+	ic := cache.NewInitiativeCache()
+	require.NoError(t, ic.LoadFromBytes([]byte(testInitiativesJSON)))
 
 	pcRepo := newInMemoryPlayerCardRepo()
-	svc := NewDeckInteractor(repo, pcRepo, cc, pc)
+	svc := NewDeckInteractor(repo, pcRepo, cc, pc, ic)
 	return svc, repo, pcRepo, cc
 }
 
-// testProductsJSON は SHE プロダクト PD-TST (ルーチン IN-TST-R / スペシャル IN-TST-S) と、
-// 別陣営 (Tenki) のプロダクト PD-TST2 を持つテスト用定義。施策の effect は検証に使わないため最小限。
+// testProductsJSON は SHE プロダクト PD-TST と別陣営 (Tenki) の PD-TST2 を持つテスト用定義。
 const testProductID = "PD-TST"
 const testRoutineID = "IN-TST-R"
 const testSpecialID = "IN-TST-S"
 const testProductsJSON = `[
-  {"product_id":"PD-TST","faction":"SHE","product_name":"Test",
-   "initiatives":[
-     {"initiative_id":"IN-TST-R","kind":"routine","name":"R","insight_cost":100,"effect_text":"","effect":{"ops":[]}},
-     {"initiative_id":"IN-TST-S","kind":"special","name":"S","insight_cost":200,"effect_text":"","effect":{"ops":[]}}
-   ]},
-  {"product_id":"PD-TST2","faction":"Tenki","product_name":"Other",
-   "initiatives":[
-     {"initiative_id":"IN-TST-R2","kind":"routine","name":"R2","insight_cost":100,"effect_text":"","effect":{"ops":[]}},
-     {"initiative_id":"IN-TST-S2","kind":"special","name":"S2","insight_cost":200,"effect_text":"","effect":{"ops":[]}}
-   ]}
+  {"product_id":"PD-TST","faction":"SHE","product_name":"Test"},
+  {"product_id":"PD-TST2","faction":"Tenki","product_name":"Other"}
+]`
+
+// testInitiativesJSON は PD-TST / PD-TST2 それぞれのルーチン・スペシャルを持つ。
+// effect は検証に使わないため最小限。
+const testInitiativesJSON = `[
+  {"initiative_id":"IN-TST-R","product_id":"PD-TST","kind":"routine","name":"R","insight_cost":100,"effect_text":"","effect":{"ops":[]}},
+  {"initiative_id":"IN-TST-S","product_id":"PD-TST","kind":"special","name":"S","insight_cost":200,"effect_text":"","effect":{"ops":[]}},
+  {"initiative_id":"IN-TST-R2","product_id":"PD-TST2","kind":"routine","name":"R2","insight_cost":100,"effect_text":"","effect":{"ops":[]}},
+  {"initiative_id":"IN-TST-S2","product_id":"PD-TST2","kind":"special","name":"S2","insight_cost":200,"effect_text":"","effect":{"ops":[]}}
 ]`
 
 func grantCards(repo *inMemoryPlayerCardRepo, playerID string, cards ...*domain.PlayerCard) {

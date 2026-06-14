@@ -6,10 +6,11 @@ Inputs (SSoT, edited by humans):
   - data/initiatives.yaml   (initiatives, referencing products by product_id)
 
 Outputs:
-  - data/cache/products_gen.json   (Go embedded via data/cache/embed.go)
-  - db/seed/products_seed.sql      (PostgreSQL UPSERT seed: products)
-  - db/seed/initiatives_seed.sql   (PostgreSQL UPSERT seed: initiatives)
-  - docs/PRODUCTS.md               (human-readable product list)
+  - data/cache/products_gen.json     (Go embedded via data/cache/embed.go)
+  - data/cache/initiatives_gen.json  (Go embedded via data/cache/embed.go)
+  - db/seed/products_seed.sql        (PostgreSQL UPSERT seed: products)
+  - db/seed/initiatives_seed.sql     (PostgreSQL UPSERT seed: initiatives)
+  - docs/PRODUCTS.md                 (human-readable product list)
 
 Usage:
     python3 scripts/generate_products.py
@@ -30,7 +31,8 @@ except ImportError:
 ROOT = Path(__file__).resolve().parent.parent
 PRODUCTS_YAML_PATH = ROOT / "data" / "products.yaml"
 INITIATIVES_YAML_PATH = ROOT / "data" / "initiatives.yaml"
-GO_JSON_OUT = ROOT / "data" / "cache" / "products_gen.json"
+PRODUCTS_JSON_OUT = ROOT / "data" / "cache" / "products_gen.json"
+INITIATIVES_JSON_OUT = ROOT / "data" / "cache" / "initiatives_gen.json"
 PRODUCTS_SEED_OUT = ROOT / "db" / "seed" / "products_seed.sql"
 INITIATIVES_SEED_OUT = ROOT / "db" / "seed" / "initiatives_seed.sql"
 MD_OUT = ROOT / "docs" / "PRODUCTS.md"
@@ -157,32 +159,43 @@ def assemble(products, initiatives):
 
 
 # ─── Generate JSON ─────────────────────────────────────
-def generate_json(products, *, out_path):
-    """Generate products_gen.json."""
-    output = []
-    for product in sorted(products, key=lambda p: p["product_id"]):
-        output.append({
-            "product_id": product["product_id"],
-            "faction": product["faction"],
-            "product_name": product["product_name"],
-            "initiatives": [
-                {
-                    "initiative_id": i["initiative_id"],
-                    "kind": i["kind"],
-                    "name": i["name"],
-                    "insight_cost": i["insight_cost"],
-                    "effect_text": i["effect_text"],
-                    "effect": i["effect"],
-                }
-                for i in product["initiatives"]
-            ],
-        })
-
+def _write_json(out_path, output):
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
         f.write("\n")
+
+
+def generate_products_json(products, *, out_path):
+    """Generate products_gen.json (flat products)."""
+    output = [
+        {
+            "product_id": p["product_id"],
+            "faction": p["faction"],
+            "product_name": p["product_name"],
+        }
+        for p in sorted(products, key=lambda p: p["product_id"])
+    ]
+    _write_json(out_path, output)
+    return len(output)
+
+
+def generate_initiatives_json(initiatives, *, out_path):
+    """Generate initiatives_gen.json (flat initiatives)."""
+    output = [
+        {
+            "initiative_id": i["initiative_id"],
+            "product_id": i["product_id"],
+            "kind": i["kind"],
+            "name": i["name"],
+            "insight_cost": i["insight_cost"],
+            "effect_text": i["effect_text"],
+            "effect": i["effect"],
+        }
+        for i in sorted(initiatives, key=lambda i: i["initiative_id"])
+    ]
+    _write_json(out_path, output)
     return len(output)
 
 
@@ -315,8 +328,11 @@ def main():
 
     assembled = assemble(products, initiatives)
 
-    count = generate_json(assembled, out_path=GO_JSON_OUT)
-    print(f"Generated {count} products → {GO_JSON_OUT.relative_to(ROOT)}", file=sys.stderr)
+    count = generate_products_json(products, out_path=PRODUCTS_JSON_OUT)
+    print(f"Generated {count} products → {PRODUCTS_JSON_OUT.relative_to(ROOT)}", file=sys.stderr)
+
+    count = generate_initiatives_json(initiatives, out_path=INITIATIVES_JSON_OUT)
+    print(f"Generated {count} initiatives → {INITIATIVES_JSON_OUT.relative_to(ROOT)}", file=sys.stderr)
 
     count = generate_products_seed_sql(products, out_path=PRODUCTS_SEED_OUT)
     print(f"Generated {count} products → {PRODUCTS_SEED_OUT.relative_to(ROOT)}", file=sys.stderr)

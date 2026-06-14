@@ -38,19 +38,19 @@ paths:
         "500":
           description: DB 接続エラー
 
-  /internal/v1/products:
+  /internal/v1/initiatives:
     get:
-      operationId: listProducts
-      summary: 全プロダクト定義を返す (battle 起動時キャッシュロード用)
+      operationId: listInitiatives
+      summary: 全施策定義を返す (battle 起動時キャッシュロード用)
       responses:
         "200":
-          description: プロダクト定義一覧
+          description: 施策定義一覧
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Product"
+                  $ref: "#/components/schemas/Initiative"
 
   /api/v1/cards/products:
     get:
@@ -602,12 +602,16 @@ components:
     Initiative:
       type: object
       description: プロダクトの施策。ルーチン (1ターン1回) / スペシャル (1ゲーム1回)。
-      required: [initiative_id, kind, name, insight_cost, effect_text, effect]
+      required: [initiative_id, product_id, kind, name, insight_cost, effect_text, effect]
       properties:
         initiative_id:
           type: string
           x-go-name: InitiativeID
           description: 施策識別子 (例 IN-0001)
+        product_id:
+          type: string
+          x-go-name: ProductID
+          description: 親プロダクトの ID
         kind:
           $ref: "#/components/schemas/InitiativeKind"
         name:

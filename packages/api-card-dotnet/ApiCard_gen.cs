@@ -60,19 +60,19 @@ namespace OverloadParty.ApiCard
         System.Threading.Tasks.Task<System.Collections.Generic.ICollection<CardDefinition>> ListCardsAsync(System.Threading.CancellationToken cancellationToken);
 
         /// <summary>
-        /// 全プロダクト定義を返す (battle 起動時キャッシュロード用)
+        /// 全施策定義を返す (battle 起動時キャッシュロード用)
         /// </summary>
-        /// <returns>プロダクト定義一覧</returns>
+        /// <returns>施策定義一覧</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Product>> ListProductsAsync();
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Initiative>> ListInitiativesAsync();
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
-        /// 全プロダクト定義を返す (battle 起動時キャッシュロード用)
+        /// 全施策定義を返す (battle 起動時キャッシュロード用)
         /// </summary>
-        /// <returns>プロダクト定義一覧</returns>
+        /// <returns>施策定義一覧</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Product>> ListProductsAsync(System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Initiative>> ListInitiativesAsync(System.Threading.CancellationToken cancellationToken);
 
         /// <summary>
         /// 全プロダクト定義を返す (client のデッキ構築・プロダクト表示用)
@@ -418,22 +418,22 @@ namespace OverloadParty.ApiCard
         }
 
         /// <summary>
-        /// 全プロダクト定義を返す (battle 起動時キャッシュロード用)
+        /// 全施策定義を返す (battle 起動時キャッシュロード用)
         /// </summary>
-        /// <returns>プロダクト定義一覧</returns>
+        /// <returns>施策定義一覧</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Product>> ListProductsAsync()
+        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Initiative>> ListInitiativesAsync()
         {
-            return ListProductsAsync(System.Threading.CancellationToken.None);
+            return ListInitiativesAsync(System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
-        /// 全プロダクト定義を返す (battle 起動時キャッシュロード用)
+        /// 全施策定義を返す (battle 起動時キャッシュロード用)
         /// </summary>
-        /// <returns>プロダクト定義一覧</returns>
+        /// <returns>施策定義一覧</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Product>> ListProductsAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Initiative>> ListInitiativesAsync(System.Threading.CancellationToken cancellationToken)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -446,8 +446,8 @@ namespace OverloadParty.ApiCard
 
                     var urlBuilder_ = new System.Text.StringBuilder();
                 
-                    // Operation Path: "internal/v1/products"
-                    urlBuilder_.Append("internal/v1/products");
+                    // Operation Path: "internal/v1/initiatives"
+                    urlBuilder_.Append("internal/v1/initiatives");
 
                     PrepareRequest(client_, request_, urlBuilder_);
 
@@ -474,7 +474,7 @@ namespace OverloadParty.ApiCard
                         var status_ = (int)response_.StatusCode;
                         if (status_ == 200)
                         {
-                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<Product>>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<Initiative>>(response_, headers_, cancellationToken).ConfigureAwait(false);
                             if (objectResponse_.Object == null)
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
@@ -2042,6 +2042,12 @@ namespace OverloadParty.ApiCard
         /// </summary>
         [System.Text.Json.Serialization.JsonPropertyName("initiative_id")]
         public string Initiative_id { get; set; } = default!;
+
+        /// <summary>
+        /// 親プロダクトの ID
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("product_id")]
+        public string Product_id { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("kind")]
         [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<InitiativeKind>))]

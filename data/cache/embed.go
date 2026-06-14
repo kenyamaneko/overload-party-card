@@ -14,3 +14,6 @@ var CardsJSON []byte
 
 //go:embed products_gen.json
 var ProductsJSON []byte
+
+//go:embed initiatives_gen.json
+var InitiativesJSON []byte

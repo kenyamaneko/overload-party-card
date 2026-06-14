@@ -38,15 +38,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/internal/v1/products": {
+    "/internal/v1/initiatives": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** 全プロダクト定義を返す (battle 起動時キャッシュロード用) */
-        get: operations["listProducts"];
+        /** 全施策定義を返す (battle 起動時キャッシュロード用) */
+        get: operations["listInitiatives"];
         put?: never;
         post?: never;
         delete?: never;
@@ -328,6 +328,8 @@ export interface components {
         Initiative: {
             /** @description 施策識別子 (例 IN-0001) */
             initiative_id: string;
+            /** @description 親プロダクトの ID */
+            product_id: string;
             kind: components["schemas"]["InitiativeKind"];
             name: string;
             /** Format: int64 */
@@ -500,7 +502,7 @@ export interface operations {
             };
         };
     };
-    listProducts: {
+    listInitiatives: {
         parameters: {
             query?: never;
             header?: never;
@@ -509,13 +511,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description プロダクト定義一覧 */
+            /** @description 施策定義一覧 */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Product"][];
+                    "application/json": components["schemas"]["Initiative"][];
                 };
             };
         };

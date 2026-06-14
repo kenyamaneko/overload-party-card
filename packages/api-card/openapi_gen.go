@@ -323,6 +323,9 @@ type Initiative struct {
 	// Kind 施策の区分。
 	Kind InitiativeKind `json:"kind"`
 	Name string         `json:"name"`
+
+	// ProductID 親プロダクトの ID
+	ProductID string `json:"product_id"`
 }
 
 // InitiativeKind 施策の区分。
@@ -503,8 +506,8 @@ type ClientInterface interface {
 	// ListCards request
 	ListCards(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ListProducts request
-	ListProducts(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// ListInitiatives request
+	ListInitiatives(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) ListPlayerCards(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -663,8 +666,8 @@ func (c *Client) ListCards(ctx context.Context, reqEditors ...RequestEditorFn) (
 	return c.Client.Do(req)
 }
 
-func (c *Client) ListProducts(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListProductsRequest(c.Server)
+func (c *Client) ListInitiatives(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListInitiativesRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -1026,8 +1029,8 @@ func NewListCardsRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
-// NewListProductsRequest generates requests for ListProducts
-func NewListProductsRequest(server string) (*http.Request, error) {
+// NewListInitiativesRequest generates requests for ListInitiatives
+func NewListInitiativesRequest(server string) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -1035,7 +1038,7 @@ func NewListProductsRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/internal/v1/products")
+	operationPath := fmt.Sprintf("/internal/v1/initiatives")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1133,8 +1136,8 @@ type ClientWithResponsesInterface interface {
 	// ListCardsWithResponse request
 	ListCardsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCardsResponse, error)
 
-	// ListProductsWithResponse request
-	ListProductsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListProductsResponse, error)
+	// ListInitiativesWithResponse request
+	ListInitiativesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListInitiativesResponse, error)
 }
 
 type ListPlayerCardsResponse struct {
@@ -1465,14 +1468,14 @@ func (r ListCardsResponse) ContentType() string {
 	return ""
 }
 
-type ListProductsResponse struct {
+type ListInitiativesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *[]Product
+	JSON200      *[]Initiative
 }
 
 // Status returns HTTPResponse.Status
-func (r ListProductsResponse) Status() string {
+func (r ListInitiativesResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1480,7 +1483,7 @@ func (r ListProductsResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r ListProductsResponse) StatusCode() int {
+func (r ListInitiativesResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1488,7 +1491,7 @@ func (r ListProductsResponse) StatusCode() int {
 }
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ListProductsResponse) ContentType() string {
+func (r ListInitiativesResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -1610,13 +1613,13 @@ func (c *ClientWithResponses) ListCardsWithResponse(ctx context.Context, reqEdit
 	return ParseListCardsResponse(rsp)
 }
 
-// ListProductsWithResponse request returning *ListProductsResponse
-func (c *ClientWithResponses) ListProductsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListProductsResponse, error) {
-	rsp, err := c.ListProducts(ctx, reqEditors...)
+// ListInitiativesWithResponse request returning *ListInitiativesResponse
+func (c *ClientWithResponses) ListInitiativesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListInitiativesResponse, error) {
+	rsp, err := c.ListInitiatives(ctx, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseListProductsResponse(rsp)
+	return ParseListInitiativesResponse(rsp)
 }
 
 // ParseListPlayerCardsResponse parses an HTTP response from a ListPlayerCardsWithResponse call
@@ -1885,22 +1888,22 @@ func ParseListCardsResponse(rsp *http.Response) (*ListCardsResponse, error) {
 	return response, nil
 }
 
-// ParseListProductsResponse parses an HTTP response from a ListProductsWithResponse call
-func ParseListProductsResponse(rsp *http.Response) (*ListProductsResponse, error) {
+// ParseListInitiativesResponse parses an HTTP response from a ListInitiativesWithResponse call
+func ParseListInitiativesResponse(rsp *http.Response) (*ListInitiativesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &ListProductsResponse{
+	response := &ListInitiativesResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []Product
+		var dest []Initiative
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

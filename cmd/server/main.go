@@ -55,6 +55,7 @@ func run() error {
 	playerCardRepo := repository.NewPgPlayerCardRepository(pool)
 	deckRepo := repository.NewPgDeckRepository(pool)
 	productRepo := repository.NewPgProductRepository(pool)
+	initiativeRepo := repository.NewPgInitiativeRepository(pool)
 	eventRepo := repository.NewPgProcessedEventRepository(pool)
 
 	cardCache := cache.NewCardCache()
@@ -67,21 +68,27 @@ func run() error {
 		return fmt.Errorf("load product cache: %w", err)
 	}
 
+	initiativeCache := cache.NewInitiativeCache()
+	if err := initiativeCache.Load(ctx, initiativeRepo); err != nil {
+		return fmt.Errorf("load initiative cache: %w", err)
+	}
+
 	cardInteractor := usecase.NewCardInteractor(cardRepo, playerCardRepo)
-	deckInteractor := usecase.NewDeckInteractor(deckRepo, playerCardRepo, cardCache, productCache)
+	deckInteractor := usecase.NewDeckInteractor(deckRepo, playerCardRepo, cardCache, productCache, initiativeCache)
 	playerCardInteractor := usecase.NewPlayerCardInteractor(playerCardRepo, cardCache)
 	grantInteractor := usecase.NewGrantInteractor(cardPackRepo, playerCardRepo)
 
 	cardH := rest.NewCardHandler(cardInteractor)
 	deckH := rest.NewDeckHandler(deckInteractor)
 	playerCardH := rest.NewPlayerCardHandler(playerCardInteractor)
-	productH := rest.NewProductHandler(productCache)
+	productH := rest.NewProductHandler(productCache, initiativeCache)
+	initiativeH := rest.NewInitiativeHandler(initiativeCache)
 
 	authVerifier := internalauth.NewVerifier(
 		internalauth.StaticHS256Resolver([]byte(cfg.InternalAuthSecret), internalauth.DefaultKeyID),
 	)
 
-	r := router.New(cardH, deckH, playerCardH, productH, authVerifier)
+	r := router.New(cardH, deckH, playerCardH, productH, initiativeH, authVerifier)
 
 	onboardedStream, err := pubsubadapter.NewStream(ctx, cfg.GoogleCloudProjectID, cfg.PlayerOnboardedSubscription)
 	if err != nil {
