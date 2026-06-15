@@ -144,8 +144,8 @@ Platform / Attachment / Strategy / Incident / Reactive には `stats` フィー�
 | `product_id` | VARCHAR(10) | No | 選択したプロダクトの ID（宣言陣営に属する） |
 | `routine_id` | VARCHAR(10) | No | セットしたルーチン施策の ID（選択プロダクトに属する） |
 | `special_id` | VARCHAR(10) | No | セットしたスペシャル施策の ID（選択プロダクトに属する） |
-| `playmat_no` | BIGINT | Yes | プレイマット番号（NULL: デフォルト） |
-| `sleeve_no` | BIGINT | Yes | スリーブ番号（NULL: デフォルト） |
+| `playmat_no` | BIGINT | Yes | プレイマット番号 |
+| `sleeve_no` | BIGINT | Yes | スリーブ番号 |
 | `created_at` | TIMESTAMPTZ | No | 作成日時 |
 | `updated_at` | TIMESTAMPTZ | No | 更新日時 |
 <!-- END GENERATED: decks -->

@@ -301,18 +301,6 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 			wantErrMsg: `faction "Atlantis" is not selectable`,
 		},
 		{
-			name:    "他陣営カードがデッキに含まれる",
-			faction: "SHE",
-			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
-				grantCards(pcRepo, pid,
-					&domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3},
-					&domain.PlayerCard{CardID: "C-011", ArtNo: 0, Count: 1},
-				)
-			},
-			entries:    makeEntries("C-001", 3, "C-011", 1),
-			wantErrMsg: "only SHE and Neutral cards are allowed",
-		},
-		{
 			name:    "31枚は上限超過",
 			faction: "SHE",
 			grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
@@ -423,6 +411,74 @@ func TestCreateDeck_ValidationErrors(t *testing.T) {
 
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.wantErrMsg)
+		})
+	}
+}
+
+func factionEntries(cardIDs []string) []apicard.DeckCardEntry {
+	entries := make([]apicard.DeckCardEntry, 0, len(cardIDs))
+	for _, id := range cardIDs {
+		entries = append(entries, apicard.DeckCardEntry{CardID: id, ArtNo: 0, Count: 1})
+	}
+	return entries
+}
+
+// TestCreateDeck_FactionComposition_Valid は、宣言陣営 (SHE) と Neutral のみで構成された
+// デッキが陣営検証を通過することを検証します (枚数不足は IsValid=false でエラーにはならない)。
+func TestCreateDeck_FactionComposition_Valid(t *testing.T) {
+	tests := []struct {
+		name    string
+		cardIDs []string
+	}{
+		{"選択陣営のみ", []string{"C-001"}},
+		{"選択陣営＋ニュートラル", []string{"C-001", "C-007"}},
+		{"ニュートラルのみ", []string{"C-007"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, _, pcRepo, _ := setupDeckInteractor(t)
+			pid := "p1"
+			grantUnlimited(pcRepo, pid, tt.cardIDs...)
+
+			_, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
+				DeckName: "Test", Faction: "SHE", ProductID: testProductID,
+				RoutineID: testRoutineID, SpecialID: testSpecialID,
+				Cards: factionEntries(tt.cardIDs),
+			})
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+// TestCreateDeck_FactionComposition_Invalid は、他陣営カードを含むデッキが
+// 陣営検証で弾かれることを検証します。
+func TestCreateDeck_FactionComposition_Invalid(t *testing.T) {
+	tests := []struct {
+		name    string
+		cardIDs []string
+	}{
+		{"他陣営のみ", []string{"C-011"}},
+		{"選択陣営＋他陣営", []string{"C-001", "C-011"}},
+		{"選択陣営＋他陣営＋ニュートラル", []string{"C-001", "C-011", "C-007"}},
+		{"他陣営＋ニュートラル", []string{"C-011", "C-007"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, _, pcRepo, _ := setupDeckInteractor(t)
+			pid := "p1"
+			grantUnlimited(pcRepo, pid, tt.cardIDs...)
+
+			_, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
+				DeckName: "Test", Faction: "SHE", ProductID: testProductID,
+				RoutineID: testRoutineID, SpecialID: testSpecialID,
+				Cards: factionEntries(tt.cardIDs),
+			})
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "only SHE and Neutral cards are allowed")
 		})
 	}
 }

@@ -63,12 +63,13 @@ CREATE TRIGGER trg_card_definitions_updated_at BEFORE UPDATE ON card.card_defini
 -- アプリ層で担保する（card_id と同様、FK は張らない）。
 
 CREATE TABLE card.products (
-  product_id   VARCHAR(10) NOT NULL,               -- プロダクト識別子（例: PD-0001）
-  faction      VARCHAR(20) NOT NULL CHECK (faction IN ('SHE', 'Tenki', 'Sugar', 'Tuners')), -- 所属陣営
-  product_name VARCHAR(100) NOT NULL,              -- プロダクト名
-  is_active    BOOLEAN NOT NULL DEFAULT true,       -- 有効フラグ（論理削除）
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(), -- 作成日時
-  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(), -- 更新日時
+  product_id   VARCHAR(10)  NOT NULL,                -- プロダクト識別子（例: PD-0001）
+  faction      VARCHAR(20)  NOT NULL,                -- 所属陣営
+  product_name VARCHAR(100) NOT NULL,                -- プロダクト名
+  is_active    BOOLEAN      NOT NULL DEFAULT true,   -- 有効フラグ（論理削除）
+  created_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),  -- 作成日時
+  updated_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),  -- 更新日時
+  CHECK (faction IN ('SHE', 'Tenki', 'Sugar', 'Tuners')),
   PRIMARY KEY (product_id)
 );
 
@@ -76,16 +77,18 @@ CREATE INDEX idx_products_faction ON card.products(faction);
 CREATE TRIGGER trg_products_updated_at BEFORE UPDATE ON card.products FOR EACH ROW EXECUTE FUNCTION card.update_updated_at();
 
 CREATE TABLE card.initiatives (
-  initiative_id VARCHAR(10) NOT NULL,              -- 施策識別子（例: IN-0001）
-  product_id    VARCHAR(10) NOT NULL,              -- 親プロダクト識別子
-  kind          VARCHAR(10) NOT NULL CHECK (kind IN ('routine', 'special')), -- 区分（routine: 1ターン1回 / special: 1ゲーム1回）
-  name          VARCHAR(100) NOT NULL,             -- 施策名
-  insight_cost  BIGINT NOT NULL CHECK (insight_cost >= 0), -- 発動 Insight コスト
-  effect_text   VARCHAR(500) NOT NULL,             -- 効果テキスト（表示用）
-  effect        JSONB NOT NULL,                    -- 効果定義（DSL）
-  is_active     BOOLEAN NOT NULL DEFAULT true,     -- 有効フラグ（論理削除）
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),-- 作成日時
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),-- 更新日時
+  initiative_id VARCHAR(10)  NOT NULL,                -- 施策識別子（例: IN-0001）
+  product_id    VARCHAR(10)  NOT NULL,                -- 親プロダクト識別子
+  kind          VARCHAR(10)  NOT NULL,                -- 区分（routine: 1ターン1回 / special: 1ゲーム1回）
+  name          VARCHAR(100) NOT NULL,                -- 施策名
+  insight_cost  BIGINT       NOT NULL,                -- 発動 Insight コスト
+  effect_text   VARCHAR(500) NOT NULL,                -- 効果テキスト（表示用）
+  effect        JSONB        NOT NULL,                -- 効果定義（DSL）
+  is_active     BOOLEAN      NOT NULL DEFAULT true,   -- 有効フラグ（論理削除）
+  created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),  -- 作成日時
+  updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),  -- 更新日時
+  CHECK (kind IN ('routine', 'special')),
+  CHECK (insight_cost >= 0),
   PRIMARY KEY (initiative_id),
   FOREIGN KEY (product_id) REFERENCES card.products(product_id) ON DELETE CASCADE
 );
@@ -113,8 +116,8 @@ CREATE TABLE card.decks (
   product_id  VARCHAR(10) NOT NULL,                  -- 選択したプロダクトの ID（宣言陣営に属する）
   routine_id  VARCHAR(10) NOT NULL,                  -- セットしたルーチン施策の ID（選択プロダクトに属する）
   special_id  VARCHAR(10) NOT NULL,                  -- セットしたスペシャル施策の ID（選択プロダクトに属する）
-  playmat_no  BIGINT,                                -- プレイマット番号（NULL: デフォルト）
-  sleeve_no   BIGINT,                                -- スリーブ番号（NULL: デフォルト）
+  playmat_no  BIGINT,                                -- プレイマット番号
+  sleeve_no   BIGINT,                                -- スリーブ番号
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),    -- 作成日時
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),    -- 更新日時
   PRIMARY KEY (player_id, deck_id)

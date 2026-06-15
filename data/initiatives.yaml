@@ -24,7 +24,7 @@ initiatives:
     kind: special
     name: 大感謝セール
     insight_cost: 0
-    effect_text: "Insightプールの全 Insight を消費し、1.5倍の Budget に変換する。スループットによる変換上限を無視する。"
+    effect_text: "Insightプールの全 Insight を消費し、1.5倍の Budget に変換する。"
     effect:
       custom: convert_all_insight
       meta:
@@ -45,7 +45,7 @@ initiatives:
     kind: special
     name: 台風
     insight_cost: 400
-    effect_text: "相手の表向きリソース全体に 300 ダメージを与える。"
+    effect_text: "相手の表向きリソース全てに 300 ダメージを与える。"
     effect:
       ops:
         - deal_damage:
@@ -58,7 +58,7 @@ initiatives:
     kind: routine
     name: 焼きたてのお菓子
     insight_cost: 300
-    effect_text: "味方リソース 1体の可用性を 300 回復する。可用性上限を超えない。"
+    effect_text: "味方リソース 1体の可用性を 300 回復する。"
     effect:
       ops:
         - heal_damage:
@@ -70,7 +70,7 @@ initiatives:
     kind: special
     name: お裾分け
     insight_cost: 600
-    effect_text: "相手の表向きリソース全体を休止にする。"
+    effect_text: "相手の表向きリソース全てを休止にする。"
     effect:
       ops:
         - apply_buff:
@@ -84,7 +84,7 @@ initiatives:
     kind: routine
     name: BGM配信
     insight_cost: 300
-    effect_text: "このターン、味方の表向きリソース全体のスループットを +200 する。"
+    effect_text: "このターン、味方の表向きリソース全てのスループットを +200 する。"
     effect:
       ops:
         - apply_buff:
@@ -98,7 +98,7 @@ initiatives:
     kind: special
     name: フェス開催
     insight_cost: 500
-    effect_text: "自分の表向きリソース 1体につき、Budget を +150 する。"
+    effect_text: "自分と相手の表向きリソース 1体につき、Budget を +150 する。"
     effect:
       ops:
         - gain_budget:
@@ -107,4 +107,11 @@ initiatives:
               base: 0
               per:
                 count: { owner: myself }
+                value: 150
+        - gain_budget:
+            target: myself
+            amount:
+              base: 0
+              per:
+                count: { owner: opponent }
                 value: 150
