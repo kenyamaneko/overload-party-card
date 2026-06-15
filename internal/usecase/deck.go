@@ -24,11 +24,26 @@ type DeckInteractor struct {
 	cardCache       *cache.CardCache
 	productCache    *cache.ProductCache
 	initiativeCache *cache.InitiativeCache
+	factionClient   port.FactionClient
 }
 
 // NewDeckInteractor は DeckInteractor を生成します。
-func NewDeckInteractor(deckRepo port.DeckRepo, playerCardRepo port.PlayerCardRepo, cardCache *cache.CardCache, productCache *cache.ProductCache, initiativeCache *cache.InitiativeCache) *DeckInteractor {
-	return &DeckInteractor{deckRepo: deckRepo, playerCardRepo: playerCardRepo, cardCache: cardCache, productCache: productCache, initiativeCache: initiativeCache}
+func NewDeckInteractor(deckRepo port.DeckRepo, playerCardRepo port.PlayerCardRepo, cardCache *cache.CardCache, productCache *cache.ProductCache, initiativeCache *cache.InitiativeCache, factionClient port.FactionClient) *DeckInteractor {
+	return &DeckInteractor{deckRepo: deckRepo, playerCardRepo: playerCardRepo, cardCache: cardCache, productCache: productCache, initiativeCache: initiativeCache, factionClient: factionClient}
+}
+
+// validateFactionOwnership は宣言陣営をプレイヤーが所持しているか account に照会して検証します。
+func (s *DeckInteractor) validateFactionOwnership(ctx context.Context, playerID, faction string) error {
+	owned, err := s.factionClient.ListPlayerFactions(ctx, playerID)
+	if err != nil {
+		return fmt.Errorf("check faction ownership: %w", err)
+	}
+	for _, f := range owned {
+		if f == faction {
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: faction %q is not owned by player", port.ErrInvalidDeck, faction)
 }
 
 // CreateDeck は新しいデッキを作成します。所持カードと制限をバリデーションします。
@@ -40,6 +55,9 @@ func (s *DeckInteractor) CreateDeck(ctx context.Context, playerID string, req ap
 
 	deckCardEntries := presenter.DeckCardEntriesFromRequest(req.Cards)
 	if err := s.validateDeckCards(req.Faction, deckCardEntries, ownedCards); err != nil {
+		return nil, err
+	}
+	if err := s.validateFactionOwnership(ctx, playerID, req.Faction); err != nil {
 		return nil, err
 	}
 	if err := s.validateInitiatives(req.Faction, req.ProductID, req.RoutineID, req.SpecialID); err != nil {
@@ -129,6 +147,9 @@ func (s *DeckInteractor) UpdateDeck(ctx context.Context, playerID string, deckID
 
 	deckCardEntries := presenter.DeckCardEntriesFromRequest(req.Cards)
 	if err := s.validateDeckCards(req.Faction, deckCardEntries, ownedCards); err != nil {
+		return nil, err
+	}
+	if err := s.validateFactionOwnership(ctx, playerID, req.Faction); err != nil {
 		return nil, err
 	}
 	if err := s.validateInitiatives(req.Faction, req.ProductID, req.RoutineID, req.SpecialID); err != nil {

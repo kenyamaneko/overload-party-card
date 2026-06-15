@@ -21,6 +21,11 @@ type InitiativeRepo interface {
 	FindAll(ctx context.Context) ([]*domain.Initiative, error)
 }
 
+// FactionClient はプレイヤーの所持ファクションを所有サービス (account) から取得します。
+type FactionClient interface {
+	ListPlayerFactions(ctx context.Context, playerID string) ([]string, error)
+}
+
 // PlayerCardRepo はプレイヤー所持カードの永続化を抽象化するインターフェースです。
 type PlayerCardRepo interface {
 	GetPlayerCards(ctx context.Context, playerID string) ([]*domain.PlayerCard, error)

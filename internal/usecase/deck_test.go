@@ -12,7 +12,18 @@ import (
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
 	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
+	gamedesign "github.com/kenyamaneko/overload-party-common/packages/game-design-constants"
 )
+
+// mockFactionClient は port.FactionClient のテスト用 fake。
+type mockFactionClient struct {
+	factions []string
+	err      error
+}
+
+func (m *mockFactionClient) ListPlayerFactions(_ context.Context, _ string) ([]string, error) {
+	return m.factions, m.err
+}
 
 type mockDeckRepo struct {
 	decks      map[string][]*domain.Deck
@@ -99,6 +110,11 @@ func (m *mockDeckRepo) Delete(_ context.Context, playerID string, deckID int64) 
 }
 
 func setupDeckInteractor(t *testing.T) (*DeckInteractor, *mockDeckRepo, *inMemoryPlayerCardRepo, *cache.CardCache) {
+	svc, repo, pcRepo, cc, _ := setupDeckInteractorWithFactions(t, gamedesign.SelectableFactions)
+	return svc, repo, pcRepo, cc
+}
+
+func setupDeckInteractorWithFactions(t *testing.T, ownedFactions []string) (*DeckInteractor, *mockDeckRepo, *inMemoryPlayerCardRepo, *cache.CardCache, *mockFactionClient) {
 	t.Helper()
 	repo := newMockDeckRepo()
 	cc := cache.NewCardCache()
@@ -147,8 +163,9 @@ func setupDeckInteractor(t *testing.T) (*DeckInteractor, *mockDeckRepo, *inMemor
 	require.NoError(t, ic.LoadFromBytes([]byte(testInitiativesJSON)))
 
 	pcRepo := newInMemoryPlayerCardRepo()
-	svc := NewDeckInteractor(repo, pcRepo, cc, pc, ic)
-	return svc, repo, pcRepo, cc
+	fc := &mockFactionClient{factions: ownedFactions}
+	svc := NewDeckInteractor(repo, pcRepo, cc, pc, ic, fc)
+	return svc, repo, pcRepo, cc, fc
 }
 
 // testProductsJSON は SHE プロダクト PD-TST と別陣営 (Tenki) の PD-TST2 を持つテスト用定義。
@@ -481,6 +498,37 @@ func TestCreateDeck_FactionComposition_Invalid(t *testing.T) {
 			assert.Contains(t, err.Error(), "only SHE and Neutral cards are allowed")
 		})
 	}
+}
+
+// TestCreateDeck_UnownedFaction_Rejected は、プレイヤーが所持していない陣営を
+// 宣言したデッキ作成が拒否されることを検証します。
+func TestCreateDeck_UnownedFaction_Rejected(t *testing.T) {
+	svc, _, pcRepo, _, _ := setupDeckInteractorWithFactions(t, []string{"Tenki"}) // SHE は未所持
+	pid := "p1"
+	grantUnlimited(pcRepo, pid, "C-001")
+
+	_, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
+		DeckName: "Test", Faction: "SHE", ProductID: testProductID,
+		RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: makeEntries("C-001", 1),
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not owned")
+}
+
+// TestCreateDeck_OwnedFaction_Allowed は、所持している陣営を宣言したデッキ作成が
+// 陣営所持検証を通過することを検証します。
+func TestCreateDeck_OwnedFaction_Allowed(t *testing.T) {
+	svc, _, pcRepo, _, _ := setupDeckInteractorWithFactions(t, []string{"SHE"})
+	pid := "p1"
+	grantUnlimited(pcRepo, pid, "C-001")
+
+	_, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
+		DeckName: "Test", Faction: "SHE", ProductID: testProductID,
+		RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: makeEntries("C-001", 1),
+	})
+
+	require.NoError(t, err)
 }
 
 func TestCreateDeck_InvalidInitiatives(t *testing.T) {

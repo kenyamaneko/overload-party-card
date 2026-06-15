@@ -30,6 +30,9 @@ type Config struct {
 
 	// InternalAuthSecret は内部サービス間 JWT (HS256) 検証の共有秘密鍵。
 	InternalAuthSecret string
+
+	// AccountServiceURL はデッキ検証時に faction 所持を照会する account サービスの URL。
+	AccountServiceURL string
 }
 
 // FromEnv は環境変数から Config を構築します。
@@ -41,6 +44,7 @@ func FromEnv() (*Config, error) {
 		PlayerOnboardedSubscription:   os.Getenv("PLAYER_ONBOARDED_SUBSCRIPTION"),
 		CardPackPurchasedSubscription: os.Getenv("CARD_PACK_PURCHASED_SUBSCRIPTION"),
 		InternalAuthSecret:            os.Getenv("INTERNAL_AUTH_SECRET"),
+		AccountServiceURL:             os.Getenv("ACCOUNT_SERVICE_URL"),
 	}
 
 	rawPort := os.Getenv("PORT")
@@ -78,6 +82,9 @@ func FromEnv() (*Config, error) {
 	}
 	if cfg.InternalAuthSecret == "" {
 		return nil, fmt.Errorf("config: INTERNAL_AUTH_SECRET is required")
+	}
+	if cfg.AccountServiceURL == "" {
+		return nil, fmt.Errorf("config: ACCOUNT_SERVICE_URL is required (card validates deck faction ownership via account)")
 	}
 	return cfg, nil
 }

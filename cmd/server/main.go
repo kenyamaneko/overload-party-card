@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 
+	accountadapter "github.com/kenyamaneko/overload-party-card/internal/adapter/account"
 	pubsubadapter "github.com/kenyamaneko/overload-party-card/internal/adapter/pubsub"
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
 	"github.com/kenyamaneko/overload-party-card/internal/config"
@@ -73,8 +74,10 @@ func run() error {
 		return fmt.Errorf("load initiative cache: %w", err)
 	}
 
+	accountClient := accountadapter.NewClient(cfg.AccountServiceURL)
+
 	cardInteractor := usecase.NewCardInteractor(cardRepo, playerCardRepo)
-	deckInteractor := usecase.NewDeckInteractor(deckRepo, playerCardRepo, cardCache, productCache, initiativeCache)
+	deckInteractor := usecase.NewDeckInteractor(deckRepo, playerCardRepo, cardCache, productCache, initiativeCache, accountClient)
 	playerCardInteractor := usecase.NewPlayerCardInteractor(playerCardRepo, cardCache)
 	grantInteractor := usecase.NewGrantInteractor(cardPackRepo, playerCardRepo)
 
