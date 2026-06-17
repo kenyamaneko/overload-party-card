@@ -60,6 +60,36 @@ namespace OverloadParty.ApiCard
         System.Threading.Tasks.Task<System.Collections.Generic.ICollection<CardDefinition>> ListCardsAsync(System.Threading.CancellationToken cancellationToken);
 
         /// <summary>
+        /// 全施策定義を返す (battle 起動時キャッシュロード用)
+        /// </summary>
+        /// <returns>施策定義一覧</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Initiative>> ListInitiativesAsync();
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// 全施策定義を返す (battle 起動時キャッシュロード用)
+        /// </summary>
+        /// <returns>施策定義一覧</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Initiative>> ListInitiativesAsync(System.Threading.CancellationToken cancellationToken);
+
+        /// <summary>
+        /// 全プロダクト定義を返す (client のデッキ構築・プロダクト表示用)
+        /// </summary>
+        /// <returns>プロダクト定義一覧</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Product>> ListProductsForPlayerAsync();
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// 全プロダクト定義を返す (client のデッキ構築・プロダクト表示用)
+        /// </summary>
+        /// <returns>プロダクト定義一覧</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Product>> ListProductsForPlayerAsync(System.Threading.CancellationToken cancellationToken);
+
+        /// <summary>
         /// プレイヤーの所持カード一覧を返す
         /// </summary>
         /// <returns>所持カード一覧</returns>
@@ -366,6 +396,180 @@ namespace OverloadParty.ApiCard
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
                             throw new ApiException("DB \u63a5\u7d9a\u30a8\u30e9\u30fc", status_, responseText_, headers_, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// 全施策定義を返す (battle 起動時キャッシュロード用)
+        /// </summary>
+        /// <returns>施策定義一覧</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Initiative>> ListInitiativesAsync()
+        {
+            return ListInitiativesAsync(System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// 全施策定義を返す (battle 起動時キャッシュロード用)
+        /// </summary>
+        /// <returns>施策定義一覧</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Initiative>> ListInitiativesAsync(System.Threading.CancellationToken cancellationToken)
+        {
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "internal/v1/initiatives"
+                    urlBuilder_.Append("internal/v1/initiatives");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<Initiative>>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// 全プロダクト定義を返す (client のデッキ構築・プロダクト表示用)
+        /// </summary>
+        /// <returns>プロダクト定義一覧</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Product>> ListProductsForPlayerAsync()
+        {
+            return ListProductsForPlayerAsync(System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// 全プロダクト定義を返す (client のデッキ構築・プロダクト表示用)
+        /// </summary>
+        /// <returns>プロダクト定義一覧</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Product>> ListProductsForPlayerAsync(System.Threading.CancellationToken cancellationToken)
+        {
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "api/v1/cards/products"
+                    urlBuilder_.Append("api/v1/cards/products");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<Product>>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("\u8a8d\u8a3c\u5931\u6557", status_, responseText_, headers_, null);
                         }
                         else
                         {
@@ -1791,6 +1995,121 @@ namespace OverloadParty.ApiCard
     }
 
     /// <summary>
+    /// プロダクト定義 (陣営に N:1)。デッキのメタ情報で、施策を規定する。
+    /// </summary>
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class Product
+    {
+
+        /// <summary>
+        /// プロダクト識別子 (例 PD-0001)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("product_id")]
+        public string Product_id { get; set; } = default!;
+
+        /// <summary>
+        /// 紐づく陣営 (SHE / Tenki / Sugar / Tuners)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("faction")]
+        public string Faction { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("product_name")]
+        public string Product_name { get; set; } = default!;
+
+        /// <summary>
+        /// 有効フラグ (論理削除)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("is_active")]
+        public bool Is_active { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("initiatives")]
+        public System.Collections.Generic.List<Initiative> Initiatives { get; set; } = new System.Collections.Generic.List<Initiative>();
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    /// <summary>
+    /// プロダクトの施策。ルーチン (1ターン1回) / スペシャル (1ゲーム1回)。
+    /// </summary>
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class Initiative
+    {
+
+        /// <summary>
+        /// 施策識別子 (例 IN-0001)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("initiative_id")]
+        public string Initiative_id { get; set; } = default!;
+
+        /// <summary>
+        /// 親プロダクトの ID
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("product_id")]
+        public string Product_id { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("kind")]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<InitiativeKind>))]
+        public InitiativeKind Kind { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("name")]
+        public string Name { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("insight_cost")]
+        public long Insight_cost { get; set; } = default!;
+
+        /// <summary>
+        /// 効果テキスト (表示用)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("effect_text")]
+        public string Effect_text { get; set; } = default!;
+
+        /// <summary>
+        /// battle エンジンの効果 DSL (ops / custom)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("effect")]
+        public System.Text.Json.JsonElement Effect { get; set; } = new System.Text.Json.JsonElement();
+
+        /// <summary>
+        /// 有効フラグ (論理削除)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("is_active")]
+        public bool Is_active { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    /// <summary>
+    /// 施策の区分。
+    /// </summary>
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum InitiativeKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"routine")]
+        Routine = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"special")]
+        Special = 1,
+
+    }
+
+    /// <summary>
     /// プレイヤーのデッキ (カード構成オプショナル)。
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -1808,6 +2127,30 @@ namespace OverloadParty.ApiCard
 
         [System.Text.Json.Serialization.JsonPropertyName("deck_name")]
         public string Deck_name { get; set; } = default!;
+
+        /// <summary>
+        /// 宣言陣営。宣言陣営と Neutral のカードのみ投入できる
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("faction")]
+        public string Faction { get; set; } = default!;
+
+        /// <summary>
+        /// 選択したプロダクトの ID (宣言陣営に属する)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("product_id")]
+        public string Product_id { get; set; } = default!;
+
+        /// <summary>
+        /// セットしたルーチン施策の ID
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("routine_id")]
+        public string Routine_id { get; set; } = default!;
+
+        /// <summary>
+        /// セットしたスペシャル施策の ID
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("special_id")]
+        public string Special_id { get; set; } = default!;
 
         /// <summary>
         /// バトル使用可能か (都度算出)
@@ -1908,6 +2251,30 @@ namespace OverloadParty.ApiCard
         [System.Text.Json.Serialization.JsonPropertyName("deck_name")]
         public string Deck_name { get; set; } = default!;
 
+        /// <summary>
+        /// 宣言陣営 (SHE / Tenki / Sugar / Tuners)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("faction")]
+        public string Faction { get; set; } = default!;
+
+        /// <summary>
+        /// 選択するプロダクトの ID (宣言陣営に属する)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("product_id")]
+        public string Product_id { get; set; } = default!;
+
+        /// <summary>
+        /// セットするルーチン施策の ID (選択プロダクトに属する)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("routine_id")]
+        public string Routine_id { get; set; } = default!;
+
+        /// <summary>
+        /// セットするスペシャル施策の ID (選択プロダクトに属する)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("special_id")]
+        public string Special_id { get; set; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("cards")]
         public System.Collections.Generic.List<DeckCardEntry> Cards { get; set; } = new System.Collections.Generic.List<DeckCardEntry>();
 
@@ -1934,6 +2301,30 @@ namespace OverloadParty.ApiCard
 
         [System.Text.Json.Serialization.JsonPropertyName("deck_name")]
         public string Deck_name { get; set; } = default!;
+
+        /// <summary>
+        /// 宣言陣営 (SHE / Tenki / Sugar / Tuners)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("faction")]
+        public string Faction { get; set; } = default!;
+
+        /// <summary>
+        /// 選択するプロダクトの ID (宣言陣営に属する)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("product_id")]
+        public string Product_id { get; set; } = default!;
+
+        /// <summary>
+        /// セットするルーチン施策の ID (選択プロダクトに属する)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("routine_id")]
+        public string Routine_id { get; set; } = default!;
+
+        /// <summary>
+        /// セットするスペシャル施策の ID (選択プロダクトに属する)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("special_id")]
+        public string Special_id { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("cards")]
         public System.Collections.Generic.List<DeckCardEntry> Cards { get; set; } = new System.Collections.Generic.List<DeckCardEntry>();

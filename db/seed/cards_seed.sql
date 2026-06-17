@@ -120,8 +120,8 @@ VALUES
 
   ('NT-0020', 'ランサムウェア', '', 'Neutral', 'Incident', NULL,
    false, false, '{}'::jsonb,
-   'Budget 800 を払って発動できる。相手の Resource 1体を選択。次の相手ターン終了まで機能停止（Yield 0, スループット 0, 攻撃不可）',
-   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"apply_buff": {"selector": {"owner": "opponent", "pick": "choice"}, "buff": "ransomware", "amount": 1, "duration": "until_next_turn_end"}}]}]'::jsonb,
+   'Budget 800 を払って発動できる。相手の Resource 1体を選択し、次のターン終了まで休止にする。',
+   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"apply_buff": {"selector": {"owner": "opponent", "pick": "choice"}, "buff": "dormant", "amount": 1, "duration": "until_next_turn_end"}}]}]'::jsonb,
    'limited', true),
 
   ('NT-0021', 'コンプライアンス監査', '', 'Neutral', 'Incident', NULL,
@@ -132,7 +132,7 @@ VALUES
 
   ('NT-0022', 'レートリミット', '', 'Neutral', 'Reactive', NULL,
    false, false, '{}'::jsonb,
-   '相手がスループット 900 以上のコンピュート系/AI・ML系リソースをデプロイした時に自動発動する。そのリソースをこのターン機能停止にする。',
+   '相手がスループット 900 以上のコンピュート系/AI・ML系リソースをデプロイした時に自動発動する。そのリソースをこのターン休止にする。',
    '[{"trigger": "on_deploy", "use_limit": "once_per_turn", "guard": [{"event_owner": "opponent"}], "custom": "disable_high_tp_deploy", "meta": {"categories": ["debuff"], "target": "all_opp"}}]'::jsonb,
    'unlimited', true),
 

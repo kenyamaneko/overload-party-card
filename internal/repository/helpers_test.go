@@ -44,6 +44,64 @@ func seedCards(t *testing.T, cards []cardSeed) {
 	}
 }
 
+// productSeed は card.products への最小シード入力。
+type productSeed struct {
+	ProductID   string
+	Faction     string
+	ProductName string
+}
+
+func seedProduct(t *testing.T, s productSeed) {
+	t.Helper()
+	_, err := sharedPg.Pool.Exec(context.Background(),
+		`INSERT INTO card.products (product_id, faction, product_name)
+		 VALUES ($1, $2, $3)`,
+		s.ProductID, s.Faction, s.ProductName)
+	require.NoError(t, err)
+}
+
+// initiativeSeed は card.initiatives への最小シード入力。Effect は JSON 文字列。
+type initiativeSeed struct {
+	InitiativeID string
+	ProductID    string
+	Kind         string
+	Name         string
+	InsightCost  int64
+	EffectText   string
+	Effect       string
+}
+
+func seedInitiative(t *testing.T, s initiativeSeed) {
+	t.Helper()
+	_, err := sharedPg.Pool.Exec(context.Background(),
+		`INSERT INTO card.initiatives
+		   (initiative_id, product_id, kind, name, insight_cost, effect_text, effect)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		s.InitiativeID, s.ProductID, s.Kind, s.Name, s.InsightCost, s.EffectText, json.RawMessage(s.Effect))
+	require.NoError(t, err)
+}
+
+// seedInactiveProduct は is_active=false のプロダクトを挿入する (論理削除の除外検証用)。
+func seedInactiveProduct(t *testing.T, s productSeed) {
+	t.Helper()
+	_, err := sharedPg.Pool.Exec(context.Background(),
+		`INSERT INTO card.products (product_id, faction, product_name, is_active)
+		 VALUES ($1, $2, $3, false)`,
+		s.ProductID, s.Faction, s.ProductName)
+	require.NoError(t, err)
+}
+
+// seedInactiveInitiative は is_active=false の施策を挿入する (論理削除の除外検証用)。
+func seedInactiveInitiative(t *testing.T, s initiativeSeed) {
+	t.Helper()
+	_, err := sharedPg.Pool.Exec(context.Background(),
+		`INSERT INTO card.initiatives
+		   (initiative_id, product_id, kind, name, insight_cost, effect_text, effect, is_active)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, false)`,
+		s.InitiativeID, s.ProductID, s.Kind, s.Name, s.InsightCost, s.EffectText, json.RawMessage(s.Effect))
+	require.NoError(t, err)
+}
+
 type playerCardSeed struct {
 	PlayerID string
 	CardID   string
@@ -66,7 +124,7 @@ func insertDeck(t *testing.T, playerID, deckName string) int64 {
 	t.Helper()
 	var deckID int64
 	err := sharedPg.Pool.QueryRow(context.Background(),
-		`INSERT INTO card.decks (player_id, deck_name) VALUES ($1, $2) RETURNING deck_id`,
+		`INSERT INTO card.decks (player_id, deck_name, faction, product_id, routine_id, special_id) VALUES ($1, $2, 'SHE', 'PD-TST', 'IN-TST-R', 'IN-TST-S') RETURNING deck_id`,
 		playerID, deckName).Scan(&deckID)
 	require.NoError(t, err)
 	return deckID

@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 
+	accountadapter "github.com/kenyamaneko/overload-party-card/internal/adapter/account"
 	pubsubadapter "github.com/kenyamaneko/overload-party-card/internal/adapter/pubsub"
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
 	"github.com/kenyamaneko/overload-party-card/internal/config"
@@ -54,6 +55,8 @@ func run() error {
 	cardPackRepo := repository.NewPgCardPackRepository(pool)
 	playerCardRepo := repository.NewPgPlayerCardRepository(pool)
 	deckRepo := repository.NewPgDeckRepository(pool)
+	productRepo := repository.NewPgProductRepository(pool)
+	initiativeRepo := repository.NewPgInitiativeRepository(pool)
 	eventRepo := repository.NewPgProcessedEventRepository(pool)
 
 	cardCache := cache.NewCardCache()
@@ -61,20 +64,34 @@ func run() error {
 		return fmt.Errorf("load card cache: %w", err)
 	}
 
+	productCache := cache.NewProductCache()
+	if err := productCache.Load(ctx, productRepo); err != nil {
+		return fmt.Errorf("load product cache: %w", err)
+	}
+
+	initiativeCache := cache.NewInitiativeCache()
+	if err := initiativeCache.Load(ctx, initiativeRepo); err != nil {
+		return fmt.Errorf("load initiative cache: %w", err)
+	}
+
+	accountClient := accountadapter.NewClient(cfg.AccountServiceURL)
+
 	cardInteractor := usecase.NewCardInteractor(cardRepo, playerCardRepo)
-	deckInteractor := usecase.NewDeckInteractor(deckRepo, playerCardRepo, cardCache)
+	deckInteractor := usecase.NewDeckInteractor(deckRepo, playerCardRepo, cardCache, productCache, initiativeCache, accountClient)
 	playerCardInteractor := usecase.NewPlayerCardInteractor(playerCardRepo, cardCache)
 	grantInteractor := usecase.NewGrantInteractor(cardPackRepo, playerCardRepo)
 
 	cardH := rest.NewCardHandler(cardInteractor)
 	deckH := rest.NewDeckHandler(deckInteractor)
 	playerCardH := rest.NewPlayerCardHandler(playerCardInteractor)
+	productH := rest.NewProductHandler(productCache, initiativeCache)
+	initiativeH := rest.NewInitiativeHandler(initiativeCache)
 
 	authVerifier := internalauth.NewVerifier(
 		internalauth.StaticHS256Resolver([]byte(cfg.InternalAuthSecret), internalauth.DefaultKeyID),
 	)
 
-	r := router.New(cardH, deckH, playerCardH, authVerifier)
+	r := router.New(cardH, deckH, playerCardH, productH, initiativeH, authVerifier)
 
 	onboardedStream, err := pubsubadapter.NewStream(ctx, cfg.GoogleCloudProjectID, cfg.PlayerOnboardedSubscription)
 	if err != nil {
@@ -108,6 +125,8 @@ func run() error {
 	slog.Info("card starting",
 		"addr", srv.Addr,
 		"card_cache_size", cardCache.Count(),
+		"product_cache_size", productCache.Count(),
+		"initiative_cache_size", initiativeCache.Count(),
 		"google_cloud_project", cfg.GoogleCloudProjectID,
 	)
 

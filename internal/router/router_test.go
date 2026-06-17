@@ -41,6 +41,8 @@ func newTestRouter(verifier internalauth.Verifier) *gin.Engine {
 		rest.NewCardHandler(nil),
 		rest.NewDeckHandler(nil),
 		rest.NewPlayerCardHandler(nil),
+		rest.NewProductHandler(nil, nil),
+		rest.NewInitiativeHandler(nil),
 		verifier,
 	)
 }

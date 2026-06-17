@@ -38,6 +38,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/v1/initiatives": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 全施策定義を返す (battle 起動時キャッシュロード用) */
+        get: operations["listInitiatives"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cards/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 全プロダクト定義を返す (client のデッキ構築・プロダクト表示用) */
+        get: operations["listProductsForPlayer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cards/cards": {
         parameters: {
             query?: never;
@@ -281,6 +315,41 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** @description プロダクト定義 (陣営に N:1)。デッキのメタ情報で、施策を規定する。 */
+        Product: {
+            /** @description プロダクト識別子 (例 PD-0001) */
+            product_id: string;
+            /** @description 紐づく陣営 (SHE / Tenki / Sugar / Tuners) */
+            faction: string;
+            product_name: string;
+            /** @description 有効フラグ (論理削除) */
+            is_active: boolean;
+            initiatives: components["schemas"]["Initiative"][];
+        };
+        /** @description プロダクトの施策。ルーチン (1ターン1回) / スペシャル (1ゲーム1回)。 */
+        Initiative: {
+            /** @description 施策識別子 (例 IN-0001) */
+            initiative_id: string;
+            /** @description 親プロダクトの ID */
+            product_id: string;
+            kind: components["schemas"]["InitiativeKind"];
+            name: string;
+            /** Format: int64 */
+            insight_cost: number;
+            /** @description 効果テキスト (表示用) */
+            effect_text: string;
+            /** @description battle エンジンの効果 DSL (ops / custom) */
+            effect: {
+                [key: string]: unknown;
+            };
+            /** @description 有効フラグ (論理削除) */
+            is_active: boolean;
+        };
+        /**
+         * @description 施策の区分。
+         * @enum {string}
+         */
+        InitiativeKind: "routine" | "special";
         /** @description プレイヤーのデッキ (カード構成オプショナル)。 */
         Deck: {
             player_id: string;
@@ -290,6 +359,14 @@ export interface components {
              */
             deck_id: number;
             deck_name: string;
+            /** @description 宣言陣営。宣言陣営と Neutral のカードのみ投入できる */
+            faction: string;
+            /** @description 選択したプロダクトの ID (宣言陣営に属する) */
+            product_id: string;
+            /** @description セットしたルーチン施策の ID */
+            routine_id: string;
+            /** @description セットしたスペシャル施策の ID */
+            special_id: string;
             /** @description バトル使用可能か (都度算出) */
             is_valid: boolean;
             /** Format: int64 */
@@ -321,6 +398,14 @@ export interface components {
         };
         DeckCreateRequest: {
             deck_name: string;
+            /** @description 宣言陣営 (SHE / Tenki / Sugar / Tuners) */
+            faction: string;
+            /** @description 選択するプロダクトの ID (宣言陣営に属する) */
+            product_id: string;
+            /** @description セットするルーチン施策の ID (選択プロダクトに属する) */
+            routine_id: string;
+            /** @description セットするスペシャル施策の ID (選択プロダクトに属する) */
+            special_id: string;
             cards: components["schemas"]["DeckCardEntry"][];
             /** Format: int64 */
             playmat_no?: number;
@@ -329,6 +414,14 @@ export interface components {
         };
         DeckUpdateRequest: {
             deck_name: string;
+            /** @description 宣言陣営 (SHE / Tenki / Sugar / Tuners) */
+            faction: string;
+            /** @description 選択するプロダクトの ID (宣言陣営に属する) */
+            product_id: string;
+            /** @description セットするルーチン施策の ID (選択プロダクトに属する) */
+            routine_id: string;
+            /** @description セットするスペシャル施策の ID (選択プロダクトに属する) */
+            special_id: string;
             cards: components["schemas"]["DeckCardEntry"][];
             /** Format: int64 */
             playmat_no?: number;
@@ -406,6 +499,53 @@ export interface operations {
             };
             /** @description DB 接続エラー */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listInitiatives: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 施策定義一覧 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Initiative"][];
+                };
+            };
+        };
+    };
+    listProductsForPlayer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description プロダクト定義一覧 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"][];
+                };
+            };
+            /** @description 認証失敗 */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

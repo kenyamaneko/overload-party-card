@@ -51,6 +51,14 @@ func TestEnumDriftAgainstOpenAPISpec(t *testing.T) {
 				domain.AttachmentStatBonus,
 			},
 		},
+		{
+			name:       "InitiativeKind",
+			schemaName: "InitiativeKind",
+			want: []string{
+				domain.InitiativeKindRoutine,
+				domain.InitiativeKindSpecial,
+			},
+		},
 	}
 
 	for _, tc := range cases {
