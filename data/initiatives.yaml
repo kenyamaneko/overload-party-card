@@ -27,7 +27,7 @@ initiatives:
     effect_text: "Insightプールの全 Insight を消費し、1.5倍の Budget に変換する。"
     effect:
       ops:
-        - convert_insight:
+        - convert_all_insight:
             rate_percent: 150
 
   - initiative_id: IN-0003

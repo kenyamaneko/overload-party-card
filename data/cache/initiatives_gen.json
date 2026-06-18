@@ -36,7 +36,7 @@
     "effect": {
       "ops": [
         {
-          "convert_insight": {
+          "convert_all_insight": {
             "rate_percent": 150
           }
         }
