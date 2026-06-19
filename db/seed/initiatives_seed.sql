@@ -7,7 +7,7 @@ VALUES
   ('IN-0001', 'PD-0001', 'routine', '物欲刺激', 400, '相手の表向きリソース 1体につき、相手の Budget を -100 する。',
    '{"ops": [{"lose_budget": {"target": "opponent", "amount": {"base": 0, "per": {"count": {"owner": "opponent"}, "value": 100}}}}]}'::jsonb, true),
   ('IN-0002', 'PD-0001', 'special', '大感謝セール', 0, 'Insightプールの全 Insight を消費し、1.5倍の Budget に変換する。',
-   '{"custom": "convert_all_insight", "meta": {"multiplier_percent": 150}}'::jsonb, true),
+   '{"ops": [{"convert_all_insight": {"rate_percent": 150}}]}'::jsonb, true),
   ('IN-0003', 'PD-0002', 'routine', '天候予測', 150, '相手のサポートゾーンの伏せカード 1枚を選択して確認する。',
    '{"ops": [{"peek_reactive": {}}]}'::jsonb, true),
   ('IN-0004', 'PD-0002', 'special', '台風', 400, '相手の表向きリソース全てに 300 ダメージを与える。',

@@ -26,9 +26,9 @@ initiatives:
     insight_cost: 0
     effect_text: "Insightプールの全 Insight を消費し、1.5倍の Budget に変換する。"
     effect:
-      custom: convert_all_insight
-      meta:
-        multiplier_percent: 150
+      ops:
+        - convert_all_insight:
+            rate_percent: 150
 
   - initiative_id: IN-0003
     product_id: PD-0002
