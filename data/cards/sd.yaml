@@ -116,7 +116,7 @@ cards:
       - trigger: on_field_change
         guard:
           - count:
-              selector: { owner: myself, faction: SHE, card_type: ObjectStorage }
+              selector: { owner: myself, faction: SHE, subtype: ObjectStorage }
               min: 1
         ops:
           - apply_buff:
@@ -184,7 +184,7 @@ cards:
               amount:
                 base: 0
                 per:
-                  count: { owner: myself, zone: backend, faction: SHE, card_type: Database, exclude: source }
+                  count: { owner: myself, zone: backend, faction: SHE, subtype: Database, exclude: source }
                   value: 200
               duration: this_turn
 

@@ -549,7 +549,7 @@ cards:
       - trigger: on_field_change
         guard:
           - count:
-              selector: { owner: myself, card_type: ObjectStorage }
+              selector: { owner: myself, subtype: ObjectStorage }
               min: 1
         ops:
           - apply_buff:
