@@ -76,12 +76,12 @@ cards:
       maintenance_cost: 50
     effect_text: "**Scale to Zero:** 前のターン、このカードが攻撃していない場合に発動できる。このターン、このカードのリクエストコストは 0 になる。この効果は、このカードをデプロイしたターンは使用できない。"
     effects:
-      - trigger: activate
+      - trigger: ignition
         use_limit: once_per_turn
         custom: scale_to_zero
         meta:
           categories: [cost_reduction]
-          target: self
+          target: myself
 
   - card_no: 50
     card_id: "SL-0004"
@@ -106,7 +106,7 @@ cards:
       maintenance_cost: 100
     effect_text: "デプロイ時に「自動操縦」か「標準」を選択する。自動操縦: デプロイターンを 1 短縮する。標準: 維持費を -200 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         choice:
           autopilot:
             - reduce_deploy_turns: { amount: 1 }
@@ -192,9 +192,9 @@ cards:
       - trigger: on_destroy
         ops:
           - deal_damage:
-              selector: { owner: self, zone: backend }
+              selector: { owner: myself, zone: backend }
               amount: 400
-          - destroy_check: { target: self }
+          - destroy_check: { target: myself }
 
   # === Database / Data (5 cards) ===
 
@@ -203,7 +203,7 @@ cards:
     card_name: "エクレアーエル"
     resource_label: "RDB"
     const_name: SugarRDBEclairL
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 1
     resizable: true
@@ -223,7 +223,7 @@ cards:
     card_name: "スーパーバナナ"
     resource_label: "DistributedDB"
     const_name: SugarDistributedDBPinapo
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 1
     resizable: false
@@ -241,7 +241,7 @@ cards:
       maintenance_cost: 100
     effect_text: "**完全同期:** このカードは Incident カードの効果を受けない。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
               selector: source
@@ -254,7 +254,7 @@ cards:
     card_name: "トーストア"
     resource_label: "NoSQL"
     const_name: SugarDBToastoa
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 0
     resizable: false
@@ -272,7 +272,7 @@ cards:
       maintenance_cost: 50
     effect_text: "**即時反映:** 自分が しゅがーらぼ Resource をデプロイした時に発動できる。自分の Insight を +200 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - gain_insight: { amount: 200 }
 
@@ -281,7 +281,7 @@ cards:
     card_name: "アイスクエリム"
     resource_label: "Datawarehouse"
     const_name: SugarDWIcecream
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 1
     resizable: false
@@ -306,7 +306,7 @@ cards:
     card_name: "メレンゲスト"
     resource_label: "Cache"
     const_name: SugarCacheMeringue
-    card_type: Data
+    card_type: DataResource
     subtype: CacheDB
     deploy_turns: 0
     resizable: true
@@ -321,10 +321,10 @@ cards:
       maintenance_cost: 100
     effect_text: "**Cache Engine:** デプロイ時に、以下の効果のうち1つを選択して発動する。 — **Memcached:** 自分の Budget を +400 する / **Redis:** このカードの Yield を +200 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         choice:
           memcached:
-            - gain_budget: { target: self, amount: 400 }
+            - gain_budget: { target: myself, amount: 400 }
           redis:
             - apply_buff:
                 selector: source
@@ -339,7 +339,7 @@ cards:
     card_name: "シュトレーンジ"
     resource_label: "Storage"
     const_name: SugarStorageSchtrenge
-    card_type: Data
+    card_type: DataResource
     subtype: ObjectStorage
     deploy_turns: 0
     resizable: false
@@ -370,10 +370,10 @@ cards:
     stats:
     effect_text: "自分のフィールドの しゅがーらぼ リソースのスケールアップコストを -200 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: self, faction: Sugar }
+              selector: { owner: myself, faction: Sugar }
               buff: scale_cost_reduction
               amount: 200
               duration: while_on_field
@@ -392,10 +392,10 @@ cards:
     stats:
     effect_text: "自分のフィールドの全ての しゅがーらぼ コンピュート系リソースのスループットを +200 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: self, faction: Sugar, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless] }
+              selector: { owner: myself, faction: Sugar, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless] }
               buff: tp
               amount: 200
               duration: while_on_field
@@ -434,7 +434,7 @@ cards:
     stats:
     effect_text: "自分の しゅがーらぼ コンピュート系リソースに装備できる。装備先のスループットを +200 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
               selector: source
@@ -454,13 +454,14 @@ cards:
     restriction: unlimited
     is_active: true
     stats:
-    effect_text: "自分の しゅがーらぼ コンピュート系リソースに装備できる。装備先が攻撃した時に発動できる。選択した他の自分の しゅがーらぼ コンピュート系リソース1体は、このターン、リクエストコストなしで攻撃できる。"
+    effect_text: "自分の しゅがーらぼ コンピュート系リソースに装備できる。装備先が攻撃した時、他に自分の しゅがーらぼ コンピュート系リソースが場にいれば、対象へ追加で 200 ダメージを与える。"
     effects:
       - trigger: on_attack
         custom: chain_attack_bonus
         meta:
           categories: [single_damage]
-          target: self
+          target: myself
+          damage: 200
 
   - card_no: 64
     card_id: "SL-0019"
@@ -476,7 +477,7 @@ cards:
     stats:
     effect_text: "自分の しゅがーらぼ DB系リソースに装備できる。装備先の Yield を +400 する。装備先の SLAペナルティを +100 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
               selector: source
@@ -503,19 +504,19 @@ cards:
     stats:
     effect_text: "自分の「しゅがーらぼ Compute - ジューシィ・いちご」にのみ装備できる。①装備先の可用性を +400 する。②自分のメインフェーズに発動できる。このカードを別の自分の「しゅがーらぼ Compute - ジューシィ・いちご」に付け替える。この効果は1ターン中に1回のみ使用できる。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
               selector: source
               buff: av
               amount: 400
               duration: while_on_field
-      - trigger: activate
+      - trigger: ignition
         use_limit: once_per_turn
         custom: reattach
         meta:
           categories: [utility]
-          target: self
+          target: myself
 
   # === Strategy (3 cards) ===
 
@@ -533,7 +534,7 @@ cards:
     stats:
     effect_text: "Budget 200 を払って発動できる。リポジトリから しゅがーらぼ リソース1枚を選択して手札に加える。"
     effects:
-      - trigger: activate
+      - trigger: ignition
         use_limit: once_per_turn
         ops:
           - search_repo: { faction: Sugar }
@@ -552,11 +553,11 @@ cards:
     stats:
     effect_text: "Budget 300 を払って発動できる。コンピュート系リソース1体を選択する。このターン、そのカードのスループットを2倍にする。"
     effects:
-      - trigger: activate
+      - trigger: ignition
         use_limit: once_per_turn
         ops:
           - apply_buff:
-              selector: { owner: self, zone: frontend, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless], pick: choice }
+              selector: { owner: myself, zone: frontend, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless], pick: choice }
               buff: tp
               amount: { ref: target.tp, multiply: 1 }
               duration: this_turn
@@ -575,14 +576,14 @@ cards:
     stats:
     effect_text: "Budget 200 を払って発動できる。相手の Insight を 400 吸収する。さらに、相手のDB系リソースおよびオブジェクトストレージ1体につき相手の Insight を 200 吸収する。"
     effects:
-      - trigger: activate
+      - trigger: ignition
         use_limit: once_per_turn
         ops:
           - absorb_insight:
               amount:
                 base: 400
                 per:
-                  count: { owner: self, zone: backend }
+                  count: { owner: myself, zone: backend }
                   value: 200
                 max: 600
 
@@ -600,12 +601,13 @@ cards:
     restriction: unlimited
     is_active: true
     stats:
-    effect_text: "自分の しゅがーらぼ リソースが破壊される攻撃を受けた時に発動できる。その攻撃を無効化し、このターン中そのリソースは攻撃の対象にならない。ただし、次の自分のターン、そのリソースは攻撃できない。"
+    effect_text: "自分の しゅがーらぼ リソースが破壊される攻撃を受けた時に発動する。その攻撃を無効化し、このターン中そのリソースは攻撃の対象にならない。ただし、次の自分のターン、そのリソースは攻撃できない。"
     effects:
-      - trigger: reactive
+      - trigger: on_attack_declared
         guard:
           - match:
               selector: target
               faction: Sugar
+          - lethal: true
         ops:
           - survive_destruction: { av: 200 }

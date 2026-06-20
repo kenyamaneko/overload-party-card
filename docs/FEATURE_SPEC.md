@@ -4,7 +4,7 @@
 
 関連ドキュメント:
 - 内部動作・配線・運用設定: [ARCHITECTURE.md](ARCHITECTURE.md)
-- HTTP エンドポイント契約: [API_REFERENCE.md](API_REFERENCE.md)
+- HTTP エンドポイント契約: [data/openapi.yaml](../data/openapi.yaml) (SSoT)
 - DB スキーマ: [DATA_DESIGN.md](DATA_DESIGN.md)
 - カードデータ仕様: [CARDS.md](CARDS.md)
 
@@ -17,12 +17,13 @@ card は以下の機能ドメインを所有する。
 | 機能 | 主要な責務 |
 |---|---|
 | カードマスター配信 | 全カード定義を battle / gateway 向けに返す（SSoT） |
+| プロダクトマスター配信 | プロダクト定義（陣営に N:1、施策の効果 DSL 込み）を battle / client 向けに返す（SSoT） |
 | 所持カード照会 | プレイヤーの所持カード一覧・カード定義付き形式での返却 |
-| デッキ CRUD | プレイヤー単位のデッキ作成・更新・削除・一覧 |
-| デッキバリデーション | 枚数・所持・制限ルールの検証（都度算出） |
+| デッキ CRUD | プレイヤー単位のデッキ作成・更新・削除・一覧（陣営を宣言して構築） |
+| デッキバリデーション | 枚数・所持・制限・陣営整合ルールの検証（都度算出） |
 | バトル前検証 | `validate-for-battle` でバトル開始前のゲートキーパー |
 | カードパック配布 | 初回ファクション選択時・ショップ購入時のカード付与 |
-| Pub/Sub 消費 | `faction-purchased` / `player-onboarded` を購読しパック配布をイベント駆動で実行 (ADR-022) |
+| Pub/Sub 消費 | `card-pack-purchased` / `player-onboarded` を購読しパック配布をイベント駆動で実行 |
 
 card は **card スキーマの DB 行とカード定義 YAML (SSoT) を唯一の真実とし**、他サービスへカードマスターを複製しない。他サービスは `GET /internal/v1/cards` で起動時に読み取る read model を各自で持つ。
 
@@ -48,6 +49,15 @@ card は **card スキーマの DB 行とカード定義 YAML (SSoT) を唯一�
 
 card 自身は `cache.CardCache` に起動時にロードし、以降はメモリから参照する。ロード失敗で card は起動しない（fail-fast）。
 
+### 2.3 プロダクトマスター
+
+- `data/products.yaml` がプロダクトデータの SSoT
+- `scripts/generate_products.py` が検証（選択可能な全陣営に 1:1、ルーチン / スペシャル網羅）と `data/cache/products_gen.json` の生成を行う
+- プロダクトは DB に持たず、embed 済み JSON を `cache.ProductCache` に起動時ロードして配信する（4 件の静的マスターで運用変更は YAML 更新 + デプロイで行うため）
+- `GET /internal/v1/products`（battle 起動時ロード用、認証なし）と `GET /api/v1/cards/products`（client 用、InternalAuth）で配信する
+
+プロダクトデータの意味定義は [PRODUCTS.md](PRODUCTS.md) を参照。
+
 ---
 
 ## 3. 所持カード (`player_cards`)
@@ -56,8 +66,8 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 
 ### 3.1 取得 API
 
-1. `GET /internal/v1/players/{playerId}/cards` — 所持分のみ、カード定義付き形式 (`PlayerCardWithDef`)
-2. `GET /internal/v1/players/{playerId}/cards/with-ownership` — 全カード定義に所持フラグを付与
+1. `GET /api/v1/cards/cards` — 所持分のみ、カード定義付き形式 (`PlayerCardWithDef`)
+2. `GET /api/v1/cards/cards/with-ownership` — 全カード定義に所持フラグを付与
 
 どちらも CardCache を経由して定義情報を埋める。CardCache に存在しないカードを所持しているケースは内部エラー（データ整合性異常）として扱う。
 
@@ -67,6 +77,10 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 
 ### 4.1 デッキ制約
 
+- デッキは陣営（`decks.faction`）を 1 つ宣言する。宣言できるのは選択可能な陣営（`SelectableFactions`）のみ
+- デッキは宣言陣営に属するプロダクト（`decks.product_id`）を 1 つ選ぶ。陣営はプロダクトを複数持てる（陣営:プロダクト = 1:N）
+- 選んだプロダクトの施策から、ルーチン（`decks.routine_id`）とスペシャル（`decks.special_id`）をそれぞれ 1 つずつセットする。プロダクトは各区分の施策を複数持てる（数は区分ごとに異なってよい）。プロダクトを跨いだ施策の組み合わせは不可
+- 構成カードは宣言陣営と Neutral のカードのみ（混成不可）
 - デッキ枚数: ちょうど `constants.DeckSize`（= 30）枚
 - 構成カード全てをプレイヤーが所持していること（`player_cards.count >= deck_cards.count`）
 - 各カードが `card_definitions.restriction` の上限枚数以内であること
@@ -90,29 +104,34 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 
 1. 所持カード取得
 2. `validateDeckCards`:
-   1. 各エントリの `count > 0` チェック（`ErrInvalidDeck`）
-   2. 総枚数 ≤ `DeckSize` チェック（`ErrInvalidDeck`）
-   3. 各 `(card_id, art_no)` について所持枚数 ≥ 要求枚数（`ErrUnowned`）
-   4. 各 `card_id` の合計枚数 ≤ restriction 上限（`ErrRestrictionExceeded`）
-3. 書き込み（デッキ行 + deck_cards）
-4. 返却時に DeckCards を populate
+   1. 宣言陣営が `SelectableFactions` に含まれること（`ErrInvalidDeck`）
+   2. 各エントリの `count > 0` チェック（`ErrInvalidDeck`）
+   3. 総枚数 ≤ `DeckSize` チェック（`ErrInvalidDeck`）
+   4. 各 `(card_id, art_no)` について所持枚数 ≥ 要求枚数（`ErrUnowned`）
+   5. 各カードの陣営が宣言陣営または Neutral であること（`ErrInvalidDeck`）
+   6. 各 `card_id` の合計枚数 ≤ restriction 上限（`ErrRestrictionExceeded`）
+3. `validateInitiatives`: `product_id` が宣言陣営のプロダクトであり、`routine_id` / `special_id` がそのプロダクトの該当区分の施策であること（`ErrInvalidDeck`）
+4. 書き込み（デッキ行 + deck_cards）
+5. 返却時に DeckCards を populate
 
 **作成時の `is_valid`**: 総枚数 == `DeckSize` かつ validateDeckCards を通った場合のみ `true`。30 枚未満のドラフト状態でも保存はできるが `is_valid=false` になる。
 
 ### 4.4 `validate-for-battle` の契約
 
-`POST /internal/v1/players/{playerId}/decks/{deckId}/validate-for-battle` はバトル開始前のゲートキーパー。`is_valid=true` と同等のチェックを行い、不可の場合は具体的な理由をエラーで返す。gateway は matchmaking enqueue / NPC 対戦作成の前にこれを呼ぶ。
+`POST /api/v1/cards/decks/{deckId}/validate-for-battle` はバトル開始前のゲートキーパー。`is_valid=true` と同等のチェックを行い、不可の場合は具体的な理由をエラーで返す。gateway は matchmaking enqueue / NPC 対戦作成の前にこれを呼ぶ。
 
 チェック順序:
 
-1. `deck_cards` 取得
-2. 総枚数 == `DeckSize`（`ErrInvalidDeck`）
-3. 所持カード取得
-4. `validateDeckCards`（3.3 と同じ）
+1. デッキヘッダ取得（宣言陣営の解決）
+2. `deck_cards` 取得
+3. 総枚数 == `DeckSize`（`ErrInvalidDeck`）
+4. 所持カード取得
+5. `validateDeckCards`（4.3 と同じ）
+6. `validateInitiatives`（セットした施策が宣言陣営のものか）
 
 ### 4.5 デッキ削除
 
-`DELETE /internal/v1/players/{playerId}/decks/{deckId}` は `decks` 行を削除する。`deck_cards` は FK の `ON DELETE CASCADE` で同時に削除される。
+`DELETE /api/v1/cards/decks/{deckId}` は `decks` 行を削除する。`deck_cards` は FK の `ON DELETE CASCADE` で同時に削除される。
 
 ---
 
@@ -120,12 +139,14 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 
 ### 5.1 配布種別
 
-| API | 配布対象 | 呼び出し契機 |
-|---|---|---|
-| `POST .../grant-initial-pack` | 選択 faction + Neutral の全カード種類 × 3 枚 | onboarding 完了 (`player-onboarded` subscriber 経由) |
-| `POST .../grant-faction-pack` | 選択 faction の全カード種類 × 3 枚（Neutral なし） | ショップでの faction_set 購入 (`faction-purchased` subscriber 経由) |
+配布は内部 API `usecase.GrantInteractor.GrantPack(playerID, packID)` のみに集約され、`pack_id` をキーとして `card.card_pack` マスターから配布対象 (`card_id` × `copies`) を引く。subscriber 側で業務文脈に応じた `pack_id` を組み立てる:
 
-配布対象の faction は `card_definitions.faction` カラムで動的にフィルタする（ハードコードしない）。
+| 文脈 | 呼び出し元 | 渡す `pack_id` |
+|---|---|---|
+| onboarding 初期配布 | `player-onboarded-card-sub` | `basic` と `faction_set_<initial_faction>` の 2 回 |
+| shop 購入 | `card-pack-purchased-card-sub` | event payload の `card_pack_id` をそのまま |
+
+REST 経由の同期配布エンドポイントは ADR-032 で完全廃止されている。
 
 ### 5.2 書き込みセマンティクス
 
@@ -149,9 +170,9 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
 
 ---
 
-## 6. Pub/Sub subscriber (`faction-purchased` / `player-onboarded`)
+## 6. Pub/Sub subscriber (`card-pack-purchased` / `player-onboarded`)
 
-ファクション取得・オンボーディング完了をイベント駆動でパック配布に変換する (ADR-022)。`card.processed_events` を使って at-least-once 配信を実質的に一度だけ適用する。
+shop 購入・オンボーディング完了をイベント駆動でパック配布に変換する。`card.processed_events` を使って at-least-once 配信を実質的に一度だけ適用する。
 
 ### 6.1 処理フロー (共通)
 
@@ -161,11 +182,11 @@ card 自身は `cache.CardCache` に起動時にロードし、以降はメモ�
    - 既存行があれば `inserted = false` で `Ack`（重複適用しない）
    - INSERT 自体が失敗したら `Nack`
 4. subscriber 固有の配布を実行:
-   - `faction-purchased-card-sub` → `GrantFactionPack`（faction のみ）
-   - `player-onboarded-card-sub` → `GrantInitialPack`（faction + Neutral）
+   - `card-pack-purchased-card-sub` → `GrantPack(playerID, ev.CardPackID)`
+   - `player-onboarded-card-sub` → `GrantPack(playerID, "basic")` + `GrantPack(playerID, "faction_set_<faction>")` を順次
 5. 配布成功 → `Ack`、配布失敗 → `Nack`（Pub/Sub がリトライ）
 
-ADR-022 で業務事実単位に topic を分解したため、旧 `source` フィールド分岐は撤廃された。各 subscriber は自身の topic に紐づく副作用だけを実行する。
+各 subscriber は自身の topic に紐づく副作用だけを実行する。
 
 ### 6.2 冪等性の契約
 
@@ -176,7 +197,7 @@ ADR-022 で業務事実単位に topic を分解したため、旧 `source` フ�
 
 ### 6.3 未知 event_type の扱い
 
-`Nack` を返す。リトライしても結果は変わらないが、subscriber 側で握りつぶさず DLQ (`faction-purchased-dlq` / `player-onboarded-dlq`) に回収してオペレーション側で検出するポリシー。publisher の契約違反やイベントスキーマ拡張時の取りこぼしを早期に気付けるようにする意図。
+`Nack` を返す。リトライしても結果は変わらないが、subscriber 側で握りつぶさず DLQ (`card-pack-purchased-dlq` / `player-onboarded-dlq`) に回収してオペレーション側で検出するポリシー。publisher の契約違反やイベントスキーマ拡張時の取りこぼしを早期に気付けるようにする意図。
 
 ---
 
@@ -205,7 +226,7 @@ ADR-022 で業務事実単位に topic を分解したため、旧 `source` フ�
 
 | トピック | 購読名 | 発行元 | 契機 |
 |---|---|---|---|
-| `faction-purchased` | `faction-purchased-card-sub` | shop | プレイヤーが shop で faction を購入した時 |
+| `card-pack-purchased` | `card-pack-purchased-card-sub` | shop | プレイヤーが shop で card_pack を含む商品 (faction_set / 限定 pack 等) を購入した時 |
 | `player-onboarded` | `player-onboarded-card-sub` | scenario | プレイヤーがオンボーディングを完了した時 |
 
-card は **イベントを発行しない**。ADR-022 で業務事実単位に topic を分離したため、subscriber は source 分岐なしで自 topic 固有の副作用だけを処理する。
+card は **イベントを発行しない**。subscriber は source 分岐なしで自 topic 固有の副作用だけを処理する。

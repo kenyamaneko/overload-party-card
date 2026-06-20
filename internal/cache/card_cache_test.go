@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var resourceCardTypes = map[string]bool{"Compute": true, "Data": true}
+var resourceCardTypes = map[string]bool{"Compute": true, "DataResource": true}
 
 func isResourceType(cardType string) bool {
 	return resourceCardTypes[cardType]

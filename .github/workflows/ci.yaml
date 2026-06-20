@@ -1,10 +1,18 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.vscode/**'
+      - '.gitignore'
+      - 'LICENSE'
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -19,40 +27,44 @@ env:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
       - name: Configure Go private modules
-        run: |
-          # PAT (COMMON_GO_MODULES_FETCH) は kenyamaneko 組織全リポの read scope を持つ前提。
-          git config --global url."https://x-access-token:${{ secrets.COMMON_GO_MODULES_FETCH }}@github.com/kenyamaneko/".insteadOf "https://github.com/kenyamaneko/"
-        env:
-          GOPRIVATE: github.com/kenyamaneko/*
-          GONOSUMDB: github.com/kenyamaneko/*
+        uses: kenyamaneko/overload-party-common/.github/actions/setup-go-private-modules@main
+        with:
+          app-id: ${{ vars.CROSS_REPO_DEPS_APP_ID }}
+          private-key: ${{ secrets.CROSS_REPO_DEPS_APP_PRIVATE_KEY }}
       # golangci-lint-action のビルド済みバイナリは Go 1.25 未対応のため
       # go install でソースからビルドして使う
-      - run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-      - run: golangci-lint run --timeout 5m ./...
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.6
+      - name: Run lint
+        run: golangci-lint run --timeout 5m ./...
         env:
           GOPRIVATE: github.com/kenyamaneko/*
 
   test-unit:
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
       - name: Configure Go private modules
-        run: |
-          # PAT (COMMON_GO_MODULES_FETCH) は kenyamaneko 組織全リポの read scope を持つ前提。
-          git config --global url."https://x-access-token:${{ secrets.COMMON_GO_MODULES_FETCH }}@github.com/kenyamaneko/".insteadOf "https://github.com/kenyamaneko/"
-        env:
-          GOPRIVATE: github.com/kenyamaneko/*
-          GONOSUMDB: github.com/kenyamaneko/*
+        uses: kenyamaneko/overload-party-common/.github/actions/setup-go-private-modules@main
+        with:
+          app-id: ${{ vars.CROSS_REPO_DEPS_APP_ID }}
+          private-key: ${{ secrets.CROSS_REPO_DEPS_APP_PRIVATE_KEY }}
       - name: Run unit tests
         run: go test -race -count=1 ./...
         env:
@@ -61,52 +73,68 @@ jobs:
   test-integration:
     # ubuntu-latest には Docker がプリインストールされており、Testcontainers が
     # postgres:16-alpine を起動してリポジトリ層テストを実行する。
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
       # Testcontainers はテスト中に自動 pull するが、時間がかかりタイムアウトの原因になるため事前に取得する
       - name: Pre-pull postgres image (Testcontainers)
         run: docker pull postgres:16-alpine
       - name: Configure Go private modules
-        run: |
-          # PAT (COMMON_GO_MODULES_FETCH) は kenyamaneko 組織全リポの read scope を持つ前提。
-          git config --global url."https://x-access-token:${{ secrets.COMMON_GO_MODULES_FETCH }}@github.com/kenyamaneko/".insteadOf "https://github.com/kenyamaneko/"
-        env:
-          GOPRIVATE: github.com/kenyamaneko/*
-          GONOSUMDB: github.com/kenyamaneko/*
+        uses: kenyamaneko/overload-party-common/.github/actions/setup-go-private-modules@main
+        with:
+          app-id: ${{ vars.CROSS_REPO_DEPS_APP_ID }}
+          private-key: ${{ secrets.CROSS_REPO_DEPS_APP_PRIVATE_KEY }}
       - name: Run integration tests
         run: go test -race -count=1 -tags=integration ./...
         env:
           GOPRIVATE: github.com/kenyamaneko/*
 
-  build-and-push:
-    needs: [lint, test-unit, test-integration]
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+  codegen-sync:
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-
-      - id: auth
-        uses: google-github-actions/auth@v2
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
-          service_account: ${{ vars.CI_SERVICE_ACCOUNT }}
-
-      - uses: google-github-actions/setup-gcloud@v2
-
-      - run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
-
-      - name: Build and push
-        env:
-          DOCKER_BUILDKIT: "1"
-          COMMON_GO_MODULES_FETCH: ${{ secrets.COMMON_GO_MODULES_FETCH }}
+          python-version: "3.12"
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Set up .NET (NSwag)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Install NSwag CLI
+        run: dotnet tool install -g NSwag.ConsoleCore
+      - name: Configure private repo auth
+        # pip install で git+https://github.com/kenyamaneko/... を clone するために
+        # token-based 認証 (insteadOf) を git config に注入する。
+        uses: kenyamaneko/overload-party-common/.github/actions/setup-go-private-modules@main
+        with:
+          app-id: ${{ vars.CROSS_REPO_DEPS_APP_ID }}
+          private-key: ${{ secrets.CROSS_REPO_DEPS_APP_PRIVATE_KEY }}
+      - name: Install Python dependencies
         run: |
-          IMAGE=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}
-          docker build \
-            --secret id=COMMON_GO_MODULES_FETCH,env=COMMON_GO_MODULES_FETCH \
-            -t ${IMAGE}:${{ github.sha }} -t ${IMAGE}:latest .
-          docker push ${IMAGE}:${{ github.sha }}
-          docker push ${IMAGE}:latest
+          pip install pyyaml \
+            "overload-party-doc-tools @ git+https://github.com/kenyamaneko/overload-party-common.git@main#subdirectory=packages/doc-tools"
+      - name: Install oapi-codegen
+        run: go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.7.0
+      - name: Run codegen (OpenAPI)
+        run: scripts/generate_types.sh
+      - name: Run schema-doc codegen
+        run: python3 scripts/generate_schema_doc.py
+      - name: Check for drift
+        run: .github/scripts/ci/check-codegen-drift.sh

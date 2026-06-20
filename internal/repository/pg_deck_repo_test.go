@@ -50,6 +50,10 @@ func TestCreate(t *testing.T) {
 			deck := domain.Deck{
 				PlayerID:  playerA,
 				DeckName:  "Starter",
+				Faction:   "SHE",
+				ProductID: "PD-TST",
+				RoutineID: "IN-TST-R",
+				SpecialID: "IN-TST-S",
 				CreatedAt: now,
 				UpdatedAt: now,
 			}
@@ -57,6 +61,13 @@ func TestCreate(t *testing.T) {
 			deckID, err := repo.Create(ctx, deck, tt.entries)
 			require.NoError(t, err)
 			assert.NotZero(t, deckID, "deck_id should be auto-assigned")
+
+			persisted, err := repo.FindByID(ctx, playerA, deckID)
+			require.NoError(t, err)
+			assert.Equal(t, "SHE", persisted.Faction)
+			assert.Equal(t, "PD-TST", persisted.ProductID)
+			assert.Equal(t, "IN-TST-R", persisted.RoutineID)
+			assert.Equal(t, "IN-TST-S", persisted.SpecialID)
 
 			got, err := repo.GetDeckCards(ctx, playerA, deckID)
 			require.NoError(t, err)
@@ -73,35 +84,33 @@ func TestCreate(t *testing.T) {
 func TestFindByPlayerID(t *testing.T) {
 	tests := []struct {
 		name      string
-		setup     func(t *testing.T) []string // 戻り値: 期待される deck_name 順序 (player_A 視点、updated_at DESC)
+		setup     func(t *testing.T)
 		target    string
 		wantNames []string
 	}{
 		{
 			name: "複数デッキは updated_at 降順で返る",
-			setup: func(t *testing.T) []string {
+			setup: func(t *testing.T) {
 				// updated_at は now() デフォルト。手動で 3 件作って順序を制御する
 				insertDeckAt(t, playerA, "Old", time.Now().Add(-2*time.Hour))
 				insertDeckAt(t, playerA, "Middle", time.Now().Add(-1*time.Hour))
 				insertDeckAt(t, playerA, "New", time.Now())
-				return nil
 			},
 			target:    playerA,
 			wantNames: []string{"New", "Middle", "Old"},
 		},
 		{
 			name: "他プレイヤーのデッキは除外される",
-			setup: func(t *testing.T) []string {
+			setup: func(t *testing.T) {
 				insertDeck(t, playerA, "Mine")
 				insertDeck(t, playerB, "Theirs")
-				return nil
 			},
 			target:    playerA,
 			wantNames: []string{"Mine"},
 		},
 		{
 			name:      "デッキ 0 件なら空スライス",
-			setup:     func(t *testing.T) []string { return nil },
+			setup:     func(t *testing.T) {},
 			target:    playerA,
 			wantNames: nil,
 		},
@@ -135,6 +144,10 @@ func TestFindByID_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Target Deck", got.DeckName)
 	assert.Equal(t, playerA, got.PlayerID)
+	assert.Equal(t, "SHE", got.Faction)
+	assert.Equal(t, "PD-TST", got.ProductID)
+	assert.Equal(t, "IN-TST-R", got.RoutineID)
+	assert.Equal(t, "IN-TST-S", got.SpecialID)
 }
 
 // TestFindByID_NotFound は存在しない / 他プレイヤー配下の deck_id が
@@ -240,6 +253,10 @@ func TestUpdate(t *testing.T) {
 		PlayerID:  playerA,
 		DeckID:    deckID,
 		DeckName:  "Renamed",
+		Faction:   "Tenki",
+		ProductID: "PD-TST2",
+		RoutineID: "IN-TST-R2",
+		SpecialID: "IN-TST-S2",
 		PlaymatNo: &newPlaymat,
 		UpdatedAt: time.Now(),
 	}, []domain.DeckCardEntry{
@@ -250,6 +267,10 @@ func TestUpdate(t *testing.T) {
 	got, err := repo.FindByID(ctx, playerA, deckID)
 	require.NoError(t, err)
 	assert.Equal(t, "Renamed", got.DeckName)
+	assert.Equal(t, "Tenki", got.Faction)
+	assert.Equal(t, "PD-TST2", got.ProductID, "product can be updated")
+	assert.Equal(t, "IN-TST-R2", got.RoutineID, "routine can be updated")
+	assert.Equal(t, "IN-TST-S2", got.SpecialID, "special can be updated")
 	require.NotNil(t, got.PlaymatNo)
 	assert.Equal(t, newPlaymat, *got.PlaymatNo)
 
@@ -263,12 +284,12 @@ func TestUpdate(t *testing.T) {
 // 他プレイヤーのデッキには影響しない PK スコープを検証する。
 func TestDelete(t *testing.T) {
 	tests := []struct {
-		name            string
-		setup           func(t *testing.T) (int64, int64) // target deck_id, other deck_id
-		deletePID       string
-		deleteDID       func(targetID int64) int64
-		wantDecksAfter  int
-		wantCardsAfter  int
+		name           string
+		setup          func(t *testing.T) (int64, int64) // target deck_id, other deck_id
+		deletePID      string
+		deleteDID      func(targetID int64) int64
+		wantDecksAfter int
+		wantCardsAfter int
 	}{
 		{
 			name: "自分のデッキは cards も CASCADE で削除される",
@@ -318,8 +339,8 @@ func insertDeckAt(t *testing.T, playerID, deckName string, updatedAt time.Time) 
 	t.Helper()
 	var deckID int64
 	err := sharedPg.Pool.QueryRow(context.Background(),
-		`INSERT INTO card.decks (player_id, deck_name, created_at, updated_at)
-		 VALUES ($1, $2, $3, $3) RETURNING deck_id`,
+		`INSERT INTO card.decks (player_id, deck_name, faction, product_id, routine_id, special_id, created_at, updated_at)
+		 VALUES ($1, $2, 'SHE', 'PD-TST', 'IN-TST-R', 'IN-TST-S', $3, $3) RETURNING deck_id`,
 		playerID, deckName, updatedAt).Scan(&deckID)
 	require.NoError(t, err)
 	return deckID

@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 
+	accountadapter "github.com/kenyamaneko/overload-party-card/internal/adapter/account"
 	pubsubadapter "github.com/kenyamaneko/overload-party-card/internal/adapter/pubsub"
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
 	"github.com/kenyamaneko/overload-party-card/internal/config"
@@ -20,6 +21,8 @@ import (
 	"github.com/kenyamaneko/overload-party-card/internal/repository"
 	"github.com/kenyamaneko/overload-party-card/internal/router"
 	"github.com/kenyamaneko/overload-party-card/internal/usecase"
+
+	internalauth "github.com/kenyamaneko/overload-party-gateway/packages/internalauth-go"
 )
 
 func main() {
@@ -52,6 +55,8 @@ func run() error {
 	cardPackRepo := repository.NewPgCardPackRepository(pool)
 	playerCardRepo := repository.NewPgPlayerCardRepository(pool)
 	deckRepo := repository.NewPgDeckRepository(pool)
+	productRepo := repository.NewPgProductRepository(pool)
+	initiativeRepo := repository.NewPgInitiativeRepository(pool)
 	eventRepo := repository.NewPgProcessedEventRepository(pool)
 
 	cardCache := cache.NewCardCache()
@@ -59,18 +64,36 @@ func run() error {
 		return fmt.Errorf("load card cache: %w", err)
 	}
 
+	productCache := cache.NewProductCache()
+	if err := productCache.Load(ctx, productRepo); err != nil {
+		return fmt.Errorf("load product cache: %w", err)
+	}
+
+	initiativeCache := cache.NewInitiativeCache()
+	if err := initiativeCache.Load(ctx, initiativeRepo); err != nil {
+		return fmt.Errorf("load initiative cache: %w", err)
+	}
+
+	accountClient := accountadapter.NewClient(cfg.AccountServiceURL)
+
 	cardInteractor := usecase.NewCardInteractor(cardRepo, playerCardRepo)
-	deckInteractor := usecase.NewDeckInteractor(deckRepo, playerCardRepo, cardCache)
+	deckInteractor := usecase.NewDeckInteractor(deckRepo, playerCardRepo, cardCache, productCache, initiativeCache, accountClient)
 	playerCardInteractor := usecase.NewPlayerCardInteractor(playerCardRepo, cardCache)
 	grantInteractor := usecase.NewGrantInteractor(cardPackRepo, playerCardRepo)
 
 	cardH := rest.NewCardHandler(cardInteractor)
 	deckH := rest.NewDeckHandler(deckInteractor)
 	playerCardH := rest.NewPlayerCardHandler(playerCardInteractor)
+	productH := rest.NewProductHandler(productCache, initiativeCache)
+	initiativeH := rest.NewInitiativeHandler(initiativeCache)
 
-	r := router.New(cardH, deckH, playerCardH)
+	authVerifier := internalauth.NewVerifier(
+		internalauth.StaticHS256Resolver([]byte(cfg.InternalAuthSecret), internalauth.DefaultKeyID),
+	)
 
-	onboardedStream, err := pubsubadapter.NewStream(ctx, cfg.PubsubProjectID, cfg.PlayerOnboardedSubscription)
+	r := router.New(cardH, deckH, playerCardH, productH, initiativeH, authVerifier)
+
+	onboardedStream, err := pubsubadapter.NewStream(ctx, cfg.GoogleCloudProjectID, cfg.PlayerOnboardedSubscription)
 	if err != nil {
 		return fmt.Errorf("player-onboarded stream: %w", err)
 	}
@@ -80,7 +103,18 @@ func run() error {
 		}
 	}()
 
+	cardPackPurchasedStream, err := pubsubadapter.NewStream(ctx, cfg.GoogleCloudProjectID, cfg.CardPackPurchasedSubscription)
+	if err != nil {
+		return fmt.Errorf("card-pack-purchased stream: %w", err)
+	}
+	defer func() {
+		if cerr := cardPackPurchasedStream.Close(); cerr != nil {
+			slog.Warn("card-pack-purchased stream close", "error", cerr)
+		}
+	}()
+
 	onboardedSub := pubsubadapter.NewPlayerOnboardedSubscriber(onboardedStream, grantInteractor, eventRepo)
+	cardPackPurchasedSub := pubsubadapter.NewCardPackPurchasedSubscriber(cardPackPurchasedStream, grantInteractor, eventRepo)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
@@ -91,15 +125,17 @@ func run() error {
 	slog.Info("card starting",
 		"addr", srv.Addr,
 		"card_cache_size", cardCache.Count(),
-		"pubsub_project", cfg.PubsubProjectID,
+		"product_cache_size", productCache.Count(),
+		"initiative_cache_size", initiativeCache.Count(),
+		"google_cloud_project", cfg.GoogleCloudProjectID,
 	)
 
-	return runHTTPAndSubscribers(ctx, srv, onboardedSub)
+	return runHTTPAndSubscribers(ctx, srv, onboardedSub, cardPackPurchasedSub)
 }
 
 // runHTTPAndSubscribers は HTTP server と Pub/Sub subscriber 群を並行起動し、
 // どれかの失敗・シグナル到来で全体を graceful に停止する。
-func runHTTPAndSubscribers(ctx context.Context, srv *http.Server, onboardedSub subscriber) error {
+func runHTTPAndSubscribers(ctx context.Context, srv *http.Server, subscribers ...subscriber) error {
 	g, gCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
@@ -109,12 +145,14 @@ func runHTTPAndSubscribers(ctx context.Context, srv *http.Server, onboardedSub s
 		return nil
 	})
 
-	g.Go(func() error {
-		if err := onboardedSub.Start(gCtx); err != nil && gCtx.Err() == nil {
-			return fmt.Errorf("player-onboarded subscriber: %w", err)
-		}
-		return nil
-	})
+	for _, sub := range subscribers {
+		g.Go(func() error {
+			if err := sub.Start(gCtx); err != nil && gCtx.Err() == nil {
+				return fmt.Errorf("subscriber: %w", err)
+			}
+			return nil
+		})
+	}
 
 	g.Go(func() error {
 		<-gCtx.Done()

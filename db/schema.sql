@@ -2,6 +2,8 @@
 --
 -- Scope (ADR-014):
 --   card.card_definitions             - カードマスター
+--   card.products                     - プロダクトマスター
+--   card.initiatives                  - 施策マスター
 --   card.player_cards                 - プレイヤーの所持カード
 --   card.decks                        - プレイヤーのデッキヘッダー
 --   card.deck_cards                   - デッキ内カード構成
@@ -52,6 +54,49 @@ CREATE INDEX idx_cards_type ON card.card_definitions(card_type);
 CREATE TRIGGER trg_card_definitions_updated_at BEFORE UPDATE ON card.card_definitions FOR EACH ROW EXECUTE FUNCTION card.update_updated_at();
 
 -- =============================================================================
+-- Product Master (schema: card)
+-- =============================================================================
+-- 陣営に属するプロダクトと、その施策 (ルーチン / スペシャル) の SSoT。
+-- 陣営:プロダクト = 1:N（陣営は products.faction 列で表現）、
+-- プロダクト:施策 = 1:N（initiatives.product_id で親を参照）。
+-- decks は product_id / routine_id / special_id を論理参照として持ち、整合性は
+-- アプリ層で担保する（card_id と同様、FK は張らない）。
+
+CREATE TABLE card.products (
+  product_id   VARCHAR(10)  NOT NULL,                -- プロダクト識別子（例: PD-0001）
+  faction      VARCHAR(20)  NOT NULL,                -- 所属陣営
+  product_name VARCHAR(100) NOT NULL,                -- プロダクト名
+  is_active    BOOLEAN      NOT NULL DEFAULT true,   -- 有効フラグ（論理削除）
+  created_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),  -- 作成日時
+  updated_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),  -- 更新日時
+  CHECK (faction IN ('SHE', 'Tenki', 'Sugar', 'Tuners')),
+  PRIMARY KEY (product_id)
+);
+
+CREATE INDEX idx_products_faction ON card.products(faction);
+CREATE TRIGGER trg_products_updated_at BEFORE UPDATE ON card.products FOR EACH ROW EXECUTE FUNCTION card.update_updated_at();
+
+CREATE TABLE card.initiatives (
+  initiative_id VARCHAR(10)  NOT NULL,                -- 施策識別子（例: IN-0001）
+  product_id    VARCHAR(10)  NOT NULL,                -- 親プロダクト識別子
+  kind          VARCHAR(10)  NOT NULL,                -- 区分（routine: 1ターン1回 / special: 1ゲーム1回）
+  name          VARCHAR(100) NOT NULL,                -- 施策名
+  insight_cost  BIGINT       NOT NULL,                -- 発動 Insight コスト
+  effect_text   VARCHAR(500) NOT NULL,                -- 効果テキスト（表示用）
+  effect        JSONB        NOT NULL,                -- 効果定義（DSL）
+  is_active     BOOLEAN      NOT NULL DEFAULT true,   -- 有効フラグ（論理削除）
+  created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),  -- 作成日時
+  updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),  -- 更新日時
+  CHECK (kind IN ('routine', 'special')),
+  CHECK (insight_cost >= 0),
+  PRIMARY KEY (initiative_id),
+  FOREIGN KEY (product_id) REFERENCES card.products(product_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_initiatives_product ON card.initiatives(product_id);
+CREATE TRIGGER trg_initiatives_updated_at BEFORE UPDATE ON card.initiatives FOR EACH ROW EXECUTE FUNCTION card.update_updated_at();
+
+-- =============================================================================
 -- Card & Deck Management (schema: card, children of players)
 -- =============================================================================
 
@@ -67,8 +112,12 @@ CREATE TABLE card.decks (
   player_id   UUID NOT NULL, -- 所有プレイヤー (cross-schema reference to account.players; app-level integrity, not enforced by FK)
   deck_id     BIGINT NOT NULL GENERATED ALWAYS AS IDENTITY, -- デッキID（自動採番）
   deck_name   VARCHAR(50) NOT NULL,                  -- デッキ名
-  playmat_no  BIGINT,                                -- プレイマット番号（NULL: デフォルト）
-  sleeve_no   BIGINT,                                -- スリーブ番号（NULL: デフォルト）
+  faction     VARCHAR(20) NOT NULL,                  -- 宣言陣営（SHE / Tenki / Sugar / Tuners）
+  product_id  VARCHAR(10) NOT NULL,                  -- 選択したプロダクトの ID（宣言陣営に属する）
+  routine_id  VARCHAR(10) NOT NULL,                  -- セットしたルーチン施策の ID（選択プロダクトに属する）
+  special_id  VARCHAR(10) NOT NULL,                  -- セットしたスペシャル施策の ID（選択プロダクトに属する）
+  playmat_no  BIGINT,                                -- プレイマット番号
+  sleeve_no   BIGINT,                                -- スリーブ番号
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),    -- 作成日時
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),    -- 更新日時
   PRIMARY KEY (player_id, deck_id)
@@ -119,6 +168,6 @@ CREATE TABLE card.card_pack_cards (
 
 CREATE TABLE card.processed_events (
   event_id     UUID PRIMARY KEY,                     -- Pub/Sub EventID (publisher 生成の UUIDv4)
-  event_type   TEXT NOT NULL,                        -- イベント種別 (faction_purchased / player_onboarded) - ADR-022
+  event_type   TEXT NOT NULL,                        -- イベント種別 (card_pack_purchased / player_onboarded)
   processed_at TIMESTAMPTZ NOT NULL DEFAULT now()    -- 処理日時
 );

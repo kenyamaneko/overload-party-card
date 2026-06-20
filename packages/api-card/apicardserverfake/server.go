@@ -34,40 +34,32 @@ type Server struct {
 	mu  sync.Mutex
 	srv *httptest.Server
 
-	// ListAllCardsFn は GET /internal/v1/cards の応答を決定する。nil なら 200 + 空配列。
+	// ListAllCardsFn は GET /internal/v1/cards (master 配信) の応答を決定する。
 	ListAllCardsFn func() (int, any)
 
-	// ListCardsWithOwnershipFn は GET /internal/v1/players/{playerID}/cards/with-ownership の応答を決定する。
-	// nil なら 200 + 空配列。
-	ListCardsWithOwnershipFn func(playerID string) (int, any)
+	// ListCardsWithOwnershipFn は GET /api/v1/cards/cards/with-ownership の応答を決定する。
+	ListCardsWithOwnershipFn func() (int, any)
 
-	// ListPlayerCardsFn は GET /internal/v1/players/{playerID}/cards の応答を決定する。
-	// nil なら 200 + 空配列。
-	ListPlayerCardsFn func(playerID string) (int, any)
+	// ListPlayerCardsFn は GET /api/v1/cards/cards の応答を決定する。
+	ListPlayerCardsFn func() (int, any)
 
-	// ListDecksFn は GET /internal/v1/players/{playerID}/decks の応答を決定する。
-	// nil なら 200 + 空配列。
-	ListDecksFn func(playerID string) (int, any)
+	// ListDecksFn は GET /api/v1/cards/decks の応答を決定する。
+	ListDecksFn func() (int, any)
 
-	// GetDeckFn は GET /internal/v1/players/{playerID}/decks/{deckID} の応答を決定する。
-	// nil なら 200 + 空の DeckWithCardsResponse。
-	GetDeckFn func(playerID, deckID string) (int, any)
+	// GetDeckFn は GET /api/v1/cards/decks/{deckID} の応答を決定する。
+	GetDeckFn func(deckID string) (int, any)
 
-	// CreateDeckFn は POST /internal/v1/players/{playerID}/decks の応答を決定する。
-	// nil なら 200 + 空の Deck を返す。
-	CreateDeckFn func(playerID string, req apicard.DeckCreateRequest) (int, any)
+	// CreateDeckFn は POST /api/v1/cards/decks の応答を決定する。
+	CreateDeckFn func(req apicard.DeckCreateRequest) (int, any)
 
-	// UpdateDeckFn は PUT /internal/v1/players/{playerID}/decks/{deckID} の応答を決定する。
-	// nil なら 200 + 空の Deck を返す。
-	UpdateDeckFn func(playerID, deckID string, req apicard.DeckUpdateRequest) (int, any)
+	// UpdateDeckFn は PUT /api/v1/cards/decks/{deckID} の応答を決定する。
+	UpdateDeckFn func(deckID string, req apicard.DeckUpdateRequest) (int, any)
 
-	// DeleteDeckFn は DELETE /internal/v1/players/{playerID}/decks/{deckID} の応答を決定する。
-	// nil なら 204 No Content を返す。
-	DeleteDeckFn func(playerID, deckID string) (int, any)
+	// DeleteDeckFn は DELETE /api/v1/cards/decks/{deckID} の応答を決定する。
+	DeleteDeckFn func(deckID string) (int, any)
 
-	// ValidateDeckForBattleFn は POST /internal/v1/players/{playerID}/decks/{deckID}/validate-for-battle の応答を決定する。
-	// nil なら 200 OK を返す (バトル可用を示す)。
-	ValidateDeckForBattleFn func(playerID, deckID string) (int, any)
+	// ValidateDeckForBattleFn は POST /api/v1/cards/decks/{deckID}/validate-for-battle の応答を決定する。
+	ValidateDeckForBattleFn func(deckID string) (int, any)
 }
 
 // NewServer は起動済み Server を返す。テスト終了時に Close() すること。
@@ -75,14 +67,14 @@ func NewServer() *Server {
 	s := &Server{}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /internal/v1/cards", s.handleListAllCards)
-	mux.HandleFunc("GET /internal/v1/players/{playerID}/cards/with-ownership", s.handleListCardsWithOwnership)
-	mux.HandleFunc("GET /internal/v1/players/{playerID}/cards", s.handleListPlayerCards)
-	mux.HandleFunc("GET /internal/v1/players/{playerID}/decks", s.handleListDecks)
-	mux.HandleFunc("GET /internal/v1/players/{playerID}/decks/{deckID}", s.handleGetDeck)
-	mux.HandleFunc("POST /internal/v1/players/{playerID}/decks", s.handleCreateDeck)
-	mux.HandleFunc("PUT /internal/v1/players/{playerID}/decks/{deckID}", s.handleUpdateDeck)
-	mux.HandleFunc("DELETE /internal/v1/players/{playerID}/decks/{deckID}", s.handleDeleteDeck)
-	mux.HandleFunc("POST /internal/v1/players/{playerID}/decks/{deckID}/validate-for-battle", s.handleValidateDeckForBattle)
+	mux.HandleFunc("GET /api/v1/cards/cards/with-ownership", s.handleListCardsWithOwnership)
+	mux.HandleFunc("GET /api/v1/cards/cards", s.handleListPlayerCards)
+	mux.HandleFunc("GET /api/v1/cards/decks", s.handleListDecks)
+	mux.HandleFunc("GET /api/v1/cards/decks/{deckID}", s.handleGetDeck)
+	mux.HandleFunc("POST /api/v1/cards/decks", s.handleCreateDeck)
+	mux.HandleFunc("PUT /api/v1/cards/decks/{deckID}", s.handleUpdateDeck)
+	mux.HandleFunc("DELETE /api/v1/cards/decks/{deckID}", s.handleDeleteDeck)
+	mux.HandleFunc("POST /api/v1/cards/decks/{deckID}/validate-for-battle", s.handleValidateDeckForBattle)
 	s.srv = httptest.NewServer(mux)
 	return s
 }
@@ -105,42 +97,39 @@ func (s *Server) handleListAllCards(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, status, body)
 }
 
-func (s *Server) handleListCardsWithOwnership(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleListCardsWithOwnership(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
 	fn := s.ListCardsWithOwnershipFn
 	s.mu.Unlock()
-	playerID := r.PathValue("playerID")
 	if fn == nil {
 		writeJSON(w, http.StatusOK, []*apicard.CardWithOwnership{})
 		return
 	}
-	status, body := fn(playerID)
+	status, body := fn()
 	writeJSON(w, status, body)
 }
 
-func (s *Server) handleListPlayerCards(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleListPlayerCards(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
 	fn := s.ListPlayerCardsFn
 	s.mu.Unlock()
-	playerID := r.PathValue("playerID")
 	if fn == nil {
 		writeJSON(w, http.StatusOK, []*apicard.PlayerCardWithDef{})
 		return
 	}
-	status, body := fn(playerID)
+	status, body := fn()
 	writeJSON(w, status, body)
 }
 
-func (s *Server) handleListDecks(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleListDecks(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
 	fn := s.ListDecksFn
 	s.mu.Unlock()
-	playerID := r.PathValue("playerID")
 	if fn == nil {
 		writeJSON(w, http.StatusOK, []*apicard.Deck{})
 		return
 	}
-	status, body := fn(playerID)
+	status, body := fn()
 	writeJSON(w, status, body)
 }
 
@@ -148,13 +137,12 @@ func (s *Server) handleGetDeck(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	fn := s.GetDeckFn
 	s.mu.Unlock()
-	playerID := r.PathValue("playerID")
 	deckID := r.PathValue("deckID")
 	if fn == nil {
 		writeJSON(w, http.StatusOK, DeckWithCardsResponse{Cards: []apicard.DeckCard{}})
 		return
 	}
-	status, body := fn(playerID, deckID)
+	status, body := fn(deckID)
 	writeJSON(w, status, body)
 }
 
@@ -165,12 +153,11 @@ func (s *Server) handleCreateDeck(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	fn := s.CreateDeckFn
 	s.mu.Unlock()
-	playerID := r.PathValue("playerID")
 	if fn == nil {
 		writeJSON(w, http.StatusOK, apicard.Deck{})
 		return
 	}
-	status, body := fn(playerID, req)
+	status, body := fn(req)
 	writeJSON(w, status, body)
 }
 
@@ -181,13 +168,12 @@ func (s *Server) handleUpdateDeck(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	fn := s.UpdateDeckFn
 	s.mu.Unlock()
-	playerID := r.PathValue("playerID")
 	deckID := r.PathValue("deckID")
 	if fn == nil {
 		writeJSON(w, http.StatusOK, apicard.Deck{})
 		return
 	}
-	status, body := fn(playerID, deckID, req)
+	status, body := fn(deckID, req)
 	writeJSON(w, status, body)
 }
 
@@ -195,13 +181,12 @@ func (s *Server) handleDeleteDeck(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	fn := s.DeleteDeckFn
 	s.mu.Unlock()
-	playerID := r.PathValue("playerID")
 	deckID := r.PathValue("deckID")
 	if fn == nil {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	status, body := fn(playerID, deckID)
+	status, body := fn(deckID)
 	writeJSON(w, status, body)
 }
 
@@ -209,13 +194,12 @@ func (s *Server) handleValidateDeckForBattle(w http.ResponseWriter, r *http.Requ
 	s.mu.Lock()
 	fn := s.ValidateDeckForBattleFn
 	s.mu.Unlock()
-	playerID := r.PathValue("playerID")
 	deckID := r.PathValue("deckID")
 	if fn == nil {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	status, body := fn(playerID, deckID)
+	status, body := fn(deckID)
 	writeJSON(w, status, body)
 }
 

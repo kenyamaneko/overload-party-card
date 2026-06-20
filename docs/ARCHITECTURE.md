@@ -2,11 +2,13 @@
 
 本ドキュメントは **コードを読んでも一見しては分からない設計意図** だけを残す。実装詳細（バリデーション順序・state 遷移の対応・エラー → HTTP ステータス変換・環境変数の一覧）は [FEATURE_SPEC.md](FEATURE_SPEC.md) と各ファイルの実装・コメントを一次情報とする。
 
-サービス概要・起動手順は [../README.md](../README.md)、エンドポイントは [API_REFERENCE.md](API_REFERENCE.md)、テーブル定義は [DATA_DESIGN.md](DATA_DESIGN.md) を参照。
+サービス概要・起動手順は [../README.md](../README.md)、エンドポイント契約は [data/openapi.yaml](../data/openapi.yaml) (SSoT)、テーブル定義は [DATA_DESIGN.md](DATA_DESIGN.md) を参照。
 
 ## Card の責務境界 (SSoT 契約)
 
 card は **カードマスターデータそのもの** の single source of truth である。他サービスはカード定義を DB テーブル/seed として持たず、card の `GET /internal/v1/cards` を起動時に呼び出してインメモリに保持する read model を各自で構築する。
+
+エンドポイントは 2 系統に分かれる。`/internal/v1/cards` は battle / gateway が起動時に master データをロードする経路で player_id を要求しないため認証なし。`/api/v1/cards/...` は gateway 経由の player-scoped 操作 (デッキ管理・所持カード照会等) で `X-Internal-Auth` (HMAC JWT) を要求し、`sub` クレームから player_id を解決する (ADR-037)。
 
 この契約により:
 
@@ -94,10 +96,10 @@ at-least-once を at-most-once 相当に近づけるための前段ガードで�
 
 ADR-022 で `FactionSelectedEvent` を業務事実単位に分解し、ADR-031 / ADR-032 で `faction-purchased` を `card-pack-purchased` (card 向け) + `faction-acquired` (account / gateway 向け) に再分解した結果、card は以下の subscriber を持つ:
 
-| subscriber | 副作用 | 備考 |
-|---|---|---|
-| `player-onboarded-card-sub` | onboarding 完了時に `basic` pack と `faction_set_<faction>` pack を順次配布 (内部で `GrantPack` を 2 回呼ぶ) | 導入済み |
-| `card-pack-purchased-card-sub` | shop の card_pack 系商品 (faction_set / 限定パック等) 購入時に `card_pack_id` で指定された pack を配布 | ADR-032 PR 2 で追加 |
+| subscriber | 副作用 |
+|---|---|
+| `player-onboarded-card-sub` | onboarding 完了時に `basic` pack と `faction_set_<faction>` pack を順次配布 (内部で `GrantPack` を 2 回呼ぶ) |
+| `card-pack-purchased-card-sub` | shop の card_pack 系商品 (faction_set / 限定パック等) 購入時に `card_pack_id` で指定された pack を配布 |
 
 `player-onboarded` での 2 pack 配布は順次呼びのため、間でクラッシュすると「basic だけ配布された」「faction だけ配布された」「重複配布」のいずれかの状態が残りうる。これは下記「Pub/Sub subscriber の冪等性」で述べる at-most-once 相当の制約を 2 pack に拡張したもので、稼働前は許容する。
 
@@ -178,8 +180,10 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 - **`PORT`**: 起動ポート。未設定で起動不可
 - **`ENV`**: `dev` / `stg` / `prod` のいずれか。未設定で起動不可。`prod` / `stg` は Cloud Logging 互換の JSON slog、`dev` はテキスト slog にルーティングする
 - **`DATABASE_CONN`**: card スキーマへの接続文字列。未設定で起動不可
-- **`PUBSUB_PROJECT_ID`**: card は `player-onboarded` subscriber を持つため必須 (ADR-032 PR 2 で `card-pack-purchased` も追加予定)
+- **`GOOGLE_CLOUD_PROJECT_ID`**: Google Cloud プロジェクト ID。card は `player-onboarded` / `card-pack-purchased` subscriber を持つため必須
 - **`PLAYER_ONBOARDED_SUBSCRIPTION`**: player-onboarded subscription 名。未設定で起動不可
+- **`CARD_PACK_PURCHASED_SUBSCRIPTION`**: card-pack-purchased subscription 名。未設定で起動不可
+- **`INTERNAL_AUTH_SECRET`**: gateway が発行する内部認証 JWT の検証鍵。未設定で起動不可。`/api/v1/cards` 配下の player-scoped API は本鍵で署名された `X-Internal-Auth` header を要求する
 
 ### カードデータ変更時
 
@@ -199,9 +203,9 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 
 ### 型定義変更時
 
-1. `data/models.yaml` を編集
-2. `python3 scripts/generate_types.py` を実行
-3. `packages/api-card/*_gen.go` と `docs/API_REFERENCE.md` のマーカー間を更新
+1. `data/openapi.yaml` を編集 (SSoT)
+2. `scripts/generate_types.sh` を実行 (oapi-codegen が `packages/api-card/openapi_gen.go` を再生成)
+3. enum 追加・削除があれば `internal/domain/card_enum.go` も更新 (drift test が乖離を検知)
 4. コミット
 
 ### Pub/Sub トピックと subscriber

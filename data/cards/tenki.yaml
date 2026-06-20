@@ -44,19 +44,21 @@ cards:
       availability: 1500
       sla_penalty: 400
       maintenance_cost: 50
-    effect_text: "**Auto Patch:** 相手がインシデントカードを使った時に発動できる。このカードが受けるダメージを半分にする。"
+    effect_text: "**Auto Patch:** 相手がインシデントカードを使った時に発動する。このカードが受けるダメージを半分にする。"
     effects:
-      - trigger: reactive
+      - trigger: on_incident
+        guard:
+          - event_owner: opponent
         ops:
           - apply_buff:
-              selector: { owner: self }
+              selector: { owner: myself }
               buff: incident_reduction
               amount: 50
               mode: percent
               duration: this_turn
         meta:
           categories: [defensive]
-          target: self
+          target: myself
 
   - card_no: 25
     card_id: "TK-0003"
@@ -132,7 +134,7 @@ cards:
               amount:
                 base: 0
                 per:
-                  count: { owner: self, zone: backend, faction: Tenki, card_type: Data }
+                  count: { owner: myself, zone: backend, faction: Tenki, card_type: DataResource }
                   value: 200
               duration: this_turn
 
@@ -169,7 +171,7 @@ cards:
     card_name: "シグレ"
     resource_label: "RDB"
     const_name: TenkiRDBShigure
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 1
     resizable: true
@@ -189,7 +191,7 @@ cards:
     card_name: "ハヤテ"
     resource_label: "DB"
     const_name: TenkiDBHayate
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 1
     resizable: true
@@ -209,7 +211,7 @@ cards:
           - match:
               selector: target
               faction: Tenki
-              card_type: Data
+              card_type: DataResource
           - not_same: { a: source, b: target }
         ops:
           - apply_buff:
@@ -223,7 +225,7 @@ cards:
     card_name: "フブキ"
     resource_label: "Storage"
     const_name: TenkiStorageFubuki
-    card_type: Data
+    card_type: DataResource
     subtype: ObjectStorage
     deploy_turns: 0
     resizable: false
@@ -243,7 +245,7 @@ cards:
     card_name: "百花の天穹<コスモ>"
     resource_label: "NoSQL"
     const_name: TenkiDBCosmo
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 0
     resizable: false
@@ -261,14 +263,14 @@ cards:
       maintenance_cost: 50
     effect_text: "**百花の形:** このカードが 天気使い DB系リソースとして効果の対象になる時、このカードは2枚分として数える。\n**百花繚乱:** このカードをデプロイした時に発動できる。リポジトリから「天気使い NoSQL - 秩序の蒼<コスモ>」1枚をコストなしでデプロイする。この効果は1ターン中に1回のみ使用できる"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
               selector: source
               buff: count_multiplier
               amount: 2
               duration: while_on_field
-      - trigger: deploy
+      - trigger: on_deploy
         use_limit: once_per_turn
         ops:
           - deploy_from_repo:
@@ -279,7 +281,7 @@ cards:
     card_name: "シュウウ"
     resource_label: "Cache"
     const_name: TenkiCacheReiu
-    card_type: Data
+    card_type: DataResource
     subtype: CacheDB
     deploy_turns: 0
     resizable: true
@@ -310,10 +312,10 @@ cards:
     stats:
     effect_text: "自分のフィールドの 天気使い リソースのスケールアップのコストを -200 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: self, faction: Tenki }
+              selector: { owner: myself, faction: Tenki }
               buff: scale_cost_reduction
               amount: 200
               duration: while_on_field
@@ -332,10 +334,10 @@ cards:
     stats:
     effect_text: "自分のフィールドの全ての 天気使い コンピュート系リソースのスループットを +200 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: self, faction: Tenki, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless] }
+              selector: { owner: myself, faction: Tenki, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless] }
               buff: tp
               amount: 200
               duration: while_on_field
@@ -354,7 +356,12 @@ cards:
     stats:
     effect_text: "相手の「DDoS攻撃」と「データ流出」を無効化する。"
     effects:
-      - trigger: reactive
+      - trigger: on_incident
+        guard:
+          - event_owner: opponent
+          - match:
+              selector: event_card
+              card_id: [NT-0013, NT-0014]
         ops:
           - cancel_action: {}
 
@@ -397,7 +404,7 @@ cards:
     stats:
     effect_text: "自分のリソースに装備できる。装備先へのインシデントカードによるダメージを -200 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
               selector: source
@@ -419,7 +426,15 @@ cards:
     stats:
     effect_text: "自分のバックエンドリソースに装備できる。装備先は「データ流出」の効果を受けない。"
     effects:
-      - trigger: reactive
+      - trigger: on_incident
+        guard:
+          - event_owner: opponent
+          - match:
+              selector: event_card
+              card_id: NT-0014
+          - same:
+              a: target
+              b: equip_host
         ops:
           - cancel_action: {}
 
@@ -456,7 +471,7 @@ cards:
     stats:
     effect_text: "自分の「天気使い VM - ソラ」にのみ装備できる。装備先の可用性を +300 し、スループットを +200 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
               selector: source
@@ -485,7 +500,7 @@ cards:
     stats:
     effect_text: "Budget 200 を払って発動できる。リポジトリから 天気使い リソース1枚を選択して手札に加える。"
     effects:
-      - trigger: activate
+      - trigger: ignition
         use_limit: once_per_turn
         ops:
           - search_repo: { faction: Tenki }
@@ -504,7 +519,7 @@ cards:
     stats:
     effect_text: "Budget 100 を払って発動できる。トラッシュから 天気使い リソース1枚を選択して手札に加える。"
     effects:
-      - trigger: activate
+      - trigger: ignition
         use_limit: once_per_turn
         ops:
           - trash_to_hand:
@@ -525,7 +540,7 @@ cards:
     stats:
     effect_text: "Budget 400 を払って発動できる。このターン、相手はインシデントカードを使用できない。"
     effects:
-      - trigger: activate
+      - trigger: ignition
         use_limit: once_per_turn
         ops:
           - apply_buff:
@@ -548,9 +563,11 @@ cards:
     restriction: unlimited
     is_active: true
     stats:
-    effect_text: "相手がインシデントカードを使用した時に発動できる。そのインシデントを無効化する。"
+    effect_text: "相手がインシデントカードを使用した時に発動する。そのインシデントを無効化する。"
     effects:
-      - trigger: reactive
+      - trigger: on_incident
+        guard:
+          - event_owner: opponent
         ops:
           - cancel_action: {}
 
@@ -566,9 +583,14 @@ cards:
     restriction: unlimited
     is_active: true
     stats:
-    effect_text: "自分の 天気使い コンピュート系リソースが破壊された時に発動できる。手札から 天気使い コンピュート系リソース1枚をデプロイコストなしでデプロイする。"
+    effect_text: "自分の 天気使い コンピュート系リソースが破壊された時に発動する。手札から 天気使い コンピュート系リソース1枚をデプロイコストなしでデプロイする。"
     effects:
-      - trigger: reactive
+      - trigger: on_destroy
+        guard:
+          - match:
+              selector: target
+              faction: Tenki
+              card_type: [Compute, Container, Orchestrator, Serverless, "AI/ML"]
         ops:
           - deploy_from_hand:
               filter:
@@ -589,13 +611,13 @@ cards:
     stats:
     effect_text: "①デプロイ時、相手フィールドの裏向きリアクティブカードを1枚選び、確認する。②このカードがフィールドに存在する限り、インシデントカードによる自分のリソースへのダメージを300軽減する"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - peek_reactive: {}
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: self }
+              selector: { owner: myself }
               buff: incident_reduction
               amount: 300
               duration: while_on_field

@@ -34,7 +34,7 @@ STARTER_DECKS_JSON_OUT = ROOT / "data" / "cache" / "starter_decks_gen.json"
 # 3階層分類（Zone / CardType / Subtype）。Phase 2b で導入。
 # 参考: overload-party-battle/memory/project_card_taxonomy.md
 CARD_TYPE_COMPUTE = "Compute"
-CARD_TYPE_DATA = "Data"
+CARD_TYPE_DATA = "DataResource"
 CARD_TYPE_LOG = "Log"
 RESOURCE_CARD_TYPES = {CARD_TYPE_COMPUTE, CARD_TYPE_DATA}
 SUPPORT_CARD_TYPES = {"Platform", "Attachment", "Strategy", "Reactive", "Incident"}

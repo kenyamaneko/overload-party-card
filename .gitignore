@@ -1,6 +1,8 @@
 /bin/
 /dist/
 *.out
+packages/api-card-dotnet/bin/
+packages/api-card-dotnet/obj/
 .env
 .env.local
 vendor/

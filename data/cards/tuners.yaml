@@ -103,7 +103,7 @@ cards:
       - trigger: on_field_change
         guard:
           - count:
-              selector: { owner: self, faction: Tuners }
+              selector: { owner: myself, faction: Tuners }
               max: 3
         ops:
           - apply_buff:
@@ -164,7 +164,7 @@ cards:
       - trigger: on_field_change
         guard:
           - count:
-              selector: { owner: self, faction: Tuners, card_type: [Database, CacheDB] }
+              selector: { owner: myself, faction: Tuners, card_type: [Database, CacheDB] }
               min: 1
         ops:
           - apply_buff:
@@ -180,7 +180,7 @@ cards:
     card_name: "音の魔術師〈マジシャン・オブ・ミュージック〉"
     resource_label: "DB"
     const_name: TunersDBOtonmajutsushi
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 1
     resizable: false
@@ -203,7 +203,7 @@ cards:
     card_name: "エクサノーツ"
     resource_label: "DB"
     const_name: TunersDBExanotes
-    card_type: Data
+    card_type: DataResource
     subtype: Database
     deploy_turns: 1
     resizable: true
@@ -225,7 +225,7 @@ cards:
     card_name: "スコアージ"
     resource_label: "Storage"
     const_name: TunersStorageScourge
-    card_type: Data
+    card_type: DataResource
     subtype: ObjectStorage
     deploy_turns: 0
     resizable: false
@@ -247,7 +247,7 @@ cards:
     card_name: "カプリッシュ"
     resource_label: "Cache"
     const_name: TunersCacheCaprish
-    card_type: Data
+    card_type: DataResource
     subtype: CacheDB
     deploy_turns: 0
     resizable: true
@@ -278,10 +278,10 @@ cards:
     stats:
     effect_text: "自分のフィールドの 調律部 リソースのスケールアップコストを -300 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: self, faction: Tuners }
+              selector: { owner: myself, faction: Tuners }
               buff: scale_cost_reduction
               amount: 300
               duration: while_on_field
@@ -300,10 +300,10 @@ cards:
     stats:
     effect_text: "インシデントカードによる自分の 調律部 リソースへのダメージを -200 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: self, faction: Tuners }
+              selector: { owner: myself, faction: Tuners }
               buff: incident_reduction
               amount: 200
               duration: while_on_field
@@ -322,7 +322,15 @@ cards:
     stats:
     effect_text: "自分のフィールドの 調律部 リソースは相手の「DDoS攻撃」と「データ流出」の効果を受けない。"
     effects:
-      - trigger: reactive
+      - trigger: on_incident
+        guard:
+          - event_owner: opponent
+          - match:
+              selector: event_card
+              card_id: [NT-0013, NT-0014]
+          - match:
+              selector: target
+              faction: Tuners
         ops:
           - cancel_action: {}
 
@@ -363,7 +371,7 @@ cards:
     stats:
     effect_text: "自分の 調律部 DB系リソースに装備できる。装備先の可用性を +400 する。装備先へのインシデントカードによるダメージを -200 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
               selector: source
@@ -390,7 +398,7 @@ cards:
     stats:
     effect_text: "自分の「調律部 Compute - コンタータ」または「調律部 Bare Metal - ベア太」にのみ装備できる。装備先の可用性を +800 する。装備先へのインシデントカードによるダメージを -100 する。"
     effects:
-      - trigger: deploy
+      - trigger: on_deploy
         ops:
           - apply_buff:
               selector: source
@@ -419,12 +427,12 @@ cards:
     stats:
     effect_text: "Budget 100 を払って発動できる。自分の 調律部 DB系リソース1体の可用性を最大値まで回復する。"
     effects:
-      - trigger: activate
+      - trigger: ignition
         use_limit: once_per_turn
         ops:
           - heal_damage:
               selector:
-                owner: self
+                owner: myself
                 zone: backend
                 faction: Tuners
                 card_type: Database
@@ -445,9 +453,14 @@ cards:
     restriction: unlimited
     is_active: true
     stats:
-    effect_text: "自分の 調律部 DB系リソースが破壊された時に発動できる。手札から 調律部 DB系リソース1枚をデプロイコストなしでデプロイする。"
+    effect_text: "自分の 調律部 DB系リソースが破壊された時に発動する。手札から 調律部 DB系リソース1枚をデプロイコストなしでデプロイする。"
     effects:
-      - trigger: reactive
+      - trigger: on_destroy
+        guard:
+          - match:
+              selector: target
+              faction: Tuners
+              card_type: Database
         ops:
           - deploy_from_hand:
               filter: { faction: Tuners, card_type: Database }
