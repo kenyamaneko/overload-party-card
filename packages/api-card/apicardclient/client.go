@@ -88,7 +88,7 @@ func (c *Client) GetHealth(ctx context.Context) (*apicard.HealthResponse, error)
 	if resp.JSON200 != nil {
 		return resp.JSON200, nil
 	}
-	return nil, statusError("GetHealth", resp.StatusCode())
+	return nil, newStatusError("GetHealth", resp.StatusCode())
 }
 
 // ListCards は全カード定義 (master データ) を返す。
@@ -100,7 +100,7 @@ func (c *Client) ListCards(ctx context.Context) ([]apicard.CardDefinition, error
 	if resp.JSON200 != nil {
 		return *resp.JSON200, nil
 	}
-	return nil, statusError("ListCards", resp.StatusCode())
+	return nil, newStatusError("ListCards", resp.StatusCode())
 }
 
 // ListPlayerCards はプレイヤーの所持カード一覧を返す。
@@ -112,7 +112,7 @@ func (c *Client) ListPlayerCards(ctx context.Context) ([]apicard.PlayerCardWithD
 	if resp.JSON200 != nil {
 		return *resp.JSON200, nil
 	}
-	return nil, statusError("ListPlayerCards", resp.StatusCode())
+	return nil, newStatusError("ListPlayerCards", resp.StatusCode())
 }
 
 // ListCardsWithOwnership は全カード定義にプレイヤー所持状態を付与して返す。
@@ -124,7 +124,7 @@ func (c *Client) ListCardsWithOwnership(ctx context.Context) ([]apicard.CardWith
 	if resp.JSON200 != nil {
 		return *resp.JSON200, nil
 	}
-	return nil, statusError("ListCardsWithOwnership", resp.StatusCode())
+	return nil, newStatusError("ListCardsWithOwnership", resp.StatusCode())
 }
 
 // ListDecks はプレイヤーのデッキ一覧を返す。
@@ -136,7 +136,7 @@ func (c *Client) ListDecks(ctx context.Context) ([]apicard.Deck, error) {
 	if resp.JSON200 != nil {
 		return *resp.JSON200, nil
 	}
-	return nil, statusError("ListDecks", resp.StatusCode())
+	return nil, newStatusError("ListDecks", resp.StatusCode())
 }
 
 // GetDeck はデッキ詳細 (deck メタとカード構成) を返す。
@@ -148,7 +148,7 @@ func (c *Client) GetDeck(ctx context.Context, deckID int64) (*apicard.Deck, []ap
 	if resp.JSON200 != nil {
 		return &resp.JSON200.Deck, resp.JSON200.Cards, nil
 	}
-	return nil, nil, statusError("GetDeck", resp.StatusCode())
+	return nil, nil, newStatusError("GetDeck", resp.StatusCode())
 }
 
 // CreateDeck は新しいデッキを作成する。
@@ -160,7 +160,7 @@ func (c *Client) CreateDeck(ctx context.Context, req apicard.DeckCreateRequest) 
 	if resp.JSON201 != nil {
 		return resp.JSON201, nil
 	}
-	return nil, statusError("CreateDeck", resp.StatusCode())
+	return nil, newStatusError("CreateDeck", resp.StatusCode())
 }
 
 // UpdateDeck は既存デッキを更新する。
@@ -172,7 +172,7 @@ func (c *Client) UpdateDeck(ctx context.Context, deckID int64, req apicard.DeckU
 	if resp.JSON200 != nil {
 		return resp.JSON200, nil
 	}
-	return nil, statusError("UpdateDeck", resp.StatusCode())
+	return nil, newStatusError("UpdateDeck", resp.StatusCode())
 }
 
 // DeleteDeck はデッキを削除する。
@@ -184,7 +184,7 @@ func (c *Client) DeleteDeck(ctx context.Context, deckID int64) error {
 	if resp.StatusCode() == http.StatusNoContent {
 		return nil
 	}
-	return statusError("DeleteDeck", resp.StatusCode())
+	return newStatusError("DeleteDeck", resp.StatusCode())
 }
 
 // ValidateDeckForBattle はデッキがバトル使用可能か検証する。
@@ -200,12 +200,12 @@ func (c *Client) ValidateDeckForBattle(ctx context.Context, deckID int64) error 
 	case http.StatusBadRequest:
 		return fmt.Errorf("apicardclient: ValidateDeckForBattle: %w: %s", ErrDeckInvalid, string(resp.Body))
 	}
-	return statusError("ValidateDeckForBattle", resp.StatusCode())
+	return newStatusError("ValidateDeckForBattle", resp.StatusCode())
 }
 
-// statusError は HTTP status code を sentinel error (errors.Is 分岐可能) に変換する。
+// newStatusError は HTTP status code を sentinel error (errors.Is 分岐可能) に変換する。
 // validate-for-battle の 400 は呼出側で先に ErrDeckInvalid に変換するため、ここでは ErrBadRequest にフォールバックする。
-func statusError(op string, code int) error {
+func newStatusError(op string, code int) error {
 	var sentinel error
 	switch {
 	case code == http.StatusUnauthorized:

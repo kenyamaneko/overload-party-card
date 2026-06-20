@@ -9,7 +9,7 @@ import (
 	"github.com/kenyamaneko/overload-party-card/internal/port"
 )
 
-func errorStatus(err error) int {
+func toHTTPStatus(err error) int {
 	switch {
 	case errors.Is(err, port.ErrNotFound):
 		return http.StatusNotFound
@@ -25,5 +25,5 @@ func errorStatus(err error) int {
 }
 
 func respondError(c *gin.Context, err error) {
-	c.JSON(errorStatus(err), gin.H{"error": err.Error()})
+	c.JSON(toHTTPStatus(err), gin.H{"error": err.Error()})
 }

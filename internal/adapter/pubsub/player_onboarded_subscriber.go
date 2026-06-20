@@ -50,35 +50,35 @@ func (s *PlayerOnboardedSubscriber) Start(ctx context.Context) error {
 
 // process は 1 イベントを処理する。戻り値 nil = ack、非 nil = nack。
 func (s *PlayerOnboardedSubscriber) process(ctx context.Context, data []byte) error {
-	var ev apiscenario.PlayerOnboardedEvent
-	if err := json.Unmarshal(data, &ev); err != nil {
+	var event apiscenario.PlayerOnboardedEvent
+	if err := json.Unmarshal(data, &event); err != nil {
 		slog.Error("player-onboarded-card bad payload", "error", err)
 		return fmt.Errorf("player-onboarded-card: bad payload: %w", err)
 	}
-	if ev.EventType != apiscenario.EventTypePlayerOnboarded {
+	if event.EventType != apiscenario.EventTypePlayerOnboarded {
 		slog.Warn("player-onboarded-card unexpected event_type",
-			"event_id", ev.EventID, "event_type", ev.EventType)
-		return fmt.Errorf("player-onboarded-card: unexpected event_type %q", ev.EventType)
+			"event_id", event.EventID, "event_type", event.EventType)
+		return fmt.Errorf("player-onboarded-card: unexpected event_type %q", event.EventType)
 	}
 
-	inserted, err := s.eventRepo.Insert(ctx, ev.EventID, ev.EventType)
+	inserted, err := s.eventRepo.Insert(ctx, event.EventID, event.EventType)
 	if err != nil {
 		slog.Error("player-onboarded-card processed_events insert failed",
-			"event_id", ev.EventID, "error", err)
+			"event_id", event.EventID, "error", err)
 		return fmt.Errorf("player-onboarded-card: insert processed_events: %w", err)
 	}
 	if !inserted {
 		return nil
 	}
 
-	factionPackID := "faction_set_" + ev.InitialFactionID
+	factionPackID := "faction_set_" + event.InitialFactionID
 	totalGranted := 0
 	for _, packID := range []string{"basic", factionPackID} {
-		granted, err := s.grantInteractor.GrantPack(ctx, ev.PlayerID, packID)
+		granted, err := s.grantInteractor.GrantPack(ctx, event.PlayerID, packID)
 		if err != nil {
 			slog.Error("player-onboarded-card grant failed",
-				"event_id", ev.EventID,
-				"player_id", ev.PlayerID,
+				"event_id", event.EventID,
+				"player_id", event.PlayerID,
 				"pack_id", packID,
 				"error", err,
 			)
@@ -88,9 +88,9 @@ func (s *PlayerOnboardedSubscriber) process(ctx context.Context, data []byte) er
 	}
 
 	slog.Info("player-onboarded-card granted",
-		"event_id", ev.EventID,
-		"player_id", ev.PlayerID,
-		"faction", ev.InitialFactionID,
+		"event_id", event.EventID,
+		"player_id", event.PlayerID,
+		"faction", event.InitialFactionID,
 		"copies", totalGranted,
 	)
 	return nil
