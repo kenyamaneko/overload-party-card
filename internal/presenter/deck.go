@@ -21,12 +21,12 @@ func ToDeck(d *domain.Deck, cards []domain.DeckCard, isValid bool) *apicard.Deck
 		SleeveNo:  d.SleeveNo,
 		CreatedAt: d.CreatedAt,
 		UpdatedAt: d.UpdatedAt,
-		DeckCards: optionalDeckCards(ToDeckCards(cards)),
+		DeckCards: normalizeDeckCards(ToDeckCards(cards)),
 	}
 }
 
-// optionalDeckCards は空 slice を nil ポインタに正規化し omitempty を機能させます。
-func optionalDeckCards(cards []apicard.DeckCard) *[]apicard.DeckCard {
+// normalizeDeckCards は空 slice を nil ポインタに正規化し omitempty を機能させます。
+func normalizeDeckCards(cards []apicard.DeckCard) *[]apicard.DeckCard {
 	if len(cards) == 0 {
 		return nil
 	}

@@ -40,42 +40,42 @@ func (s *CardPackPurchasedSubscriber) Start(ctx context.Context) error {
 
 // process は 1 イベントを処理する。戻り値 nil = ack、非 nil = nack。
 func (s *CardPackPurchasedSubscriber) process(ctx context.Context, data []byte) error {
-	var ev apishop.CardPackPurchasedEvent
-	if err := json.Unmarshal(data, &ev); err != nil {
+	var event apishop.CardPackPurchasedEvent
+	if err := json.Unmarshal(data, &event); err != nil {
 		slog.Error("card-pack-purchased-card bad payload", "error", err)
 		return fmt.Errorf("card-pack-purchased-card: bad payload: %w", err)
 	}
-	if ev.EventType != apishop.EventTypeCardPackPurchased {
+	if event.EventType != apishop.EventTypeCardPackPurchased {
 		slog.Warn("card-pack-purchased-card unexpected event_type",
-			"event_id", ev.EventID, "event_type", ev.EventType)
-		return fmt.Errorf("card-pack-purchased-card: unexpected event_type %q", ev.EventType)
+			"event_id", event.EventID, "event_type", event.EventType)
+		return fmt.Errorf("card-pack-purchased-card: unexpected event_type %q", event.EventType)
 	}
 
-	inserted, err := s.eventRepo.Insert(ctx, ev.EventID, ev.EventType)
+	inserted, err := s.eventRepo.Insert(ctx, event.EventID, event.EventType)
 	if err != nil {
 		slog.Error("card-pack-purchased-card processed_events insert failed",
-			"event_id", ev.EventID, "error", err)
+			"event_id", event.EventID, "error", err)
 		return fmt.Errorf("card-pack-purchased-card: insert processed_events: %w", err)
 	}
 	if !inserted {
 		return nil
 	}
 
-	granted, err := s.grantInteractor.GrantPack(ctx, ev.PlayerID, ev.CardPackID)
+	granted, err := s.grantInteractor.GrantPack(ctx, event.PlayerID, event.CardPackID)
 	if err != nil {
 		slog.Error("card-pack-purchased-card grant failed",
-			"event_id", ev.EventID,
-			"player_id", ev.PlayerID,
-			"pack_id", ev.CardPackID,
+			"event_id", event.EventID,
+			"player_id", event.PlayerID,
+			"pack_id", event.CardPackID,
 			"error", err,
 		)
-		return fmt.Errorf("card-pack-purchased-card: grant %q: %w", ev.CardPackID, err)
+		return fmt.Errorf("card-pack-purchased-card: grant %q: %w", event.CardPackID, err)
 	}
 
 	slog.Info("card-pack-purchased-card granted",
-		"event_id", ev.EventID,
-		"player_id", ev.PlayerID,
-		"pack_id", ev.CardPackID,
+		"event_id", event.EventID,
+		"player_id", event.PlayerID,
+		"pack_id", event.CardPackID,
 		"copies", granted,
 	)
 	return nil
