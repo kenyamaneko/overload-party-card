@@ -1,6 +1,4 @@
 # Initiative master data (SSoT).
-#
-# 台風の amount とお裾分けの insight_cost はシミュレーション前の暫定値。
 
 initiatives:
   - initiative_id: IN-0001
@@ -45,12 +43,12 @@ initiatives:
     kind: special
     name: 台風
     insight_cost: 400
-    effect_text: "相手の表向きリソース全てに 300 ダメージを与える。"
+    effect_text: "相手の表向きリソース全てに 700 ダメージを与える。"
     effect:
       ops:
         - deal_damage:
             selector: { owner: opponent }
-            amount: 300
+            amount: 700
         - destroy_check: { target: opponent }
 
   - initiative_id: IN-0005
