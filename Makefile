@@ -1,4 +1,4 @@
-.PHONY: build test vet fmt run tidy help
+.PHONY: build test vet fmt run tidy generate help
 
 APP    := overload-party-card
 MODULE := github.com/kenyamaneko/$(APP)
@@ -20,6 +20,13 @@ fmt: ## Format code
 
 run: ## Run card server locally (ENV=dev inline; PORT / DATABASE_CONN / GOOGLE_CLOUD_PROJECT_ID / PLAYER_ONBOARDED_SUBSCRIPTION / CARD_PACK_PURCHASED_SUBSCRIPTION must be exported)
 	ENV=dev go run ./cmd/server
+
+generate: ## Regenerate all SSoT-derived outputs (契約型 / schema doc / カード / プロダクト・施策 / カードパック)。oapi-codegen / openapi-typescript / NSwag が必要
+	scripts/generate_types.sh
+	python3 scripts/generate_schema_doc.py
+	python3 scripts/generate_cards.py
+	python3 scripts/generate_products.py
+	python3 scripts/generate_card_packs.py
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \

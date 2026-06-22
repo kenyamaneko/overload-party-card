@@ -132,9 +132,7 @@ jobs:
             "overload-party-doc-tools @ git+https://github.com/kenyamaneko/overload-party-common.git@main#subdirectory=packages/doc-tools"
       - name: Install oapi-codegen
         run: go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.7.0
-      - name: Run codegen (OpenAPI)
-        run: scripts/generate_types.sh
-      - name: Run schema-doc codegen
-        run: python3 scripts/generate_schema_doc.py
+      - name: Run codegen
+        run: make generate
       - name: Check for drift
         run: .github/scripts/ci/check-codegen-drift.sh
