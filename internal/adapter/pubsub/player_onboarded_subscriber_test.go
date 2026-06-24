@@ -64,7 +64,7 @@ func TestPlayerOnboardedSubscriber_Start(t *testing.T) {
 			publish:          publishValid,
 			repoInsertResult: true,
 			wantAck:          true,
-			wantPacks:        []string{"basic", "faction_set_Tuners"},
+			wantPacks:        []string{"basic", "faction_set_tuners"},
 		},
 		{
 			name:             "重複イベント (processed_events 既存): 配布せず Ack",
@@ -106,9 +106,9 @@ func TestPlayerOnboardedSubscriber_Start(t *testing.T) {
 			publish:          publishValid,
 			repoInsertResult: true,
 			granterErr:       errors.New("grant failed"),
-			granterErrOnPack: "faction_set_Tuners",
+			granterErrOnPack: "faction_set_tuners",
 			wantAck:          false,
-			wantPacks:        []string{"basic", "faction_set_Tuners"},
+			wantPacks:        []string{"basic", "faction_set_tuners"},
 		},
 		{
 			name: "malformed JSON: Nack して DLQ 送り",
