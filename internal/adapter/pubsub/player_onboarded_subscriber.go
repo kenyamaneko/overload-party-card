@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	apiscenario "github.com/kenyamaneko/overload-party-scenario/packages/api-scenario"
 
@@ -71,7 +72,8 @@ func (s *PlayerOnboardedSubscriber) process(ctx context.Context, data []byte) er
 		return nil
 	}
 
-	factionPackID := "faction_set_" + event.InitialFactionID
+	// pack_id は card_packs.yaml で faction を小文字化した形 (faction_set_she 等) で定義される。
+	factionPackID := "faction_set_" + strings.ToLower(event.InitialFactionID)
 	totalGranted := 0
 	for _, packID := range []string{"basic", factionPackID} {
 		granted, err := s.grantInteractor.GrantPack(ctx, event.PlayerID, packID)
