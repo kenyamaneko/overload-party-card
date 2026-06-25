@@ -42,14 +42,14 @@ VALUES
 
   ('NT-0007', 'クラウドエンジニア', '', 'Neutral', 'Strategy', NULL,
    false, false, '{}'::jsonb,
-   'リポジトリから1枚ドローし手札に加える。ただし、引いたカードが 調律部 カードならトラッシュに送る',
+   'リポジトリから1枚ドローし手札に加える',
    '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"draw": {"count": 1}}]}]'::jsonb,
    'limited', true),
 
   ('NT-0008', 'クラウドアーキテクト', '', 'Neutral', 'Strategy', NULL,
    false, false, '{}'::jsonb,
-   'リポジトリから2枚ドローし、選択した1枚を手札に加える。残り1枚はトラッシュに送る。ただし、引いた 調律部 カードは全てトラッシュに送る',
-   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"draw": {"count": 2}}]}]'::jsonb,
+   'リポジトリから2枚ドローし、選択した1枚を手札に加える。残り1枚はトラッシュに送る',
+   '[{"trigger": "ignition", "use_limit": "once_per_turn", "custom": "deck_top_keep_one", "meta": {"categories": ["draw"], "count": 2}}]'::jsonb,
    'limited', true),
 
   ('NT-0009', '寺リフォーム', '', 'Neutral', 'Strategy', NULL,

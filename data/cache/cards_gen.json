@@ -201,7 +201,7 @@
     "stats": {},
     "restriction": "limited",
     "is_active": true,
-    "effect_text": "リポジトリから1枚ドローし手札に加える。ただし、引いたカードが 調律部 カードならトラッシュに送る",
+    "effect_text": "リポジトリから1枚ドローし手札に加える",
     "effects": [
       {
         "trigger": "ignition",
@@ -231,18 +231,18 @@
     "stats": {},
     "restriction": "limited",
     "is_active": true,
-    "effect_text": "リポジトリから2枚ドローし、選択した1枚を手札に加える。残り1枚はトラッシュに送る。ただし、引いた 調律部 カードは全てトラッシュに送る",
+    "effect_text": "リポジトリから2枚ドローし、選択した1枚を手札に加える。残り1枚はトラッシュに送る",
     "effects": [
       {
         "trigger": "ignition",
         "use_limit": "once_per_turn",
-        "ops": [
-          {
-            "draw": {
-              "count": 2
-            }
-          }
-        ]
+        "custom": "deck_top_keep_one",
+        "meta": {
+          "categories": [
+            "draw"
+          ],
+          "count": 2
+        }
       }
     ]
   },
