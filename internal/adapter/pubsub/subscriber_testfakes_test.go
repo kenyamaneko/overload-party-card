@@ -16,13 +16,11 @@ import (
 type fakeProcessedEventRepo struct {
 	insertResult bool
 	insertErr    error
-	calls        int
 }
 
 var _ port.ProcessedEventRepo = (*fakeProcessedEventRepo)(nil)
 
 func (r *fakeProcessedEventRepo) Insert(_ context.Context, _, _ string) (bool, error) {
-	r.calls++
 	if r.insertErr != nil {
 		return false, r.insertErr
 	}
