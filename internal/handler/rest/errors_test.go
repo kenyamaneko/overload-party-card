@@ -15,9 +15,7 @@ import (
 	internalauth "github.com/kenyamaneko/overload-party-gateway/packages/internalauth-go"
 )
 
-// TestDeckHandler_SentinelErrorToStatusAndBody は interactor が返す各 sentinel error が
-// 対応する HTTP ステータスと {"error": ...} 本文に写像され、ラップされた sentinel も
-// 解決され、写像対象外の error が 500 に落ちることを GetDeck 経由で検証します。
+// TestDeckHandler_SentinelErrorToStatusAndBody は interactor が返す sentinel error が対応する HTTP ステータスと error 本文へ写像されることを検証します。
 func TestDeckHandler_SentinelErrorToStatusAndBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
