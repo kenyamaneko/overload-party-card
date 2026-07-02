@@ -25,18 +25,18 @@ func TestListCardsWithOwnership(t *testing.T) {
 		{
 			name: "some cards owned",
 			cards: map[string]*domain.Card{
-				"C-001": {CardID: "C-001", CardName: "Fireball"},
-				"C-002": {CardID: "C-002", CardName: "Shield"},
-				"C-003": {CardID: "C-003", CardName: "Heal"},
+				"TST-0001": {CardID: "TST-0001", CardName: "Fireball"},
+				"TST-0002": {CardID: "TST-0002", CardName: "Shield"},
+				"TST-0003": {CardID: "TST-0003", CardName: "Heal"},
 			},
 			seed: []*domain.PlayerCard{
-				{PlayerID: "p1", CardID: "C-001", ArtNo: 1, Count: 1},
-				{PlayerID: "p1", CardID: "C-003", ArtNo: 1, Count: 2},
+				{PlayerID: "p1", CardID: "TST-0001", ArtNo: 1, Count: 1},
+				{PlayerID: "p1", CardID: "TST-0003", ArtNo: 1, Count: 2},
 			},
 			want: []ownershipExpectation{
-				{"C-001", true},
-				{"C-002", false},
-				{"C-003", true},
+				{"TST-0001", true},
+				{"TST-0002", false},
+				{"TST-0003", true},
 			},
 		},
 		{
@@ -48,13 +48,13 @@ func TestListCardsWithOwnership(t *testing.T) {
 		{
 			name: "no owned cards",
 			cards: map[string]*domain.Card{
-				"C-001": {CardID: "C-001", CardName: "Fireball"},
-				"C-002": {CardID: "C-002", CardName: "Shield"},
+				"TST-0001": {CardID: "TST-0001", CardName: "Fireball"},
+				"TST-0002": {CardID: "TST-0002", CardName: "Shield"},
 			},
 			seed: nil,
 			want: []ownershipExpectation{
-				{"C-001", false},
-				{"C-002", false},
+				{"TST-0001", false},
+				{"TST-0002", false},
 			},
 		},
 	}
@@ -76,14 +76,21 @@ func TestListCardsWithOwnership(t *testing.T) {
 	}
 }
 
+// TestListCards は、カードマスター全件が card_id 昇順で、投入した ID 集合どおりに
+// 返ることを検証します。
 func TestListCards(t *testing.T) {
 	cards := map[string]*domain.Card{
-		"C-001": {CardID: "C-001", CardName: "Fireball"},
-		"C-002": {CardID: "C-002", CardName: "Shield"},
+		"TST-0001": {CardID: "TST-0001", CardName: "Fireball"},
+		"TST-0002": {CardID: "TST-0002", CardName: "Shield"},
 	}
 	svc := NewCardInteractor(newInMemoryCardRepo(cards), newInMemoryPlayerCardRepo())
 
 	result, err := svc.ListCards(context.Background())
 	require.NoError(t, err)
-	require.Len(t, result, 2)
+
+	gotIDs := make([]string, len(result))
+	for i, c := range result {
+		gotIDs[i] = c.CardID
+	}
+	assert.Equal(t, []string{"TST-0001", "TST-0002"}, gotIDs)
 }

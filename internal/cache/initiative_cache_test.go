@@ -6,34 +6,47 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	gencache "github.com/kenyamaneko/overload-party-card/data/cache"
+	"github.com/kenyamaneko/overload-party-card/internal/domain"
 )
 
-func loadTestInitiativeCache(t *testing.T) *InitiativeCache {
-	t.Helper()
-	ic := NewInitiativeCache()
-	err := ic.LoadFromBytes(gencache.InitiativesJSON)
-	require.NoError(t, err, "LoadFromBytes failed")
-	return ic
-}
+// controlInitiativesJSON は既知施策 2 件の制御フィクスチャ。生成データの並びに
+// 依存せず「ID で正しい施策 1 件を引ける」ことを固定する。2 件は kind / name が
+// 異なり、返った施策が問い合わせ ID に対応する 1 件であることを判別できる。
+const controlInitiativesJSON = `[
+	{"initiative_id":"IN-TST-0001","product_id":"PD-TST-0001","kind":"routine","name":"制御施策A","is_active":true},
+	{"initiative_id":"IN-TST-0002","product_id":"PD-TST-0001","kind":"special","name":"制御施策B","is_active":true}
+]`
 
-// TestInitiativeFindByID は、ID で施策を引けること・未知 ID で nil が返ることを検証します。
+// TestInitiativeFindByID は、ID で問い合わせた施策が返ること・未知 ID で nil が返ることを検証します。
 func TestInitiativeFindByID(t *testing.T) {
-	ic := loadTestInitiativeCache(t)
-	existingID := ic.All()[0].InitiativeID
+	ic := NewInitiativeCache()
+	require.NoError(t, ic.LoadFromBytes([]byte(controlInitiativesJSON)))
 
-	tests := []struct {
-		name         string
-		initiativeID string
-		wantNil      bool
+	cases := []struct {
+		name string
+		id   string
+		want *domain.Initiative
 	}{
-		{"existing id returns an initiative", existingID, false},
-		{"unknown id returns nil", "IN-NOPE", true},
+		{
+			name: "既知 ID は対応する施策を返す",
+			id:   "IN-TST-0001",
+			want: &domain.Initiative{
+				InitiativeID: "IN-TST-0001",
+				ProductID:    "PD-TST-0001",
+				Kind:         "routine",
+				Name:         "制御施策A",
+				IsActive:     true,
+			},
+		},
+		{
+			name: "未知 ID は nil を返す",
+			id:   "IN-TST-9999",
+			want: nil,
+		},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.wantNil, ic.FindByID(tt.initiativeID) == nil)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, ic.FindByID(tc.id))
 		})
 	}
 }
