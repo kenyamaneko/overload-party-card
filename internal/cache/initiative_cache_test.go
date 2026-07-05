@@ -17,31 +17,34 @@ func loadTestInitiativeCache(t *testing.T) *InitiativeCache {
 	return ic
 }
 
-// TestInitiativeFindByID は、ID で施策を引けること・未知 ID で nil が返ることを検証します。
 func TestInitiativeFindByID(t *testing.T) {
-	ic := loadTestInitiativeCache(t)
-	existingID := ic.All()[0].InitiativeID
+	t.Run("施策の ID 検索", func(t *testing.T) {
+		ic := loadTestInitiativeCache(t)
+		existingID := ic.All()[0].InitiativeID
 
-	tests := []struct {
-		name         string
-		initiativeID string
-		wantNil      bool
-	}{
-		{"existing id returns an initiative", existingID, false},
-		{"unknown id returns nil", "IN-NOPE", true},
-	}
+		tests := []struct {
+			name         string
+			initiativeID string
+			wantNil      bool
+		}{
+			{"既知の ID のとき、施策を引ける", existingID, false},
+			{"未知の ID のとき、nil を返す", "IN-NOPE", true},
+		}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.wantNil, ic.FindByID(tt.initiativeID) == nil)
-		})
-	}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				assert.Equal(t, tt.wantNil, ic.FindByID(tt.initiativeID) == nil)
+			})
+		}
+	})
 }
 
-// TestInitiativeLoadFromBytes_Empty は、0 件 JSON がマスター欠落としてエラーに
-// なることを検証します。
-func TestInitiativeLoadFromBytes_Empty(t *testing.T) {
-	ic := NewInitiativeCache()
-	err := ic.LoadFromBytes([]byte(`[]`))
-	assert.Error(t, err)
+func TestInitiativeLoadFromBytes(t *testing.T) {
+	t.Run("施策キャッシュのロード", func(t *testing.T) {
+		t.Run("0 件 JSON のとき、マスター欠落としてエラーになる", func(t *testing.T) {
+			ic := NewInitiativeCache()
+			err := ic.LoadFromBytes([]byte(`[]`))
+			assert.Error(t, err)
+		})
+	})
 }
