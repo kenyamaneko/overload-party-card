@@ -58,7 +58,7 @@ GitFlow をベースに、環境とブランチを対応付けた運用を採用
 ### hotfix/xxx
 
 - **prod 緊急修正**の作業ブランチ
-- `main` から切る（develop からではない — develop には未リリース変更が混ざっているため）
+- `main` から切る（develop からではない。develop には未リリース変更が混ざっているため）
 - main と develop の両方にマージする（back-merge 必須）
 - release ブランチが存在する場合は、release にもマージする
 - 命名例: `hotfix/fix-deck-validation-crash`, `hotfix/critical-pack-grant-bug`
@@ -137,7 +137,7 @@ Semantic Versioning (SemVer) を採用する。
 - release マージ時: ブランチ名からバージョンを取得（`release/v1.2.0` → `v1.2.0`）
 - hotfix マージ時: 最新タグから patch を自動 bump（`v1.2.0` → `v1.2.1`）
 
-`packages/api-card` のタグは [publish.yaml](../.github/workflows/publish.yaml) が main への push 時に自動発行する（`workflow_dispatch` で minor/major bump も可）。
+`packages/api-card` / `api-card-npm` / `api-card-dotnet` のタグは [publish.yaml](../.github/workflows/publish.yaml) の `workflow_dispatch` で人がタイミングを判断して発行する（patch / minor / major bump を指定）。
 
 ### バージョンと Go module の関係
 
@@ -153,7 +153,7 @@ GitHub Rulesets で以下を設定する。
 - PR マージのみ許可（linear history）
 - force push 禁止、削除禁止
 - 履歴書き換え禁止
-- 必須ステータスチェック: CI / lint, CI / test, Validate codegen / codegen-sync, CI / check-source-branch が green
+- 必須ステータスチェック: CI / lint, CI / test-unit, CI / test-integration, CI / codegen-sync, CI / check-source-branch が green
 - required reviews: 1（self-approve 不可）
 - マージ元ブランチ制限: `release/*` と `hotfix/*` のみ（CI / check-source-branch で機械的に強制）
 
@@ -161,13 +161,13 @@ GitHub Rulesets で以下を設定する。
 
 - 直 push 禁止。PR 経由のマージのみ
 - force push 禁止、削除は手動で可
-- 必須ステータスチェック: CI / lint, CI / test, Validate codegen / codegen-sync が green
+- 必須ステータスチェック: CI / lint, CI / test-unit, CI / test-integration, CI / codegen-sync が green
 
 ### develop
 
 - 直 push 禁止
 - PR マージのみ許可
-- 必須ステータスチェック: CI / lint, CI / test, Validate codegen / codegen-sync が green
+- 必須ステータスチェック: CI / lint, CI / test-unit, CI / test-integration, CI / codegen-sync が green
 - required reviews: 不要（一人開発での速度優先）
 
 ## CI/CD パイプライン
@@ -176,14 +176,13 @@ GitHub Rulesets で以下を設定する。
 
 | ワークフロー | トリガー | 役割 |
 |---|---|---|
-| [ci.yaml](../.github/workflows/ci.yaml) | PR: main / push: main | lint + test + (main push のみ) Docker イメージのビルド・push |
-| [validate.yaml](../.github/workflows/validate.yaml) | PR: main | codegen drift 検出（types / schema-doc / api-docs） |
-| [publish.yaml](../.github/workflows/publish.yaml) | main への push（api-card 変更時） / workflow_dispatch | api-card Go モジュールのタグ付け・公開 |
+| [ci.yaml](../.github/workflows/ci.yaml) | PR: main | lint + test-unit + test-integration + codegen-sync（codegen drift 検出） |
+| [deploy.yaml](../.github/workflows/deploy.yaml) | push: main | Docker イメージのビルド・push |
+| [publish.yaml](../.github/workflows/publish.yaml) | workflow_dispatch | api-card (Go) / api-card-npm (npm) / api-card-dotnet (NuGet) のタグ付け・公開 |
 
 目標状態との差分 (**未整備**):
 
-- `ci.yaml` / `validate.yaml` のトリガに `develop`, `release/*` が含まれていない
-- `deploy.yaml` が未分離（現状 `ci.yaml` 内の `build-and-push` ジョブに統合されている）
+- `ci.yaml` / `deploy.yaml` のトリガに `develop`, `release/*` が含まれていない
 - `release-tag.yaml` 相当が未整備（release/hotfix マージ時のサービスタグ自動発行なし）
 
 段階的に shop と同じ構成に近づけていく。

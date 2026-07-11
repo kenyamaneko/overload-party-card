@@ -11,62 +11,62 @@ import (
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
 )
 
-// TestEnumDriftAgainstOpenAPISpec は domain の enum 定数が data/openapi.yaml の宣言と
-// 完全一致することを検証する。SSoT は domain 側で、openapi.yaml は外部公開ドキュメントとして
-// 同じ値集合を持つ必要がある。値の追加・削除・rename が片方だけで起きれば本テストが失敗する。
 func TestEnumDriftAgainstOpenAPISpec(t *testing.T) {
-	spec := loadOpenAPISpec(t)
+	t.Run("domain と openapi.yaml の enum 整合", func(t *testing.T) {
+		// SSoT は domain 側。openapi.yaml は外部公開ドキュメントとして同じ値集合を持つ必要がある。
+		spec := loadOpenAPISpec(t)
 
-	cases := []struct {
-		name       string
-		schemaName string
-		want       []string
-	}{
-		{
-			name:       "PassiveEffectType",
-			schemaName: "PassiveEffectType",
-			want: []string{
-				domain.PassiveTPPerBackendDB,
-				domain.PassiveTPPerBackendData,
-				domain.PassiveTPIfCardTypeOnField,
-				domain.PassiveYieldPerOtherDB,
-				domain.PassiveYieldIfCardOnField,
-				domain.PassiveAVBonus,
-				domain.PassiveScaleCostFree,
+		cases := []struct {
+			name       string
+			schemaName string
+			want       []string
+		}{
+			{
+				name:       "PassiveEffectType enum が domain と openapi.yaml で一致する",
+				schemaName: "PassiveEffectType",
+				want: []string{
+					domain.PassiveTPPerBackendDB,
+					domain.PassiveTPPerBackendData,
+					domain.PassiveTPIfCardTypeOnField,
+					domain.PassiveYieldPerOtherDB,
+					domain.PassiveYieldIfCardOnField,
+					domain.PassiveAVBonus,
+					domain.PassiveScaleCostFree,
+				},
 			},
-		},
-		{
-			name:       "PlatformEffectType",
-			schemaName: "PlatformEffectType",
-			want: []string{
-				domain.PlatformTPBonus,
-				domain.PlatformYieldBonus,
-				domain.PlatformAVBonus,
+			{
+				name:       "PlatformEffectType enum が domain と openapi.yaml で一致する",
+				schemaName: "PlatformEffectType",
+				want: []string{
+					domain.PlatformTPBonus,
+					domain.PlatformYieldBonus,
+					domain.PlatformAVBonus,
+				},
 			},
-		},
-		{
-			name:       "AttachmentEffectType",
-			schemaName: "AttachmentEffectType",
-			want: []string{
-				domain.AttachmentStatBonus,
+			{
+				name:       "AttachmentEffectType enum が domain と openapi.yaml で一致する",
+				schemaName: "AttachmentEffectType",
+				want: []string{
+					domain.AttachmentStatBonus,
+				},
 			},
-		},
-		{
-			name:       "InitiativeKind",
-			schemaName: "InitiativeKind",
-			want: []string{
-				domain.InitiativeKindRoutine,
-				domain.InitiativeKindSpecial,
+			{
+				name:       "InitiativeKind enum が domain と openapi.yaml で一致する",
+				schemaName: "InitiativeKind",
+				want: []string{
+					domain.InitiativeKindRoutine,
+					domain.InitiativeKindSpecial,
+				},
 			},
-		},
-	}
+		}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := specEnumValues(t, spec, tc.schemaName)
-			require.ElementsMatch(t, tc.want, got, "domain と openapi.yaml の %s enum が drift している", tc.schemaName)
-		})
-	}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				got := specEnumValues(t, spec, tc.schemaName)
+				require.ElementsMatch(t, tc.want, got, "domain と openapi.yaml の %s enum が drift している", tc.schemaName)
+			})
+		}
+	})
 }
 
 // loadOpenAPISpec は data/openapi.yaml をパースして返す。

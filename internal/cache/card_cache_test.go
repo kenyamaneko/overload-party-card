@@ -33,37 +33,40 @@ const controlCardsJSON = `[
 	{"card_id":"TST-0002","card_name":"Beta","card_type":"Support"}
 ]`
 
-// TestLoadFromBytes_LoadsCardsByID は、LoadFromBytes した各カードを card_id で
-// 引けること・主要フィールドが保たれること・未知 ID では取得できないことを検証します。
-func TestLoadFromBytes_LoadsCardsByID(t *testing.T) {
-	cc := NewCardCache()
-	require.NoError(t, cc.LoadFromBytes([]byte(controlCardsJSON)))
+func TestLoadFromBytes(t *testing.T) {
+	t.Run("生成カードキャッシュのロード", func(t *testing.T) {
+		t.Run("全カードで resource 種別なら resource_label があり、support 種別なら無い", func(t *testing.T) {
+			// リソース種別か否かと label 有無を 1 枚ごとに等式で突き合わせ、if 分岐なしで網羅する。
+			cc := loadTestCache(t)
+			for cardID, card := range cc.All() {
+				isResource := isResourceType(card.CardType)
+				hasLabel := card.ResourceLabel != ""
+				assert.Equalf(t, isResource, hasLabel,
+					"card %s (type=%s, label=%q): resource types must have resource_label, support types must not",
+					cardID, card.CardType, card.ResourceLabel)
+			}
+		})
+	})
 
-	assert.Equal(t, 2, cc.Count())
+	t.Run("既知カード 2 件の制御フィクスチャをロードしたとき", func(t *testing.T) {
+		cc := NewCardCache()
+		require.NoError(t, cc.LoadFromBytes([]byte(controlCardsJSON)))
 
-	alpha := cc.Get("TST-0001")
-	require.NotNil(t, alpha)
-	assert.Equal(t, "Alpha", alpha.CardName)
-	assert.Equal(t, gamedesign.CardTypeCompute, alpha.CardType)
+		t.Run("件数と card_id ごとの主要フィールドが保たれる", func(t *testing.T) {
+			assert.Equal(t, 2, cc.Count())
 
-	beta := cc.Get("TST-0002")
-	require.NotNil(t, beta)
-	assert.Equal(t, "Beta", beta.CardName)
+			alpha := cc.Get("TST-0001")
+			require.NotNil(t, alpha)
+			assert.Equal(t, "Alpha", alpha.CardName)
+			assert.Equal(t, gamedesign.CardTypeCompute, alpha.CardType)
 
-	assert.Nil(t, cc.Get("TST-9999"))
-}
+			beta := cc.Get("TST-0002")
+			require.NotNil(t, beta)
+			assert.Equal(t, "Beta", beta.CardName)
+		})
 
-// TestLoadFromBytes_ResourceLabelInvariant は、resource_label の有無が
-// CardType の resource/support 区分と一致することを確認します。
-// 1 枚ごとに「リソース種別なら label あり／それ以外なら label なし」を
-// 等式で検証することで、if による分岐フィルタを不要にしています。
-func TestLoadFromBytes_ResourceLabelInvariant(t *testing.T) {
-	cc := loadTestCache(t)
-	for cardID, card := range cc.All() {
-		isResource := isResourceType(card.CardType)
-		hasLabel := card.ResourceLabel != ""
-		assert.Equalf(t, isResource, hasLabel,
-			"card %s (type=%s, label=%q): resource types must have resource_label, support types must not",
-			cardID, card.CardType, card.ResourceLabel)
-	}
+		t.Run("未知の card_id では nil が返る", func(t *testing.T) {
+			assert.Nil(t, cc.Get("TST-9999"))
+		})
+	})
 }
