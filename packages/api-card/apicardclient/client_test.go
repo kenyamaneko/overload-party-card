@@ -19,361 +19,367 @@ import (
 // 網羅し、errors.Is で意図した sentinel に一致することを確認する。
 
 func TestClient_ListCards_StatusMapping(t *testing.T) {
-	cases := []struct {
-		name       string
-		status     int
-		wantTarget error
-	}{
-		{
-			name:       "500 を受けたとき ErrInternalServer",
-			status:     http.StatusInternalServerError,
-			wantTarget: apicardclient.ErrInternalServer,
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+	t.Run("ListCards のステータスマッピング", func(t *testing.T) {
+		t.Run("500 を受けたとき、ErrInternalServer になる", func(t *testing.T) {
 			srv := apicardserverfake.NewServer()
 			defer srv.Close()
-			srv.ListAllCardsFn = func() (int, any) { return tc.status, nil }
+			srv.ListAllCardsFn = func() (int, any) { return http.StatusInternalServerError, nil }
 
 			c := newTestClient(t, srv.URL())
 			_, err := c.ListCards(context.Background())
-			assertSentinel(t, err, tc.wantTarget)
+			assertSentinel(t, err, apicardclient.ErrInternalServer)
 		})
-	}
+	})
 }
 
 func TestClient_ListPlayerCards_StatusMapping(t *testing.T) {
-	cases := []struct {
-		name       string
-		status     int
-		wantTarget error
-	}{
-		{
-			name:       "401 を受けたとき ErrUnauthorized",
-			status:     http.StatusUnauthorized,
-			wantTarget: apicardclient.ErrUnauthorized,
-		},
-		{
-			name:       "500 を受けたとき ErrInternalServer",
-			status:     http.StatusInternalServerError,
-			wantTarget: apicardclient.ErrInternalServer,
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			srv := apicardserverfake.NewServer()
-			defer srv.Close()
-			srv.ListPlayerCardsFn = func() (int, any) { return tc.status, nil }
+	t.Run("ListPlayerCards のステータスマッピング", func(t *testing.T) {
+		cases := []struct {
+			name       string
+			status     int
+			wantTarget error
+		}{
+			{
+				name:       "401 を受けたとき、ErrUnauthorized になる",
+				status:     http.StatusUnauthorized,
+				wantTarget: apicardclient.ErrUnauthorized,
+			},
+			{
+				name:       "500 を受けたとき、ErrInternalServer になる",
+				status:     http.StatusInternalServerError,
+				wantTarget: apicardclient.ErrInternalServer,
+			},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				srv := apicardserverfake.NewServer()
+				defer srv.Close()
+				srv.ListPlayerCardsFn = func() (int, any) { return tc.status, nil }
 
-			c := newTestClient(t, srv.URL())
-			_, err := c.ListPlayerCards(context.Background())
-			assertSentinel(t, err, tc.wantTarget)
-		})
-	}
+				c := newTestClient(t, srv.URL())
+				_, err := c.ListPlayerCards(context.Background())
+				assertSentinel(t, err, tc.wantTarget)
+			})
+		}
+	})
 }
 
 func TestClient_ListCardsWithOwnership_StatusMapping(t *testing.T) {
-	cases := []struct {
-		name       string
-		status     int
-		wantTarget error
-	}{
-		{
-			name:       "401 を受けたとき ErrUnauthorized",
-			status:     http.StatusUnauthorized,
-			wantTarget: apicardclient.ErrUnauthorized,
-		},
-		{
-			name:       "500 を受けたとき ErrInternalServer",
-			status:     http.StatusInternalServerError,
-			wantTarget: apicardclient.ErrInternalServer,
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			srv := apicardserverfake.NewServer()
-			defer srv.Close()
-			srv.ListCardsWithOwnershipFn = func() (int, any) { return tc.status, nil }
+	t.Run("ListCardsWithOwnership のステータスマッピング", func(t *testing.T) {
+		cases := []struct {
+			name       string
+			status     int
+			wantTarget error
+		}{
+			{
+				name:       "401 を受けたとき、ErrUnauthorized になる",
+				status:     http.StatusUnauthorized,
+				wantTarget: apicardclient.ErrUnauthorized,
+			},
+			{
+				name:       "500 を受けたとき、ErrInternalServer になる",
+				status:     http.StatusInternalServerError,
+				wantTarget: apicardclient.ErrInternalServer,
+			},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				srv := apicardserverfake.NewServer()
+				defer srv.Close()
+				srv.ListCardsWithOwnershipFn = func() (int, any) { return tc.status, nil }
 
-			c := newTestClient(t, srv.URL())
-			_, err := c.ListCardsWithOwnership(context.Background())
-			assertSentinel(t, err, tc.wantTarget)
-		})
-	}
+				c := newTestClient(t, srv.URL())
+				_, err := c.ListCardsWithOwnership(context.Background())
+				assertSentinel(t, err, tc.wantTarget)
+			})
+		}
+	})
 }
 
 func TestClient_ListDecks_StatusMapping(t *testing.T) {
-	cases := []struct {
-		name       string
-		status     int
-		wantTarget error
-	}{
-		{
-			name:       "401 を受けたとき ErrUnauthorized",
-			status:     http.StatusUnauthorized,
-			wantTarget: apicardclient.ErrUnauthorized,
-		},
-		{
-			name:       "404 を受けたとき ErrNotFound",
-			status:     http.StatusNotFound,
-			wantTarget: apicardclient.ErrNotFound,
-		},
-		{
-			name:       "500 を受けたとき ErrInternalServer",
-			status:     http.StatusInternalServerError,
-			wantTarget: apicardclient.ErrInternalServer,
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			srv := apicardserverfake.NewServer()
-			defer srv.Close()
-			srv.ListDecksFn = func() (int, any) { return tc.status, nil }
+	t.Run("ListDecks のステータスマッピング", func(t *testing.T) {
+		cases := []struct {
+			name       string
+			status     int
+			wantTarget error
+		}{
+			{
+				name:       "401 を受けたとき、ErrUnauthorized になる",
+				status:     http.StatusUnauthorized,
+				wantTarget: apicardclient.ErrUnauthorized,
+			},
+			{
+				name:       "404 を受けたとき、ErrNotFound になる",
+				status:     http.StatusNotFound,
+				wantTarget: apicardclient.ErrNotFound,
+			},
+			{
+				name:       "500 を受けたとき、ErrInternalServer になる",
+				status:     http.StatusInternalServerError,
+				wantTarget: apicardclient.ErrInternalServer,
+			},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				srv := apicardserverfake.NewServer()
+				defer srv.Close()
+				srv.ListDecksFn = func() (int, any) { return tc.status, nil }
 
-			c := newTestClient(t, srv.URL())
-			_, err := c.ListDecks(context.Background())
-			assertSentinel(t, err, tc.wantTarget)
-		})
-	}
+				c := newTestClient(t, srv.URL())
+				_, err := c.ListDecks(context.Background())
+				assertSentinel(t, err, tc.wantTarget)
+			})
+		}
+	})
 }
 
 func TestClient_CreateDeck_StatusMapping(t *testing.T) {
-	cases := []struct {
-		name       string
-		status     int
-		wantTarget error
-	}{
-		{
-			name:       "400 を受けたとき ErrBadRequest",
-			status:     http.StatusBadRequest,
-			wantTarget: apicardclient.ErrBadRequest,
-		},
-		{
-			name:       "401 を受けたとき ErrUnauthorized",
-			status:     http.StatusUnauthorized,
-			wantTarget: apicardclient.ErrUnauthorized,
-		},
-		{
-			name:       "403 を受けたとき ErrForbidden",
-			status:     http.StatusForbidden,
-			wantTarget: apicardclient.ErrForbidden,
-		},
-		{
-			name:       "500 を受けたとき ErrInternalServer",
-			status:     http.StatusInternalServerError,
-			wantTarget: apicardclient.ErrInternalServer,
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			srv := apicardserverfake.NewServer()
-			defer srv.Close()
-			srv.CreateDeckFn = func(_ apicard.DeckCreateRequest) (int, any) { return tc.status, nil }
+	t.Run("CreateDeck のステータスマッピング", func(t *testing.T) {
+		cases := []struct {
+			name       string
+			status     int
+			wantTarget error
+		}{
+			{
+				name:       "400 を受けたとき、ErrBadRequest になる",
+				status:     http.StatusBadRequest,
+				wantTarget: apicardclient.ErrBadRequest,
+			},
+			{
+				name:       "401 を受けたとき、ErrUnauthorized になる",
+				status:     http.StatusUnauthorized,
+				wantTarget: apicardclient.ErrUnauthorized,
+			},
+			{
+				name:       "403 を受けたとき、ErrForbidden になる",
+				status:     http.StatusForbidden,
+				wantTarget: apicardclient.ErrForbidden,
+			},
+			{
+				name:       "500 を受けたとき、ErrInternalServer になる",
+				status:     http.StatusInternalServerError,
+				wantTarget: apicardclient.ErrInternalServer,
+			},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				srv := apicardserverfake.NewServer()
+				defer srv.Close()
+				srv.CreateDeckFn = func(_ apicard.DeckCreateRequest) (int, any) { return tc.status, nil }
 
-			c := newTestClient(t, srv.URL())
-			_, err := c.CreateDeck(context.Background(), apicard.DeckCreateRequest{DeckName: "x"})
-			assertSentinel(t, err, tc.wantTarget)
-		})
-	}
+				c := newTestClient(t, srv.URL())
+				_, err := c.CreateDeck(context.Background(), apicard.DeckCreateRequest{DeckName: "x"})
+				assertSentinel(t, err, tc.wantTarget)
+			})
+		}
+	})
 }
 
 func TestClient_GetDeck_StatusMapping(t *testing.T) {
-	cases := []struct {
-		name       string
-		status     int
-		wantTarget error
-	}{
-		{
-			name:       "400 を受けたとき ErrBadRequest",
-			status:     http.StatusBadRequest,
-			wantTarget: apicardclient.ErrBadRequest,
-		},
-		{
-			name:       "401 を受けたとき ErrUnauthorized",
-			status:     http.StatusUnauthorized,
-			wantTarget: apicardclient.ErrUnauthorized,
-		},
-		{
-			name:       "404 を受けたとき ErrNotFound",
-			status:     http.StatusNotFound,
-			wantTarget: apicardclient.ErrNotFound,
-		},
-		{
-			name:       "500 を受けたとき ErrInternalServer",
-			status:     http.StatusInternalServerError,
-			wantTarget: apicardclient.ErrInternalServer,
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			srv := apicardserverfake.NewServer()
-			defer srv.Close()
-			srv.GetDeckFn = func(_ string) (int, any) { return tc.status, nil }
+	t.Run("GetDeck のステータスマッピング", func(t *testing.T) {
+		cases := []struct {
+			name       string
+			status     int
+			wantTarget error
+		}{
+			{
+				name:       "400 を受けたとき、ErrBadRequest になる",
+				status:     http.StatusBadRequest,
+				wantTarget: apicardclient.ErrBadRequest,
+			},
+			{
+				name:       "401 を受けたとき、ErrUnauthorized になる",
+				status:     http.StatusUnauthorized,
+				wantTarget: apicardclient.ErrUnauthorized,
+			},
+			{
+				name:       "404 を受けたとき、ErrNotFound になる",
+				status:     http.StatusNotFound,
+				wantTarget: apicardclient.ErrNotFound,
+			},
+			{
+				name:       "500 を受けたとき、ErrInternalServer になる",
+				status:     http.StatusInternalServerError,
+				wantTarget: apicardclient.ErrInternalServer,
+			},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				srv := apicardserverfake.NewServer()
+				defer srv.Close()
+				srv.GetDeckFn = func(_ string) (int, any) { return tc.status, nil }
 
-			c := newTestClient(t, srv.URL())
-			_, _, err := c.GetDeck(context.Background(), 1)
-			assertSentinel(t, err, tc.wantTarget)
-		})
-	}
+				c := newTestClient(t, srv.URL())
+				_, _, err := c.GetDeck(context.Background(), 1)
+				assertSentinel(t, err, tc.wantTarget)
+			})
+		}
+	})
 }
 
 func TestClient_UpdateDeck_StatusMapping(t *testing.T) {
-	cases := []struct {
-		name       string
-		status     int
-		wantTarget error
-	}{
-		{
-			name:       "400 を受けたとき ErrBadRequest",
-			status:     http.StatusBadRequest,
-			wantTarget: apicardclient.ErrBadRequest,
-		},
-		{
-			name:       "401 を受けたとき ErrUnauthorized",
-			status:     http.StatusUnauthorized,
-			wantTarget: apicardclient.ErrUnauthorized,
-		},
-		{
-			name:       "403 を受けたとき ErrForbidden",
-			status:     http.StatusForbidden,
-			wantTarget: apicardclient.ErrForbidden,
-		},
-		{
-			name:       "404 を受けたとき ErrNotFound",
-			status:     http.StatusNotFound,
-			wantTarget: apicardclient.ErrNotFound,
-		},
-		{
-			name:       "500 を受けたとき ErrInternalServer",
-			status:     http.StatusInternalServerError,
-			wantTarget: apicardclient.ErrInternalServer,
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			srv := apicardserverfake.NewServer()
-			defer srv.Close()
-			srv.UpdateDeckFn = func(_ string, _ apicard.DeckUpdateRequest) (int, any) { return tc.status, nil }
+	t.Run("UpdateDeck のステータスマッピング", func(t *testing.T) {
+		cases := []struct {
+			name       string
+			status     int
+			wantTarget error
+		}{
+			{
+				name:       "400 を受けたとき、ErrBadRequest になる",
+				status:     http.StatusBadRequest,
+				wantTarget: apicardclient.ErrBadRequest,
+			},
+			{
+				name:       "401 を受けたとき、ErrUnauthorized になる",
+				status:     http.StatusUnauthorized,
+				wantTarget: apicardclient.ErrUnauthorized,
+			},
+			{
+				name:       "403 を受けたとき、ErrForbidden になる",
+				status:     http.StatusForbidden,
+				wantTarget: apicardclient.ErrForbidden,
+			},
+			{
+				name:       "404 を受けたとき、ErrNotFound になる",
+				status:     http.StatusNotFound,
+				wantTarget: apicardclient.ErrNotFound,
+			},
+			{
+				name:       "500 を受けたとき、ErrInternalServer になる",
+				status:     http.StatusInternalServerError,
+				wantTarget: apicardclient.ErrInternalServer,
+			},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				srv := apicardserverfake.NewServer()
+				defer srv.Close()
+				srv.UpdateDeckFn = func(_ string, _ apicard.DeckUpdateRequest) (int, any) { return tc.status, nil }
 
-			c := newTestClient(t, srv.URL())
-			_, err := c.UpdateDeck(context.Background(), 1, apicard.DeckUpdateRequest{DeckName: "x"})
-			assertSentinel(t, err, tc.wantTarget)
-		})
-	}
+				c := newTestClient(t, srv.URL())
+				_, err := c.UpdateDeck(context.Background(), 1, apicard.DeckUpdateRequest{DeckName: "x"})
+				assertSentinel(t, err, tc.wantTarget)
+			})
+		}
+	})
 }
 
 func TestClient_DeleteDeck_StatusMapping(t *testing.T) {
-	cases := []struct {
-		name       string
-		status     int
-		wantTarget error
-	}{
-		{
-			name:       "400 を受けたとき ErrBadRequest",
-			status:     http.StatusBadRequest,
-			wantTarget: apicardclient.ErrBadRequest,
-		},
-		{
-			name:       "401 を受けたとき ErrUnauthorized",
-			status:     http.StatusUnauthorized,
-			wantTarget: apicardclient.ErrUnauthorized,
-		},
-		{
-			name:       "404 を受けたとき ErrNotFound",
-			status:     http.StatusNotFound,
-			wantTarget: apicardclient.ErrNotFound,
-		},
-		{
-			name:       "500 を受けたとき ErrInternalServer",
-			status:     http.StatusInternalServerError,
-			wantTarget: apicardclient.ErrInternalServer,
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			srv := apicardserverfake.NewServer()
-			defer srv.Close()
-			srv.DeleteDeckFn = func(_ string) (int, any) { return tc.status, nil }
+	t.Run("DeleteDeck のステータスマッピング", func(t *testing.T) {
+		cases := []struct {
+			name       string
+			status     int
+			wantTarget error
+		}{
+			{
+				name:       "400 を受けたとき、ErrBadRequest になる",
+				status:     http.StatusBadRequest,
+				wantTarget: apicardclient.ErrBadRequest,
+			},
+			{
+				name:       "401 を受けたとき、ErrUnauthorized になる",
+				status:     http.StatusUnauthorized,
+				wantTarget: apicardclient.ErrUnauthorized,
+			},
+			{
+				name:       "404 を受けたとき、ErrNotFound になる",
+				status:     http.StatusNotFound,
+				wantTarget: apicardclient.ErrNotFound,
+			},
+			{
+				name:       "500 を受けたとき、ErrInternalServer になる",
+				status:     http.StatusInternalServerError,
+				wantTarget: apicardclient.ErrInternalServer,
+			},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				srv := apicardserverfake.NewServer()
+				defer srv.Close()
+				srv.DeleteDeckFn = func(_ string) (int, any) { return tc.status, nil }
 
-			c := newTestClient(t, srv.URL())
-			err := c.DeleteDeck(context.Background(), 1)
-			assertSentinel(t, err, tc.wantTarget)
-		})
-	}
+				c := newTestClient(t, srv.URL())
+				err := c.DeleteDeck(context.Background(), 1)
+				assertSentinel(t, err, tc.wantTarget)
+			})
+		}
+	})
 }
 
-// ValidateDeckForBattle は 400 を ErrBadRequest ではなく ErrDeckInvalid に変換する点が
-// 他 endpoint と異なる (wire 契約上「デッキ不正」を意味するため特別扱い)。
 func TestClient_ValidateDeckForBattle_StatusMapping(t *testing.T) {
-	cases := []struct {
-		name       string
-		status     int
-		wantTarget error
-	}{
-		{
-			name:       "400 を受けたとき ErrBadRequest ではなく ErrDeckInvalid",
-			status:     http.StatusBadRequest,
-			wantTarget: apicardclient.ErrDeckInvalid,
-		},
-		{
-			name:       "401 を受けたとき ErrUnauthorized",
-			status:     http.StatusUnauthorized,
-			wantTarget: apicardclient.ErrUnauthorized,
-		},
-		{
-			name:       "403 を受けたとき ErrForbidden",
-			status:     http.StatusForbidden,
-			wantTarget: apicardclient.ErrForbidden,
-		},
-		{
-			name:       "404 を受けたとき ErrNotFound",
-			status:     http.StatusNotFound,
-			wantTarget: apicardclient.ErrNotFound,
-		},
-		{
-			name:       "500 を受けたとき ErrInternalServer",
-			status:     http.StatusInternalServerError,
-			wantTarget: apicardclient.ErrInternalServer,
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			srv := apicardserverfake.NewServer()
-			defer srv.Close()
-			srv.ValidateDeckForBattleFn = func(_ string) (int, any) { return tc.status, nil }
+	t.Run("ValidateDeckForBattle のステータスマッピング", func(t *testing.T) {
+		// 400 のみ ErrBadRequest ではなく ErrDeckInvalid に変換する (wire 契約上「デッキ不正」を意味するため特別扱い)。
+		cases := []struct {
+			name       string
+			status     int
+			wantTarget error
+		}{
+			{
+				name:       "400 を受けたとき、ErrBadRequest ではなく ErrDeckInvalid になる",
+				status:     http.StatusBadRequest,
+				wantTarget: apicardclient.ErrDeckInvalid,
+			},
+			{
+				name:       "401 を受けたとき、ErrUnauthorized になる",
+				status:     http.StatusUnauthorized,
+				wantTarget: apicardclient.ErrUnauthorized,
+			},
+			{
+				name:       "403 を受けたとき、ErrForbidden になる",
+				status:     http.StatusForbidden,
+				wantTarget: apicardclient.ErrForbidden,
+			},
+			{
+				name:       "404 を受けたとき、ErrNotFound になる",
+				status:     http.StatusNotFound,
+				wantTarget: apicardclient.ErrNotFound,
+			},
+			{
+				name:       "500 を受けたとき、ErrInternalServer になる",
+				status:     http.StatusInternalServerError,
+				wantTarget: apicardclient.ErrInternalServer,
+			},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				srv := apicardserverfake.NewServer()
+				defer srv.Close()
+				srv.ValidateDeckForBattleFn = func(_ string) (int, any) { return tc.status, nil }
 
-			c := newTestClient(t, srv.URL())
-			err := c.ValidateDeckForBattle(context.Background(), 1)
-			assertSentinel(t, err, tc.wantTarget)
-		})
-	}
+				c := newTestClient(t, srv.URL())
+				err := c.ValidateDeckForBattle(context.Background(), 1)
+				assertSentinel(t, err, tc.wantTarget)
+			})
+		}
+	})
 }
 
-// TestClient_RequestEditor は Option pattern の契約 (WithRequestEditorFn で渡した
-// editor が全リクエストに適用される) を検証する。X-Internal-Auth header 注入の
-// 接続点として SDK が機能することを担保する。
 func TestClient_RequestEditor(t *testing.T) {
-	var gotHeader string
-	spy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotHeader = r.Header.Get("X-Internal-Auth")
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("[]"))
-	}))
-	defer spy.Close()
+	t.Run("リクエストエディタの適用", func(t *testing.T) {
+		t.Run("WithRequestEditorFn で渡した editor が全リクエストに適用される", func(t *testing.T) {
+			// X-Internal-Auth header 注入の接続点として SDK が機能することを担保する。
+			var gotHeader string
+			spy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotHeader = r.Header.Get("X-Internal-Auth")
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte("[]"))
+			}))
+			defer spy.Close()
 
-	c, err := apicardclient.New(spy.URL,
-		apicardclient.WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
-			req.Header.Set("X-Internal-Auth", "test-token")
-			return nil
-		}),
-	)
-	require.NoError(t, err)
+			c, err := apicardclient.New(spy.URL,
+				apicardclient.WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
+					req.Header.Set("X-Internal-Auth", "test-token")
+					return nil
+				}),
+			)
+			require.NoError(t, err)
 
-	_, err = c.ListDecks(context.Background())
-	require.NoError(t, err)
-	assert.Equal(t, "test-token", gotHeader)
+			_, err = c.ListDecks(context.Background())
+			require.NoError(t, err)
+			assert.Equal(t, "test-token", gotHeader)
+		})
+	})
 }
 
 func newTestClient(t *testing.T, baseURL string) *apicardclient.Client {

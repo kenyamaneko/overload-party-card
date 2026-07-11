@@ -40,90 +40,69 @@ func (f *fakeGrantPlayerCardRepo) AddCards(_ context.Context, playerID string, c
 	return f.retAdded, nil
 }
 
-// TestGrantPack_PassesPackCardsToAddCards は pack マスターから取得したカード集合
-// (card_id と copies の組) がそのまま AddCards に渡ることを固定する。
-// pack 内でカードごとに枚数が異なるケースで、写し漏れを検出する。
-func TestGrantPack_PassesPackCardsToAddCards(t *testing.T) {
-	packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
-		IsActive: true,
-		Cards: []domain.CardPackCard{
-			{CardID: "SH-0001", Copies: 3},
-			{CardID: "SH-0002", Copies: 1},
-		},
-	}}
-	pcRepo := &fakeGrantPlayerCardRepo{retAdded: 4}
+func TestGrantPack(t *testing.T) {
+	t.Run("パック付与", func(t *testing.T) {
+		t.Run("有効な pack のとき、pack の全カードを AddCards に渡し付与枚数を返す", func(t *testing.T) {
+			// pack 内でカードごとに枚数が異なるケースで、写し漏れを検出する。
+			packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
+				IsActive: true,
+				Cards: []domain.CardPackCard{
+					{CardID: "SH-0001", Copies: 3},
+					{CardID: "SH-0002", Copies: 1},
+				},
+			}}
+			pcRepo := &fakeGrantPlayerCardRepo{retAdded: 4}
 
-	svc := NewGrantInteractor(packRepo, pcRepo)
-	got, err := svc.GrantPack(context.Background(), "player-1", "any")
+			svc := NewGrantInteractor(packRepo, pcRepo)
+			got, err := svc.GrantPack(context.Background(), "player-1", "any")
 
-	require.NoError(t, err)
-	assert.Equal(t, 4, got)
-	assert.Equal(t, "player-1", pcRepo.gotPlayerID)
-	assert.Equal(t, []domain.CardPackCard{
-		{CardID: "SH-0001", Copies: 3},
-		{CardID: "SH-0002", Copies: 1},
-	}, pcRepo.gotCards)
-}
+			require.NoError(t, err)
+			assert.Equal(t, 4, got)
+			assert.Equal(t, "player-1", pcRepo.gotPlayerID)
+			assert.Equal(t, []domain.CardPackCard{
+				{CardID: "SH-0001", Copies: 3},
+				{CardID: "SH-0002", Copies: 1},
+			}, pcRepo.gotCards)
+		})
 
-// TestGrantPack_InactivePack は is_active=false の pack に対して
-// port.ErrPackInactive を返し、AddCards を呼ばないことを固定する。
-func TestGrantPack_InactivePack(t *testing.T) {
-	packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
-		IsActive: false,
-		Cards:    []domain.CardPackCard{{CardID: "SH-0001", Copies: 3}},
-	}}
-	pcRepo := &fakeGrantPlayerCardRepo{}
+		// いずれのエラーでも配布は起きない (AddCards は呼ばれない)。
+		dbDown := errors.New("db down")
+		errorCases := []struct {
+			name     string
+			packRepo *fakeCardPackRepo
+			wantErr  error
+		}{
+			{
+				name:     "is_active=false の pack のとき、ErrPackInactive になり AddCards を呼ばない",
+				packRepo: &fakeCardPackRepo{pack: &domain.CardPack{IsActive: false, Cards: []domain.CardPackCard{{CardID: "SH-0001", Copies: 3}}}},
+				wantErr:  port.ErrPackInactive,
+			},
+			{
+				name:     "pack が存在しないとき、ErrNotFound を伝播し AddCards を呼ばない",
+				packRepo: &fakeCardPackRepo{err: port.ErrNotFound},
+				wantErr:  port.ErrNotFound,
+			},
+			{
+				name:     "内包カードが 0 件のとき、ErrEmptyPack になり AddCards を呼ばない",
+				packRepo: &fakeCardPackRepo{pack: &domain.CardPack{IsActive: true, Cards: nil}},
+				wantErr:  port.ErrEmptyPack,
+			},
+			{
+				name:     "pack repo が任意エラーのとき、それを伝播し AddCards を呼ばない",
+				packRepo: &fakeCardPackRepo{err: dbDown},
+				wantErr:  dbDown,
+			},
+		}
 
-	svc := NewGrantInteractor(packRepo, pcRepo)
-	_, err := svc.GrantPack(context.Background(), "player-1", "any")
+		for _, tc := range errorCases {
+			t.Run(tc.name, func(t *testing.T) {
+				pcRepo := &fakeGrantPlayerCardRepo{}
+				svc := NewGrantInteractor(tc.packRepo, pcRepo)
+				_, err := svc.GrantPack(context.Background(), "player-1", "any")
 
-	require.Error(t, err)
-	assert.ErrorIs(t, err, port.ErrPackInactive)
-	assert.False(t, pcRepo.called)
-}
-
-// TestGrantPack_PackNotFound は pack repo の ErrNotFound が呼び出し側に伝播し、
-// AddCards が呼ばれないことを固定する。
-func TestGrantPack_PackNotFound(t *testing.T) {
-	packRepo := &fakeCardPackRepo{err: port.ErrNotFound}
-	pcRepo := &fakeGrantPlayerCardRepo{}
-
-	svc := NewGrantInteractor(packRepo, pcRepo)
-	_, err := svc.GrantPack(context.Background(), "player-1", "any")
-
-	require.Error(t, err)
-	assert.ErrorIs(t, err, port.ErrNotFound)
-	assert.False(t, pcRepo.called)
-}
-
-// TestGrantPack_EmptyPack は内包カードが 0 件の pack に対して
-// port.ErrEmptyPack を返し、AddCards を呼ばないことを固定する。
-func TestGrantPack_EmptyPack(t *testing.T) {
-	packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
-		IsActive: true,
-		Cards:    nil,
-	}}
-	pcRepo := &fakeGrantPlayerCardRepo{}
-
-	svc := NewGrantInteractor(packRepo, pcRepo)
-	_, err := svc.GrantPack(context.Background(), "player-1", "any")
-
-	require.Error(t, err)
-	assert.ErrorIs(t, err, port.ErrEmptyPack)
-	assert.False(t, pcRepo.called)
-}
-
-// TestGrantPack_PackRepoError は pack repo の任意エラーが伝播し、
-// AddCards が呼ばれないことを固定する。
-func TestGrantPack_PackRepoError(t *testing.T) {
-	dbDown := errors.New("db down")
-	packRepo := &fakeCardPackRepo{err: dbDown}
-	pcRepo := &fakeGrantPlayerCardRepo{}
-
-	svc := NewGrantInteractor(packRepo, pcRepo)
-	_, err := svc.GrantPack(context.Background(), "player-1", "any")
-
-	require.Error(t, err)
-	assert.ErrorIs(t, err, dbDown)
-	assert.False(t, pcRepo.called)
+				require.ErrorIs(t, err, tc.wantErr)
+				assert.False(t, pcRepo.called)
+			})
+		}
+	})
 }
