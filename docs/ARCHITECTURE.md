@@ -58,7 +58,7 @@ CardCache は読み取り専用。マスター改定時は Pod 再起動で inva
 
 ## pack マスターはキャッシュしない
 
-`card.card_pack` は配布リクエストごとに DB を引く（[ADR-032](https://github.com/kenyamaneko/overload-party-common/blob/main/docs/adr/032-card-pack-introduction-and-grant-unification.md) §2 で確定）。CardCache 同様の起動時 fail-fast ロード戦略は **採らない**。
+`card.card_pack` は配布リクエストごとに DB を引く（[ADR-032](https://github.com/kenyamaneko/overload-party-common/blob/main/docs/adr/032-card-pack-introduction-and-grant-unification.md)「配布 API を `GrantPack(pack_id)` に統一」で確定）。CardCache 同様の起動時 fail-fast ロード戦略は **採らない**。
 
 理由:
 
@@ -82,15 +82,15 @@ CardCache は静的なカードマスターを参照する read-heavy ホット�
 
 ## Pub/Sub subscriber の冪等性
 
-card は `player-onboarded-card-sub` を購読してパック配布をイベント駆動で実行する (ADR-022 / ADR-031)。`card-pack-purchased-card-sub` は ADR-032 に伴い導入予定で本セクションが想定する subscriber 群に同様に従う。冪等性は `card.processed_events` テーブルに `event_id` を INSERT することで前段ガードとして機能させる。
+card は `player-onboarded-card-sub` と `card-pack-purchased-card-sub` を購読してパック配布をイベント駆動で実行する (ADR-022 / ADR-031 / ADR-032)。冪等性は `card.processed_events` テーブルに `event_id` を INSERT することで前段ガードとして機能させる。
 
 ただし **完全な idempotency 保証ではない**:
 
-- `GrantService` の `player_cards` UPSERT は独自トランザクションを張る
-- `processed_events` INSERT と UPSERT を同一 tx にまとめると、GrantService が `port.PlayerCardRepo` を通じて内部で tx 管理するという責任分界が壊れる
+- `GrantInteractor` の `player_cards` UPSERT は独自トランザクションを張る
+- `processed_events` INSERT と UPSERT を同一 tx にまとめると、GrantInteractor が `port.PlayerCardRepo` を通じて内部で tx 管理するという責任分界が壊れる
 - そこで processed_events は「**再試行の早期打ち切り用 fast-path**」と位置付け、grant 実行中のクラッシュ窓では稀に 2 重加算がありうる（publisher 側のリトライ間隔が短く、実用上の影響は限定的）
 
-at-least-once を at-most-once 相当に近づけるための前段ガードであり、strict exactly-once を謳っていない点に注意。将来 GrantService を processed_events と同一 tx に組み込む設計変更で完全 idempotent にできる（現状は実用上の優先度が低い）。
+at-least-once を at-most-once 相当に近づけるための前段ガードであり、strict exactly-once を謳っていない点に注意。将来 GrantInteractor を processed_events と同一 tx に組み込む設計変更で完全 idempotent にできる（現状は実用上の優先度が低い）。
 
 ### subscriber の責務分離 (ADR-022 / ADR-031 / ADR-032)
 
@@ -184,12 +184,13 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 - **`PLAYER_ONBOARDED_SUBSCRIPTION`**: player-onboarded subscription 名。未設定で起動不可
 - **`CARD_PACK_PURCHASED_SUBSCRIPTION`**: card-pack-purchased subscription 名。未設定で起動不可
 - **`INTERNAL_AUTH_SECRET`**: gateway が発行する内部認証 JWT の検証鍵。未設定で起動不可。`/api/v1/cards` 配下の player-scoped API は本鍵で署名された `X-Internal-Auth` header を要求する
+- **`ACCOUNT_SERVICE_URL`**: デッキ作成・更新時に faction 所持を照会する account サービスの URL。未設定で起動不可
 
 ### カードデータ変更時
 
 1. `data/cards/*.yaml` を編集
 2. `python3 scripts/generate_cards.py` を実行して `db/seed/cards_seed.sql` / `data/cards_gen.json` を更新
-3. コミット（`validate.yaml` が drift を検出する）
+3. コミット（CI の `codegen-sync` ジョブが drift を検出する）
 4. デプロイ後に ops の `db-migrate` を走らせて seed を反映
 
 ### card_pack マスター変更時
@@ -199,12 +200,12 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 3. コミット
 4. デプロイ後に ops の `db-migrate` を走らせて seed を反映
 
-`is_active=false` で pack を非アクティブ化する際の運用順序は ADR-032 §5「pack 非アクティブ化の運用順序」に従う（shop product を先に停止 → outbox drain → card_pack を停止）。
+`is_active=false` で pack を非アクティブ化する際の運用順序は ADR-032「pack 非アクティブ化の運用順序」に従う（shop product を先に停止 → outbox drain → card_pack を停止）。
 
 ### 型定義変更時
 
 1. `data/openapi.yaml` を編集 (SSoT)
-2. `scripts/generate_types.sh` を実行 (oapi-codegen が `packages/api-card/openapi_gen.go` を再生成)
+2. `scripts/generate_types.sh` を実行 (oapi-codegen / openapi-typescript / NSwag が `packages/api-card` / `api-card-npm` / `api-card-dotnet` の生成物を再生成)
 3. enum 追加・削除があれば `internal/domain/card_enum.go` も更新 (drift test が乖離を検知)
 4. コミット
 

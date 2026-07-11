@@ -22,22 +22,23 @@ func loadTestCache(t *testing.T) *CardCache {
 	return cc
 }
 
-func TestLoadFromBytes_CardCount(t *testing.T) {
-	cc := loadTestCache(t)
-	require.NotZero(t, cc.Count(), "no cards loaded")
-}
+func TestLoadFromBytes(t *testing.T) {
+	t.Run("生成カードキャッシュのロード", func(t *testing.T) {
+		t.Run("生成 JSON をロードするとき、カードが 1 枚以上読み込まれる", func(t *testing.T) {
+			cc := loadTestCache(t)
+			require.NotZero(t, cc.Count(), "no cards loaded")
+		})
 
-// TestLoadFromBytes_ResourceLabelInvariant は、resource_label の有無が
-// CardType の resource/support 区分と一致することを確認します。
-// 1 枚ごとに「リソース種別なら label あり／それ以外なら label なし」を
-// 等式で検証することで、if による分岐フィルタを不要にしています。
-func TestLoadFromBytes_ResourceLabelInvariant(t *testing.T) {
-	cc := loadTestCache(t)
-	for cardID, card := range cc.All() {
-		isResource := isResourceType(card.CardType)
-		hasLabel := card.ResourceLabel != ""
-		assert.Equalf(t, isResource, hasLabel,
-			"card %s (type=%s, label=%q): resource types must have resource_label, support types must not",
-			cardID, card.CardType, card.ResourceLabel)
-	}
+		t.Run("全カードで resource 種別なら resource_label があり、support 種別なら無い", func(t *testing.T) {
+			// リソース種別か否かと label 有無を 1 枚ごとに等式で突き合わせ、if 分岐なしで網羅する。
+			cc := loadTestCache(t)
+			for cardID, card := range cc.All() {
+				isResource := isResourceType(card.CardType)
+				hasLabel := card.ResourceLabel != ""
+				assert.Equalf(t, isResource, hasLabel,
+					"card %s (type=%s, label=%q): resource types must have resource_label, support types must not",
+					cardID, card.CardType, card.ResourceLabel)
+			}
+		})
+	})
 }
