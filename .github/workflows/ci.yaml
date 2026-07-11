@@ -3,12 +3,6 @@ name: CI
 on:
   pull_request:
     branches: [main]
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - '.vscode/**'
-      - '.gitignore'
-      - 'LICENSE'
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -26,7 +20,23 @@ env:
   IMAGE_NAME: card
 
 jobs:
+  changes:
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.detect.outputs.changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect code change
+        id: detect
+        uses: kenyamaneko/overload-party-common/.github/actions/detect-code-change@main
+
   lint:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubicloud-standard-2
     timeout-minutes: 10
     steps:
@@ -51,6 +61,8 @@ jobs:
           GOPRIVATE: github.com/kenyamaneko/*
 
   test-unit:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubicloud-standard-2
     timeout-minutes: 20
     steps:
@@ -77,6 +89,8 @@ jobs:
           title: 単体テスト結果
 
   test-integration:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     # ubuntu-latest には Docker がプリインストールされており、Testcontainers が
     # postgres:16-alpine を起動してリポジトリ層テストを実行する。
     runs-on: ubicloud-standard-2
@@ -108,6 +122,8 @@ jobs:
           title: 結合テスト結果
 
   codegen-sync:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubicloud-standard-2
     timeout-minutes: 10
     steps:
