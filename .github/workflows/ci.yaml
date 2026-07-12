@@ -87,6 +87,18 @@ jobs:
         with:
           json-path: go-test-unit.json
           title: 単体テスト結果
+      # packages/api-card は別 go.mod (公開 SDK モジュール) のため go.work 上の
+      # ワークスペース参照だけではルートの `go test ./...` に含まれず、明示的に走らせる。
+      - name: Run api-card unit tests
+        working-directory: packages/api-card
+        run: go test -race -count=1 ./... -json | tee go-test-unit.json
+      - name: Report api-card test results
+        if: ${{ !cancelled() }}
+        uses: kenyamaneko/overload-party-common/.github/actions/go-test-report@main
+        with:
+          json-path: packages/api-card/go-test-unit.json
+          title: api-card 単体テスト結果
+          module-dir: packages/api-card
 
   test-integration:
     needs: changes
