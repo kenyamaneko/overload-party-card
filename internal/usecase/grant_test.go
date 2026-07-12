@@ -22,27 +22,23 @@ func (f *fakeCardPackRepo) GetPack(_ context.Context, _ string) (*domain.CardPac
 	return f.pack, f.err
 }
 
-// fakeGrantPlayerCardRepo は PlayerCardRepo の最小スタブ。AddCards の引数を記録する。
+// fakeGrantPlayerCardRepo は PlayerCardRepo の最小スタブ。guard 系ケースで
+// AddCards が呼ばれないことだけを記録する。
 type fakeGrantPlayerCardRepo struct {
-	called      bool
-	gotPlayerID string
-	gotCards    []domain.CardPackCard
-	retAdded    int
+	called bool
 }
 
 func (f *fakeGrantPlayerCardRepo) GetPlayerCards(_ context.Context, _ string) ([]*domain.PlayerCard, error) {
 	return nil, nil
 }
-func (f *fakeGrantPlayerCardRepo) AddCards(_ context.Context, playerID string, cards []domain.CardPackCard) (int, error) {
+func (f *fakeGrantPlayerCardRepo) AddCards(_ context.Context, _ string, _ []domain.CardPackCard) (int, error) {
 	f.called = true
-	f.gotPlayerID = playerID
-	f.gotCards = append([]domain.CardPackCard(nil), cards...)
-	return f.retAdded, nil
+	return 0, nil
 }
 
 func TestGrantPack(t *testing.T) {
 	t.Run("パック付与", func(t *testing.T) {
-		t.Run("有効な pack のとき、pack の全カードを AddCards に渡し付与枚数を返す", func(t *testing.T) {
+		t.Run("有効な pack のとき、pack の全カードがプレイヤーの所持へ加算され、付与枚数は copies 合計になる", func(t *testing.T) {
 			// pack 内でカードごとに枚数が異なるケースで、写し漏れを検出する。
 			packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
 				IsActive: true,
@@ -51,18 +47,43 @@ func TestGrantPack(t *testing.T) {
 					{CardID: "SH-0002", Copies: 1},
 				},
 			}}
-			pcRepo := &fakeGrantPlayerCardRepo{retAdded: 4}
+			pcRepo := newInMemoryPlayerCardRepo()
 
 			svc := NewGrantInteractor(packRepo, pcRepo)
 			got, err := svc.GrantPack(context.Background(), "player-1", "any")
 
 			require.NoError(t, err)
 			assert.Equal(t, 4, got)
-			assert.Equal(t, "player-1", pcRepo.gotPlayerID)
-			assert.Equal(t, []domain.CardPackCard{
-				{CardID: "SH-0001", Copies: 3},
-				{CardID: "SH-0002", Copies: 1},
-			}, pcRepo.gotCards)
+
+			playerCards, err := pcRepo.GetPlayerCards(context.Background(), "player-1")
+			require.NoError(t, err)
+			assert.ElementsMatch(t, []*domain.PlayerCard{
+				{PlayerID: "player-1", CardID: "SH-0001", Count: 3},
+				{PlayerID: "player-1", CardID: "SH-0002", Count: 1},
+			}, playerCards)
+		})
+
+		t.Run("既に所持しているカードを含む pack を配布するとき、既存枚数へ加算される", func(t *testing.T) {
+			packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
+				IsActive: true,
+				Cards: []domain.CardPackCard{
+					{CardID: "SH-0001", Copies: 2},
+				},
+			}}
+			pcRepo := newInMemoryPlayerCardRepo()
+			pcRepo.Seed("player-1", []*domain.PlayerCard{{PlayerID: "player-1", CardID: "SH-0001", Count: 5}})
+
+			svc := NewGrantInteractor(packRepo, pcRepo)
+			got, err := svc.GrantPack(context.Background(), "player-1", "any")
+
+			require.NoError(t, err)
+			assert.Equal(t, 2, got)
+
+			playerCards, err := pcRepo.GetPlayerCards(context.Background(), "player-1")
+			require.NoError(t, err)
+			assert.ElementsMatch(t, []*domain.PlayerCard{
+				{PlayerID: "player-1", CardID: "SH-0001", Count: 7},
+			}, playerCards)
 		})
 
 		// いずれのエラーでも配布は起きない (AddCards は呼ばれない)。

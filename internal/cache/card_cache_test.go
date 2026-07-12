@@ -24,9 +24,10 @@ func loadTestCache(t *testing.T) *CardCache {
 
 func TestLoadFromBytes(t *testing.T) {
 	t.Run("生成カードキャッシュのロード", func(t *testing.T) {
-		t.Run("生成 JSON をロードするとき、カードが 1 枚以上読み込まれる", func(t *testing.T) {
-			cc := loadTestCache(t)
-			require.NotZero(t, cc.Count(), "no cards loaded")
+		t.Run("0 件 JSON のとき、マスター欠落としてエラーになる", func(t *testing.T) {
+			cc := NewCardCache()
+			err := cc.LoadFromBytes([]byte(`[]`))
+			assert.Error(t, err)
 		})
 
 		t.Run("全カードで resource 種別なら resource_label があり、support 種別なら無い", func(t *testing.T) {

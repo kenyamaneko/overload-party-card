@@ -168,7 +168,7 @@ func TestClient_CreateDeck_StatusMapping(t *testing.T) {
 				srv.CreateDeckFn = func(_ apicard.DeckCreateRequest) (int, any) { return tc.status, nil }
 
 				c := newTestClient(t, srv.URL())
-				_, err := c.CreateDeck(context.Background(), apicard.DeckCreateRequest{DeckName: "x"})
+				_, err := c.CreateDeck(context.Background(), apicard.DeckCreateRequest{})
 				assertSentinel(t, err, tc.wantTarget)
 			})
 		}
@@ -257,7 +257,7 @@ func TestClient_UpdateDeck_StatusMapping(t *testing.T) {
 				srv.UpdateDeckFn = func(_ string, _ apicard.DeckUpdateRequest) (int, any) { return tc.status, nil }
 
 				c := newTestClient(t, srv.URL())
-				_, err := c.UpdateDeck(context.Background(), 1, apicard.DeckUpdateRequest{DeckName: "x"})
+				_, err := c.UpdateDeck(context.Background(), 1, apicard.DeckUpdateRequest{})
 				assertSentinel(t, err, tc.wantTarget)
 			})
 		}
