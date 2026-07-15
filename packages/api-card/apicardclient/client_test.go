@@ -13,12 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// 以下の TestClient_<Endpoint>_StatusMapping 群は、SDK の固有責務である
-// 「OpenAPI spec で宣言された 4xx/5xx status を sentinel error に変換する」契約を
-// endpoint ごとに検証する。各テスト関数は data/openapi.yaml が宣言する error status を
-// 網羅し、errors.Is で意図した sentinel に一致することを確認する。
-
-func TestClient_ListCards_StatusMapping(t *testing.T) {
+func TestClient_ListCards(t *testing.T) {
 	t.Run("ListCards", func(t *testing.T) {
 		t.Run("500 を受けたとき、ErrInternalServer になる", func(t *testing.T) {
 			srv := apicardserverfake.NewServer()
@@ -32,7 +27,7 @@ func TestClient_ListCards_StatusMapping(t *testing.T) {
 	})
 }
 
-func TestClient_ListPlayerCards_StatusMapping(t *testing.T) {
+func TestClient_ListPlayerCards(t *testing.T) {
 	t.Run("ListPlayerCards", func(t *testing.T) {
 		cases := []struct {
 			name       string
@@ -64,7 +59,7 @@ func TestClient_ListPlayerCards_StatusMapping(t *testing.T) {
 	})
 }
 
-func TestClient_ListCardsWithOwnership_StatusMapping(t *testing.T) {
+func TestClient_ListCardsWithOwnership(t *testing.T) {
 	t.Run("ListCardsWithOwnership", func(t *testing.T) {
 		cases := []struct {
 			name       string
@@ -96,7 +91,7 @@ func TestClient_ListCardsWithOwnership_StatusMapping(t *testing.T) {
 	})
 }
 
-func TestClient_ListDecks_StatusMapping(t *testing.T) {
+func TestClient_ListDecks(t *testing.T) {
 	t.Run("ListDecks", func(t *testing.T) {
 		cases := []struct {
 			name       string
@@ -133,7 +128,7 @@ func TestClient_ListDecks_StatusMapping(t *testing.T) {
 	})
 }
 
-func TestClient_CreateDeck_StatusMapping(t *testing.T) {
+func TestClient_CreateDeck(t *testing.T) {
 	t.Run("CreateDeck", func(t *testing.T) {
 		cases := []struct {
 			name       string
@@ -175,7 +170,7 @@ func TestClient_CreateDeck_StatusMapping(t *testing.T) {
 	})
 }
 
-func TestClient_GetDeck_StatusMapping(t *testing.T) {
+func TestClient_GetDeck(t *testing.T) {
 	t.Run("GetDeck", func(t *testing.T) {
 		cases := []struct {
 			name       string
@@ -217,7 +212,7 @@ func TestClient_GetDeck_StatusMapping(t *testing.T) {
 	})
 }
 
-func TestClient_UpdateDeck_StatusMapping(t *testing.T) {
+func TestClient_UpdateDeck(t *testing.T) {
 	t.Run("UpdateDeck", func(t *testing.T) {
 		cases := []struct {
 			name       string
@@ -264,7 +259,7 @@ func TestClient_UpdateDeck_StatusMapping(t *testing.T) {
 	})
 }
 
-func TestClient_DeleteDeck_StatusMapping(t *testing.T) {
+func TestClient_DeleteDeck(t *testing.T) {
 	t.Run("DeleteDeck", func(t *testing.T) {
 		cases := []struct {
 			name       string
@@ -306,7 +301,7 @@ func TestClient_DeleteDeck_StatusMapping(t *testing.T) {
 	})
 }
 
-func TestClient_ValidateDeckForBattle_StatusMapping(t *testing.T) {
+func TestClient_ValidateDeckForBattle(t *testing.T) {
 	t.Run("ValidateDeckForBattle", func(t *testing.T) {
 		// 400 のみ ErrBadRequest ではなく ErrDeckInvalid に変換する (wire 契約上「デッキ不正」を意味するため特別扱い)。
 		cases := []struct {

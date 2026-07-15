@@ -348,7 +348,7 @@ func TestCreateDeck(t *testing.T) {
 					wantErrMsg:   "deck cannot exceed 30 cards",
 				},
 				{
-					name:    "未所持カードを含むとき、not enough owned エラーになる",
+					name:    "未所持カードを含むとき、所持枚数不足エラーになる",
 					faction: "SHE",
 					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
@@ -358,7 +358,7 @@ func TestCreateDeck(t *testing.T) {
 					wantErrMsg:   "not enough owned",
 				},
 				{
-					name:    "無制限カード4枚のとき、restriction limit 超過エラーになる",
+					name:    "無制限カード4枚のとき、制限枚数超過エラーになる",
 					faction: "SHE",
 					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 4})
@@ -368,7 +368,7 @@ func TestCreateDeck(t *testing.T) {
 					wantErrMsg:   "exceeds restriction limit (4/3)",
 				},
 				{
-					name:    "制限カード2枚のとき、restriction limit 超過エラーになる",
+					name:    "制限カード2枚のとき、制限枚数超過エラーになる",
 					faction: "SHE",
 					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-050", ArtNo: 0, Count: 2})
@@ -378,7 +378,7 @@ func TestCreateDeck(t *testing.T) {
 					wantErrMsg:   "exceeds restriction limit (2/1)",
 				},
 				{
-					name:    "準制限カード3枚のとき、restriction limit 超過エラーになる",
+					name:    "準制限カード3枚のとき、制限枚数超過エラーになる",
 					faction: "SHE",
 					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-060", ArtNo: 0, Count: 3})
@@ -388,7 +388,7 @@ func TestCreateDeck(t *testing.T) {
 					wantErrMsg:   "exceeds restriction limit (3/2)",
 				},
 				{
-					name:    "枚数0のとき、count must be positive エラーになる",
+					name:    "枚数0のとき、枚数不正エラーになる",
 					faction: "SHE",
 					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
@@ -398,7 +398,7 @@ func TestCreateDeck(t *testing.T) {
 					wantErrMsg:   "count must be positive",
 				},
 				{
-					name:    "枚数-1のとき、count must be positive エラーになる",
+					name:    "枚数-1のとき、枚数不正エラーになる",
 					faction: "SHE",
 					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
@@ -408,7 +408,7 @@ func TestCreateDeck(t *testing.T) {
 					wantErrMsg:   "count must be positive",
 				},
 				{
-					name:    "カード定義に存在しない ID のとき、not found エラーになる",
+					name:    "カード定義に存在しない ID のとき、カード未定義エラーになる",
 					faction: "SHE",
 					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-999", ArtNo: 0, Count: 3})
@@ -418,7 +418,7 @@ func TestCreateDeck(t *testing.T) {
 					wantErrMsg:   "card C-999 not found in card definitions",
 				},
 				{
-					name:    "同カードをアート違いで合算すると、restriction limit 超過エラーになる",
+					name:    "同カードをアート違いで合算すると、制限枚数超過エラーになる",
 					faction: "SHE",
 					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 						grantCards(pcRepo, pid,
@@ -554,49 +554,49 @@ func TestCreateDeck(t *testing.T) {
 				wantErrMsg string
 			}{
 				{
-					name:       "不明なプロダクトのとき、not found エラーになる",
+					name:       "不明なプロダクトのとき、プロダクトが見つからずエラーになる",
 					productID:  "PD-NOPE",
 					routineID:  testRoutineID,
 					specialID:  testSpecialID,
 					wantErrMsg: "not found",
 				},
 				{
-					name:       "他陣営のプロダクトのとき、not deck faction エラーになる",
+					name:       "他陣営のプロダクトのとき、デッキの陣営と一致せずエラーになる",
 					productID:  "PD-TST2",
 					routineID:  testRoutineID,
 					specialID:  testSpecialID,
 					wantErrMsg: "not deck faction",
 				},
 				{
-					name:       "不明なルーチン ID のとき、is not a routine エラーになる",
+					name:       "不明なルーチン ID のとき、ルーチンでないためエラーになる",
 					productID:  testProductID,
 					routineID:  "IN-NOPE",
 					specialID:  testSpecialID,
 					wantErrMsg: "is not a routine",
 				},
 				{
-					name:       "不明なスペシャル ID のとき、is not a special エラーになる",
+					name:       "不明なスペシャル ID のとき、スペシャルでないためエラーになる",
 					productID:  testProductID,
 					routineID:  testRoutineID,
 					specialID:  "IN-NOPE",
 					wantErrMsg: "is not a special",
 				},
 				{
-					name:       "スペシャルにルーチン ID を指定するとき、is not a special エラーになる",
+					name:       "スペシャルにルーチン ID を指定するとき、スペシャルでないためエラーになる",
 					productID:  testProductID,
 					routineID:  testRoutineID,
 					specialID:  testRoutineID,
 					wantErrMsg: "is not a special",
 				},
 				{
-					name:       "ルーチンにスペシャル ID を指定するとき、is not a routine エラーになる",
+					name:       "ルーチンにスペシャル ID を指定するとき、ルーチンでないためエラーになる",
 					productID:  testProductID,
 					routineID:  testSpecialID,
 					specialID:  testSpecialID,
 					wantErrMsg: "is not a routine",
 				},
 				{
-					name:       "別プロダクトのルーチンを指定するとき、is not a routine エラーになる",
+					name:       "別プロダクトのルーチンを指定するとき、ルーチンでないためエラーになる",
 					productID:  testProductID,
 					routineID:  "IN-TST-R2",
 					specialID:  testSpecialID,
