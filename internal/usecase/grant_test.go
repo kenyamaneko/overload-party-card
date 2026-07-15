@@ -22,24 +22,9 @@ func (f *fakeCardPackRepo) GetPack(_ context.Context, _ string) (*domain.CardPac
 	return f.pack, f.err
 }
 
-// fakeGrantPlayerCardRepo は PlayerCardRepo の最小スタブ。guard 系ケースで
-// AddCards が呼ばれないことだけを記録する。
-type fakeGrantPlayerCardRepo struct {
-	called bool
-}
-
-func (f *fakeGrantPlayerCardRepo) GetPlayerCards(_ context.Context, _ string) ([]*domain.PlayerCard, error) {
-	return nil, nil
-}
-func (f *fakeGrantPlayerCardRepo) AddCards(_ context.Context, _ string, _ []domain.CardPackCard) (int, error) {
-	f.called = true
-	return 0, nil
-}
-
 func TestGrantPack(t *testing.T) {
 	t.Run("パック付与", func(t *testing.T) {
-		t.Run("有効な pack のとき、pack の全カードがプレイヤーの所持へ加算され、付与枚数は各カードの枚数を合計した値になる", func(t *testing.T) {
-			// pack 内でカードごとに枚数が異なるケースで、写し漏れを検出する。
+		t.Run("カードパックを配ると、含まれる各カードが枚数分プレイヤーに付与され、付与数は合計枚数になる", func(t *testing.T) {
 			packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
 				IsActive: true,
 				Cards: []domain.CardPackCard{
@@ -63,7 +48,7 @@ func TestGrantPack(t *testing.T) {
 			}, playerCards)
 		})
 
-		t.Run("既に所持しているカードを含む pack を配布するとき、既存枚数へ加算される", func(t *testing.T) {
+		t.Run("既に所持しているカードを配ると、所持枚数に加算される", func(t *testing.T) {
 			packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
 				IsActive: true,
 				Cards: []domain.CardPackCard{
@@ -86,7 +71,6 @@ func TestGrantPack(t *testing.T) {
 			}, playerCards)
 		})
 
-		// いずれのエラーでも配布は起きない (AddCards は呼ばれない)。
 		dbDown := errors.New("db down")
 		errorCases := []struct {
 			name     string
@@ -94,22 +78,22 @@ func TestGrantPack(t *testing.T) {
 			wantErr  error
 		}{
 			{
-				name:     "is_active=false の pack のとき、ErrPackInactive になり AddCards を呼ばない",
+				name:     "無効化されたカードパックのとき、ErrPackInactive になり何も付与されない",
 				packRepo: &fakeCardPackRepo{pack: &domain.CardPack{IsActive: false, Cards: []domain.CardPackCard{{CardID: "SH-0001", Copies: 3}}}},
 				wantErr:  port.ErrPackInactive,
 			},
 			{
-				name:     "pack が存在しないとき、ErrNotFound を伝播し AddCards を呼ばない",
+				name:     "存在しないカードパックのとき、ErrNotFound になり何も付与されない",
 				packRepo: &fakeCardPackRepo{err: port.ErrNotFound},
 				wantErr:  port.ErrNotFound,
 			},
 			{
-				name:     "内包カードが 0 件のとき、ErrEmptyPack になり AddCards を呼ばない",
+				name:     "中身が空のカードパックのとき、ErrEmptyPack になり何も付与されない",
 				packRepo: &fakeCardPackRepo{pack: &domain.CardPack{IsActive: true, Cards: nil}},
 				wantErr:  port.ErrEmptyPack,
 			},
 			{
-				name:     "pack repo が任意エラーのとき、それを伝播し AddCards を呼ばない",
+				name:     "カードパックの取得が失敗したとき、そのエラーになり何も付与されない",
 				packRepo: &fakeCardPackRepo{err: dbDown},
 				wantErr:  dbDown,
 			},
@@ -117,12 +101,14 @@ func TestGrantPack(t *testing.T) {
 
 		for _, tc := range errorCases {
 			t.Run(tc.name, func(t *testing.T) {
-				pcRepo := &fakeGrantPlayerCardRepo{}
+				pcRepo := newInMemoryPlayerCardRepo()
 				svc := NewGrantInteractor(tc.packRepo, pcRepo)
 				_, err := svc.GrantPack(context.Background(), "player-1", "any")
 
 				require.ErrorIs(t, err, tc.wantErr)
-				assert.False(t, pcRepo.called)
+				playerCards, err := pcRepo.GetPlayerCards(context.Background(), "player-1")
+				require.NoError(t, err)
+				assert.Empty(t, playerCards)
 			})
 		}
 	})

@@ -516,7 +516,7 @@ func TestCreateDeck(t *testing.T) {
 		})
 
 		t.Run("宣言陣営の所持検証", func(t *testing.T) {
-			t.Run("未所持の陣営 (SHE) を宣言するとき、not owned で拒否される", func(t *testing.T) {
+			t.Run("未所持の陣営 (SHE) を宣言すると、拒否される", func(t *testing.T) {
 				svc, _, pcRepo, _, _ := setupDeckInteractorWithFactions(t, []string{"Tenki"}) // SHE は未所持
 				pid := "p1"
 				grantUnlimited(pcRepo, pid, "C-001")
@@ -545,7 +545,7 @@ func TestCreateDeck(t *testing.T) {
 			})
 		})
 
-		t.Run("施策 (initiative) の検証", func(t *testing.T) {
+		t.Run("施策の検証", func(t *testing.T) {
 			tests := []struct {
 				name       string
 				productID  string
@@ -661,7 +661,7 @@ func TestCreateDeck(t *testing.T) {
 
 func TestUpdateDeck(t *testing.T) {
 	t.Run("デッキ更新", func(t *testing.T) {
-		t.Run("不完全なデッキを 30枚に更新するとき、IsValid=true になり反映される", func(t *testing.T) {
+		t.Run("不完全なデッキを 30枚に更新すると、有効になり一覧に反映される", func(t *testing.T) {
 			svc, _, pcRepo, _ := setupDeckInteractor(t)
 			pid := "p1"
 			grantUnlimited(pcRepo, pid, allTenCards...)
@@ -724,7 +724,7 @@ func TestValidateDeckForBattle(t *testing.T) {
 			assert.NoError(t, err)
 		})
 
-		t.Run("30枚に満たないデッキのとき、need exactly 30 エラーになる", func(t *testing.T) {
+		t.Run("30枚に満たないデッキは、無効として拒否される", func(t *testing.T) {
 			svc, _, pcRepo, _ := setupDeckInteractor(t)
 			pid := "p1"
 			grantUnlimited(pcRepo, pid, "C-001", "C-002")
