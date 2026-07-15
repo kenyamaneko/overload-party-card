@@ -38,7 +38,7 @@ func (f *fakeGrantPlayerCardRepo) AddCards(_ context.Context, _ string, _ []doma
 
 func TestGrantPack(t *testing.T) {
 	t.Run("パック付与", func(t *testing.T) {
-		t.Run("有効な pack のとき、pack の全カードがプレイヤーの所持へ加算され、付与枚数は copies 合計になる", func(t *testing.T) {
+		t.Run("有効な pack のとき、pack の全カードがプレイヤーの所持へ加算され、付与枚数は各カードの枚数を合計した値になる", func(t *testing.T) {
 			// pack 内でカードごとに枚数が異なるケースで、写し漏れを検出する。
 			packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
 				IsActive: true,
