@@ -5,37 +5,30 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	gencache "github.com/kenyamaneko/overload-party-card/data/cache"
 )
 
-func loadTestProductCache(t *testing.T) *ProductCache {
-	t.Helper()
-	pc := NewProductCache()
-	err := pc.LoadFromBytes(gencache.ProductsJSON)
-	require.NoError(t, err, "LoadFromBytes failed")
-	return pc
-}
+// testProductsFixtureJSON は ID 検索の期待値を固定するための制御フィクスチャ。
+// 生成データの並びに依存しないよう、既知の product_id を持つ複数件を用意する。
+const testProductsFixtureJSON = `[
+  {"product_id":"PD-TST-0001","faction":"SHE","product_name":"テストプロダクト1","is_active":true},
+  {"product_id":"PD-TST-0002","faction":"ORD","product_name":"テストプロダクト2","is_active":true}
+]`
 
 func TestProductFindByID(t *testing.T) {
 	t.Run("プロダクトの ID 検索", func(t *testing.T) {
-		pc := loadTestProductCache(t)
-		existingID := pc.All()[0].ProductID
+		pc := NewProductCache()
+		require.NoError(t, pc.LoadFromBytes([]byte(testProductsFixtureJSON)))
 
-		tests := []struct {
-			name      string
-			productID string
-			wantNil   bool
-		}{
-			{"既知の ID のとき、プロダクトを引ける", existingID, false},
-			{"未知の ID のとき、nil を返す", "PD-NOPE", true},
-		}
+		t.Run("既知の ID のとき、該当するプロダクトが返る", func(t *testing.T) {
+			got := pc.FindByID("PD-TST-0001")
+			require.NotNil(t, got)
+			assert.Equal(t, "PD-TST-0001", got.ProductID)
+			assert.Equal(t, "SHE", got.Faction)
+		})
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				assert.Equal(t, tt.wantNil, pc.FindByID(tt.productID) == nil)
-			})
-		}
+		t.Run("未知の ID のとき、nil を返す", func(t *testing.T) {
+			assert.Nil(t, pc.FindByID("PD-NOPE"))
+		})
 	})
 }
 

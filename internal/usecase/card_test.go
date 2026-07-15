@@ -80,16 +80,20 @@ func TestListCardsWithOwnership(t *testing.T) {
 
 func TestListCards(t *testing.T) {
 	t.Run("カード一覧", func(t *testing.T) {
-		t.Run("マスターにカードがあるとき、全件返る", func(t *testing.T) {
+		t.Run("マスターにカードがあるとき、全件が ID 昇順で名前とともに返る", func(t *testing.T) {
 			cards := map[string]*domain.Card{
-				"C-001": {CardID: "C-001", CardName: "Fireball"},
 				"C-002": {CardID: "C-002", CardName: "Shield"},
+				"C-001": {CardID: "C-001", CardName: "Fireball"},
 			}
 			svc := NewCardInteractor(newInMemoryCardRepo(cards), newInMemoryPlayerCardRepo())
 
 			result, err := svc.ListCards(context.Background())
 			require.NoError(t, err)
 			require.Len(t, result, 2)
+			assert.Equal(t, "C-001", result[0].CardID)
+			assert.Equal(t, "Fireball", result[0].CardName)
+			assert.Equal(t, "C-002", result[1].CardID)
+			assert.Equal(t, "Shield", result[1].CardName)
 		})
 	})
 }
