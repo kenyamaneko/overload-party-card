@@ -24,6 +24,17 @@ func TestClient_ListCards(t *testing.T) {
 			_, err := c.ListCards(context.Background())
 			assertSentinel(t, err, apicardclient.ErrInternalServer)
 		})
+
+		t.Run("契約に無い 302 を受けたとき、unexpected status エラーになる", func(t *testing.T) {
+			srv := apicardserverfake.NewServer()
+			defer srv.Close()
+			srv.ListAllCardsFn = func() (int, any) { return http.StatusFound, nil }
+
+			c := newTestClient(t, srv.URL())
+			_, err := c.ListCards(context.Background())
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "unexpected status 302")
+		})
 	})
 }
 
