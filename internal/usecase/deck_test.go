@@ -70,7 +70,7 @@ func (m *mockDeckRepo) FindByID(_ context.Context, playerID string, deckID int64
 			return d, nil
 		}
 	}
-	return nil, fmt.Errorf("deck not found")
+	return nil, fmt.Errorf("deck %d for player %s: %w", deckID, playerID, port.ErrNotFound)
 }
 
 func (m *mockDeckRepo) GetDeckCards(_ context.Context, _ string, deckID int64) ([]domain.DeckCard, error) {
@@ -155,6 +155,12 @@ func setupDeckInteractorWithFactions(t *testing.T, ownedFactions []string) (*Dec
 	cc.InjectForTest("C-060", &domain.Card{
 		CardID: "C-060", CardName: "SemiLimited Trap", Faction: "SHE", CardType: "Incident",
 		Restriction: "semi_limited", IsActive: true,
+		Stats: json.RawMessage(`{}`),
+	})
+
+	cc.InjectForTest("TST-0001", &domain.Card{
+		CardID: "TST-0001", CardName: "Forbidden Card", Faction: "SHE", CardType: "Strategy",
+		Restriction: "forbidden", IsActive: true,
 		Stats: json.RawMessage(`{}`),
 	})
 
@@ -388,6 +394,16 @@ func TestCreateDeck(t *testing.T) {
 					wantErrMsg:   "exceeds restriction limit (3/2)",
 				},
 				{
+					name:    "禁止カード1枚のとき、制限枚数超過エラーになる",
+					faction: "SHE",
+					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
+						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 0, Count: 1})
+					},
+					entries:      makeEntries("TST-0001", 1),
+					wantSentinel: port.ErrRestrictionExceeded,
+					wantErrMsg:   "exceeds restriction limit (1/0)",
+				},
+				{
 					name:    "枚数0のとき、枚数不正エラーになる",
 					faction: "SHE",
 					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
@@ -455,6 +471,39 @@ func TestCreateDeck(t *testing.T) {
 					assert.Contains(t, err.Error(), tt.wantErrMsg)
 				})
 			}
+		})
+
+		t.Run("カード定義の制限区分が未知の値のとき、デッキ検証がエラーになる", func(t *testing.T) {
+			svc, _, pcRepo, cc := setupDeckInteractor(t)
+			pid := "p1"
+			cc.InjectForTest("TST-0002", &domain.Card{
+				CardID: "TST-0002", CardName: "Unknown Restriction", Faction: "SHE", CardType: "Strategy",
+				Restriction: "banned", IsActive: true,
+				Stats: json.RawMessage(`{}`),
+			})
+			grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "TST-0002", ArtNo: 0, Count: 1})
+
+			_, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
+				DeckName: "Test", Faction: "SHE", ProductID: testProductID,
+				RoutineID: testRoutineID, SpecialID: testSpecialID,
+				Cards: makeEntries("TST-0002", 1),
+			})
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), `unknown restriction "banned"`)
+		})
+
+		t.Run("カード0枚で作成したデッキの応答では、構成カード一覧が省略される", func(t *testing.T) {
+			svc, _, _, _ := setupDeckInteractor(t)
+			pid := "p1"
+
+			deck, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
+				DeckName: "Empty", Faction: "SHE", ProductID: testProductID,
+				RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: []apicard.DeckCardEntry{},
+			})
+
+			require.NoError(t, err)
+			assert.Nil(t, deck.DeckCards)
 		})
 
 		// 枚数不足でも陣営検証は通過する (IsValid=false になるだけでエラーにはならない)。
@@ -659,6 +708,39 @@ func TestCreateDeck(t *testing.T) {
 	})
 }
 
+func TestGetDecks(t *testing.T) {
+	t.Run("デッキ一覧の取得", func(t *testing.T) {
+		t.Run("30枚のデッキと6枚のデッキを持つとき、一覧では前者だけが有効と判定される", func(t *testing.T) {
+			svc, _, pcRepo, _ := setupDeckInteractor(t)
+			pid := "p1"
+			grantUnlimited(pcRepo, pid, allTenCards...)
+
+			full, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
+				DeckName: "Full", Faction: "SHE", ProductID: testProductID,
+				RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: full30Entries(),
+			})
+			require.NoError(t, err)
+
+			partial, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
+				DeckName: "Partial", Faction: "SHE", ProductID: testProductID,
+				RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: makeEntries("C-001", 3, "C-002", 3),
+			})
+			require.NoError(t, err)
+
+			decks, err := svc.GetDecks(context.Background(), pid)
+			require.NoError(t, err)
+			require.Len(t, decks, 2)
+
+			byID := make(map[int64]*apicard.Deck, len(decks))
+			for _, d := range decks {
+				byID[d.DeckID] = d
+			}
+			assert.True(t, byID[full.DeckID].IsValid)
+			assert.False(t, byID[partial.DeckID].IsValid)
+		})
+	})
+}
+
 func TestUpdateDeck(t *testing.T) {
 	t.Run("デッキ更新", func(t *testing.T) {
 		t.Run("不完全なデッキを 30枚に更新すると、有効になり一覧に反映される", func(t *testing.T) {
@@ -683,6 +765,34 @@ func TestUpdateDeck(t *testing.T) {
 			assert.True(t, updated.IsValid)
 			require.NotNil(t, updated.DeckCards)
 			assert.Len(t, *updated.DeckCards, 10)
+		})
+
+		t.Run("未所持カードを含む構成へ更新すると、拒否され一覧は元の構成のまま残る", func(t *testing.T) {
+			svc, _, pcRepo, _ := setupDeckInteractor(t)
+			pid := "p1"
+			grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
+
+			created, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
+				DeckName: "Original", Faction: "SHE", ProductID: testProductID,
+				RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: makeEntries("C-001", 3),
+			})
+			require.NoError(t, err)
+
+			_, err = svc.UpdateDeck(context.Background(), pid, created.DeckID, apicard.DeckUpdateRequest{
+				DeckName: "Renamed", Faction: "SHE", ProductID: testProductID,
+				RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: makeEntries("C-002", 1),
+			})
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrUnowned)
+
+			decks, err := svc.GetDecks(context.Background(), pid)
+			require.NoError(t, err)
+			require.Len(t, decks, 1)
+			assert.Equal(t, "Original", decks[0].DeckName)
+			require.NotNil(t, decks[0].DeckCards)
+			require.Len(t, *decks[0].DeckCards, 1)
+			assert.Equal(t, "C-001", (*decks[0].DeckCards)[0].CardID)
 		})
 	})
 }
@@ -739,6 +849,38 @@ func TestValidateDeckForBattle(t *testing.T) {
 			require.Error(t, err)
 			assert.ErrorIs(t, err, port.ErrInvalidDeck)
 			assert.Contains(t, err.Error(), "need exactly 30")
+		})
+
+		t.Run("存在しないデッキを対戦検証すると、ErrNotFound になる", func(t *testing.T) {
+			svc, _, _, _ := setupDeckInteractor(t)
+			pid := "p1"
+
+			err := svc.ValidateDeckForBattle(context.Background(), pid, 9999)
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrNotFound)
+		})
+
+		t.Run("保存後に制限改定で禁止になったカードを含むデッキは、対戦検証で拒否される", func(t *testing.T) {
+			svc, _, pcRepo, cc := setupDeckInteractor(t)
+			pid := "p1"
+			grantUnlimited(pcRepo, pid, allTenCards...)
+
+			deck, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
+				DeckName: "Full Deck", Faction: "SHE", ProductID: testProductID,
+				RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: full30Entries(),
+			})
+			require.NoError(t, err)
+
+			cc.InjectForTest("C-001", &domain.Card{
+				CardID: "C-001", CardName: "Compute A", Faction: "SHE", CardType: "Compute",
+				Restriction: "forbidden", IsActive: true,
+				Stats: json.RawMessage(`{}`),
+			})
+
+			err = svc.ValidateDeckForBattle(context.Background(), pid, deck.DeckID)
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrRestrictionExceeded)
+			assert.Contains(t, err.Error(), "exceeds restriction limit (3/0)")
 		})
 	})
 }
