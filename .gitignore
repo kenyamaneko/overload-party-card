@@ -10,3 +10,5 @@ vendor/
 go.work
 go.work.sum
 .claude/
+__pycache__/
+.pytest_cache/
