@@ -136,7 +136,7 @@ func TestPubSubPushHandler_HandleCardPackPurchased(t *testing.T) {
 			assert.Equal(t, 3, cards[0].Count)
 		})
 
-		t.Run("base64 で復号できない data のとき、400 になり原因が base64 であるとわかる", func(t *testing.T) {
+		t.Run("base64 で復号できない data のとき、400 になり応答本文に base64 が含まれる", func(t *testing.T) {
 			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
 			body := `{"message":{"data":"not-valid-base64!!!"}}`
 
@@ -146,7 +146,7 @@ func TestPubSubPushHandler_HandleCardPackPurchased(t *testing.T) {
 			assert.Contains(t, w.Body.String(), "base64")
 		})
 
-		t.Run("既知でない event_type のとき、400 とは異なる 500 になり原因を区別できる", func(t *testing.T) {
+		t.Run("既知でない event_type のとき、400 とは異なる 500 になり応答本文に unexpected event_type が含まれる", func(t *testing.T) {
 			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
 				"faction_set_tuners": pack,
 			}))
@@ -220,12 +220,13 @@ func TestPubSubPushHandler_HandlePlayerOnboarded(t *testing.T) {
 			}, cards)
 		})
 
-		t.Run("JSON として復号できない body のとき、400 になる", func(t *testing.T) {
+		t.Run("JSON として復号できない body のとき、400 になり応答本文に envelope が含まれる", func(t *testing.T) {
 			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
 
 			w := servePush(t, h.HandlePlayerOnboarded, `not-json-at-all`)
 
 			assert.Equal(t, http.StatusBadRequest, w.Code)
+			assert.Contains(t, w.Body.String(), "envelope")
 		})
 	})
 }
