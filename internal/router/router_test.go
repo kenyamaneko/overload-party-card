@@ -86,22 +86,22 @@ func TestNew(t *testing.T) {
 		t.Run("/internal/v1/pubsub 配下 (push 受け口) は auth header なしで handler の成功応答まで到達する", func(t *testing.T) {
 			// nullVerifier を使うと、もし auth middleware を経由してしまった場合は
 			// Verify 呼び出しで panic し gin.Recovery が 500 に丸めるため、
-			// stubMessageHandler の ack (204) との差で到達有無を検出できる。
+			// stubMessageHandler の ack (200) との差で到達有無を検出できる。
 			r := newTestRouter(nullVerifier{})
 
 			cases := []struct {
 				name string
 				path string
 			}{
-				{name: "/internal/v1/pubsub/player-onboarded は 204 を返す", path: "/internal/v1/pubsub/player-onboarded"},
-				{name: "/internal/v1/pubsub/card-pack-purchased は 204 を返す", path: "/internal/v1/pubsub/card-pack-purchased"},
+				{name: "/internal/v1/pubsub/player-onboarded は 200 を返す", path: "/internal/v1/pubsub/player-onboarded"},
+				{name: "/internal/v1/pubsub/card-pack-purchased は 200 を返す", path: "/internal/v1/pubsub/card-pack-purchased"},
 			}
 
 			for _, tc := range cases {
 				t.Run(tc.name, func(t *testing.T) {
 					w := httptest.NewRecorder()
 					r.ServeHTTP(w, newPubSubPushRequest(tc.path))
-					assert.Equal(t, http.StatusNoContent, w.Code)
+					assert.Equal(t, http.StatusOK, w.Code)
 				})
 			}
 		})

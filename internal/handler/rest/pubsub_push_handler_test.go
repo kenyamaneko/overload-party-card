@@ -79,7 +79,7 @@ func newPubSubPushHandlerFixture(packRepo *fakeCardPackRepo) (*PubSubPushHandler
 
 // servePush は Cloud Pub/Sub push subscription が送るリクエストを模した body を
 // gin handler へ実際の HTTP ディスパッチ経路 (Engine.ServeHTTP) で通す。
-// gin.Context を直接呼ぶだけでは応答ヘッダのフラッシュ (204 応答時など) が
+// gin.Context を直接呼ぶだけでは応答ヘッダのフラッシュ (200 応答時など) が
 // Engine の終端処理に依存するため確定しない。
 func servePush(t *testing.T, handlerFunc gin.HandlerFunc, body string) *httptest.ResponseRecorder {
 	t.Helper()
@@ -113,78 +113,80 @@ func TestPubSubPushHandler_HandleCardPackPurchased(t *testing.T) {
 		Cards:    []domain.CardPackCard{{CardID: fxPushCardID, Copies: 3}},
 	}
 
-	t.Run("push 本文を受け取ると、既存の subscriber 処理が走りカードが付与される", func(t *testing.T) {
-		h, pcRepo := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
-			"faction_set_tuners": pack,
-		}))
-		payload, err := json.Marshal(apishop.CardPackPurchasedEvent{
-			EventType:  apishop.EventTypeCardPackPurchased,
-			EventID:    "evt-1",
-			PlayerID:   fxPushPlayerID,
-			CardPackID: "faction_set_tuners",
+	t.Run("card-pack-purchased の push 受け口", func(t *testing.T) {
+		t.Run("push 本文を受け取ると、カードが付与される", func(t *testing.T) {
+			h, pcRepo := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
+				"faction_set_tuners": pack,
+			}))
+			payload, err := json.Marshal(apishop.CardPackPurchasedEvent{
+				EventType:  apishop.EventTypeCardPackPurchased,
+				EventID:    "evt-1",
+				PlayerID:   fxPushPlayerID,
+				CardPackID: "faction_set_tuners",
+			})
+			require.NoError(t, err)
+
+			w := servePush(t, h.HandleCardPackPurchased, pushEnvelopeBody(t, payload))
+
+			assert.Equal(t, http.StatusOK, w.Code)
+			cards, getErr := pcRepo.GetPlayerCards(context.Background(), fxPushPlayerID)
+			require.NoError(t, getErr)
+			require.Len(t, cards, 1)
+			assert.Equal(t, fxPushCardID, cards[0].CardID)
+			assert.Equal(t, 3, cards[0].Count)
 		})
-		require.NoError(t, err)
 
-		w := servePush(t, h.HandleCardPackPurchased, pushEnvelopeBody(t, payload))
+		t.Run("base64 で復号できない data のとき、400 になり原因が base64 であるとわかる", func(t *testing.T) {
+			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
+			body := `{"message":{"data":"not-valid-base64!!!"}}`
 
-		assert.Equal(t, http.StatusNoContent, w.Code)
-		cards, getErr := pcRepo.GetPlayerCards(context.Background(), fxPushPlayerID)
-		require.NoError(t, getErr)
-		require.Len(t, cards, 1)
-		assert.Equal(t, fxPushCardID, cards[0].CardID)
-		assert.Equal(t, 3, cards[0].Count)
-	})
+			w := servePush(t, h.HandleCardPackPurchased, body)
 
-	t.Run("base64 で復号できない data のとき、400 になり原因が base64 であるとわかる", func(t *testing.T) {
-		h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
-		body := `{"message":{"data":"not-valid-base64!!!"}}`
-
-		w := servePush(t, h.HandleCardPackPurchased, body)
-
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-		assert.Contains(t, w.Body.String(), "base64")
-	})
-
-	t.Run("既知でない event_type のとき、400 とは異なる 500 になり原因を区別できる", func(t *testing.T) {
-		h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
-			"faction_set_tuners": pack,
-		}))
-		payload, err := json.Marshal(apishop.CardPackPurchasedEvent{
-			EventType:  "unknown",
-			EventID:    "evt-2",
-			PlayerID:   fxPushPlayerID,
-			CardPackID: "faction_set_tuners",
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			assert.Contains(t, w.Body.String(), "base64")
 		})
-		require.NoError(t, err)
 
-		w := servePush(t, h.HandleCardPackPurchased, pushEnvelopeBody(t, payload))
+		t.Run("既知でない event_type のとき、400 とは異なる 500 になり原因を区別できる", func(t *testing.T) {
+			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
+				"faction_set_tuners": pack,
+			}))
+			payload, err := json.Marshal(apishop.CardPackPurchasedEvent{
+				EventType:  "unknown",
+				EventID:    "evt-2",
+				PlayerID:   fxPushPlayerID,
+				CardPackID: "faction_set_tuners",
+			})
+			require.NoError(t, err)
 
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
-		assert.Contains(t, w.Body.String(), "unexpected event_type")
-	})
+			w := servePush(t, h.HandleCardPackPurchased, pushEnvelopeBody(t, payload))
 
-	t.Run("同じイベントを二度投げても、2 回目はカードが二重に付与されない", func(t *testing.T) {
-		h, pcRepo := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
-			"faction_set_tuners": pack,
-		}))
-		payload, err := json.Marshal(apishop.CardPackPurchasedEvent{
-			EventType:  apishop.EventTypeCardPackPurchased,
-			EventID:    "evt-repeat",
-			PlayerID:   fxPushPlayerID,
-			CardPackID: "faction_set_tuners",
+			assert.Equal(t, http.StatusInternalServerError, w.Code)
+			assert.Contains(t, w.Body.String(), "unexpected event_type")
 		})
-		require.NoError(t, err)
-		body := pushEnvelopeBody(t, payload)
 
-		w1 := servePush(t, h.HandleCardPackPurchased, body)
-		w2 := servePush(t, h.HandleCardPackPurchased, body)
+		t.Run("同じイベントを二度投げても、2 回目はカードが二重に付与されない", func(t *testing.T) {
+			h, pcRepo := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
+				"faction_set_tuners": pack,
+			}))
+			payload, err := json.Marshal(apishop.CardPackPurchasedEvent{
+				EventType:  apishop.EventTypeCardPackPurchased,
+				EventID:    "evt-repeat",
+				PlayerID:   fxPushPlayerID,
+				CardPackID: "faction_set_tuners",
+			})
+			require.NoError(t, err)
+			body := pushEnvelopeBody(t, payload)
 
-		assert.Equal(t, http.StatusNoContent, w1.Code)
-		assert.Equal(t, http.StatusNoContent, w2.Code)
-		cards, getErr := pcRepo.GetPlayerCards(context.Background(), fxPushPlayerID)
-		require.NoError(t, getErr)
-		require.Len(t, cards, 1, "GrantPack は 1 回だけ実行される")
-		assert.Equal(t, 3, cards[0].Count)
+			w1 := servePush(t, h.HandleCardPackPurchased, body)
+			w2 := servePush(t, h.HandleCardPackPurchased, body)
+
+			assert.Equal(t, http.StatusOK, w1.Code)
+			assert.Equal(t, http.StatusOK, w2.Code)
+			cards, getErr := pcRepo.GetPlayerCards(context.Background(), fxPushPlayerID)
+			require.NoError(t, getErr)
+			require.Len(t, cards, 1, "GrantPack は 1 回だけ実行される")
+			assert.Equal(t, 3, cards[0].Count)
+		})
 	})
 }
 
@@ -196,32 +198,34 @@ func TestPubSubPushHandler_HandlePlayerOnboarded(t *testing.T) {
 		"faction_set_tuners": {PackID: "faction_set_tuners", IsActive: true, Cards: []domain.CardPackCard{{CardID: fxPushCardID, Copies: 3}}},
 	}
 
-	t.Run("push 本文を受け取ると、既存の subscriber 処理が走り basic と faction のカードが付与される", func(t *testing.T) {
-		h, pcRepo := newPubSubPushHandlerFixture(newFakeCardPackRepo(packs))
-		payload, err := json.Marshal(apiscenario.PlayerOnboardedEvent{
-			EventType:        apiscenario.EventTypePlayerOnboarded,
-			EventID:          "evt-1",
-			PlayerID:         fxPushPlayerID,
-			InitialFactionID: "Tuners",
+	t.Run("player-onboarded の push 受け口", func(t *testing.T) {
+		t.Run("push 本文を受け取ると、basic と faction のカードが付与される", func(t *testing.T) {
+			h, pcRepo := newPubSubPushHandlerFixture(newFakeCardPackRepo(packs))
+			payload, err := json.Marshal(apiscenario.PlayerOnboardedEvent{
+				EventType:        apiscenario.EventTypePlayerOnboarded,
+				EventID:          "evt-1",
+				PlayerID:         fxPushPlayerID,
+				InitialFactionID: "Tuners",
+			})
+			require.NoError(t, err)
+
+			w := servePush(t, h.HandlePlayerOnboarded, pushEnvelopeBody(t, payload))
+
+			assert.Equal(t, http.StatusOK, w.Code)
+			cards, getErr := pcRepo.GetPlayerCards(context.Background(), fxPushPlayerID)
+			require.NoError(t, getErr)
+			assert.ElementsMatch(t, []*domain.PlayerCard{
+				{PlayerID: fxPushPlayerID, CardID: "TST-0002", Count: 2},
+				{PlayerID: fxPushPlayerID, CardID: fxPushCardID, Count: 3},
+			}, cards)
 		})
-		require.NoError(t, err)
 
-		w := servePush(t, h.HandlePlayerOnboarded, pushEnvelopeBody(t, payload))
+		t.Run("JSON として復号できない body のとき、400 になる", func(t *testing.T) {
+			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
 
-		assert.Equal(t, http.StatusNoContent, w.Code)
-		cards, getErr := pcRepo.GetPlayerCards(context.Background(), fxPushPlayerID)
-		require.NoError(t, getErr)
-		assert.ElementsMatch(t, []*domain.PlayerCard{
-			{PlayerID: fxPushPlayerID, CardID: "TST-0002", Count: 2},
-			{PlayerID: fxPushPlayerID, CardID: fxPushCardID, Count: 3},
-		}, cards)
-	})
+			w := servePush(t, h.HandlePlayerOnboarded, `not-json-at-all`)
 
-	t.Run("JSON として復号できない body のとき、400 になる", func(t *testing.T) {
-		h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
-
-		w := servePush(t, h.HandlePlayerOnboarded, `not-json-at-all`)
-
-		assert.Equal(t, http.StatusBadRequest, w.Code)
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+		})
 	})
 }

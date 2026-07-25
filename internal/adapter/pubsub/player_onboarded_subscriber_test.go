@@ -135,23 +135,23 @@ func TestPlayerOnboardedSubscriber_Handle(t *testing.T) {
 				assert.Equal(t, tt.wantPacks, granter.gotPacks)
 			})
 		}
-	})
 
-	t.Run("同じ event_id を持つイベントを二度処理しても、2 回目は配布されない", func(t *testing.T) {
-		payload := mustMarshalPlayerOnboarded(t, apiscenario.PlayerOnboardedEvent{
-			EventID:          "evt-repeat",
-			PlayerID:         "player-1",
-			InitialFactionID: "Tuners",
+		t.Run("同じ event_id を持つイベントを二度処理しても、2 回目は配布されない", func(t *testing.T) {
+			payload := mustMarshalPlayerOnboarded(t, apiscenario.PlayerOnboardedEvent{
+				EventID:          "evt-repeat",
+				PlayerID:         "player-1",
+				InitialFactionID: "Tuners",
+			})
+			granter := &fakePackGranter{}
+			repo := newFakeProcessedEventRepo()
+			sub := NewPlayerOnboardedSubscriber(granter, repo)
+
+			firstErr := sub.Handle(context.Background(), payload)
+			secondErr := sub.Handle(context.Background(), payload)
+
+			assert.NoError(t, firstErr)
+			assert.NoError(t, secondErr)
+			assert.Equal(t, []string{"basic", "faction_set_tuners"}, granter.gotPacks, "GrantPack は 1 巡だけ呼ばれる")
 		})
-		granter := &fakePackGranter{}
-		repo := newFakeProcessedEventRepo()
-		sub := NewPlayerOnboardedSubscriber(granter, repo)
-
-		firstErr := sub.Handle(context.Background(), payload)
-		secondErr := sub.Handle(context.Background(), payload)
-
-		assert.NoError(t, firstErr)
-		assert.NoError(t, secondErr)
-		assert.Equal(t, []string{"basic", "faction_set_tuners"}, granter.gotPacks, "GrantPack は 1 巡だけ呼ばれる")
 	})
 }

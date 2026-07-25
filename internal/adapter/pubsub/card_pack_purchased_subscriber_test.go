@@ -100,23 +100,23 @@ func TestCardPackPurchasedSubscriber_Handle(t *testing.T) {
 				assert.Equal(t, tt.wantPacks, granter.gotPacks)
 			})
 		}
-	})
 
-	t.Run("同じ event_id を持つイベントを二度処理しても、2 回目は配布されない", func(t *testing.T) {
-		payload := mustMarshalCardPackPurchased(t, apishop.CardPackPurchasedEvent{
-			EventID:    "evt-repeat",
-			PlayerID:   "player-1",
-			CardPackID: "faction_set_Tuners",
+		t.Run("同じ event_id を持つイベントを二度処理しても、2 回目は配布されない", func(t *testing.T) {
+			payload := mustMarshalCardPackPurchased(t, apishop.CardPackPurchasedEvent{
+				EventID:    "evt-repeat",
+				PlayerID:   "player-1",
+				CardPackID: "faction_set_Tuners",
+			})
+			granter := &fakePackGranter{}
+			repo := newFakeProcessedEventRepo()
+			sub := NewCardPackPurchasedSubscriber(granter, repo)
+
+			firstErr := sub.Handle(context.Background(), payload)
+			secondErr := sub.Handle(context.Background(), payload)
+
+			assert.NoError(t, firstErr)
+			assert.NoError(t, secondErr)
+			assert.Equal(t, []string{"faction_set_Tuners"}, granter.gotPacks, "GrantPack は 1 回だけ呼ばれる")
 		})
-		granter := &fakePackGranter{}
-		repo := newFakeProcessedEventRepo()
-		sub := NewCardPackPurchasedSubscriber(granter, repo)
-
-		firstErr := sub.Handle(context.Background(), payload)
-		secondErr := sub.Handle(context.Background(), payload)
-
-		assert.NoError(t, firstErr)
-		assert.NoError(t, secondErr)
-		assert.Equal(t, []string{"faction_set_Tuners"}, granter.gotPacks, "GrantPack は 1 回だけ呼ばれる")
 	})
 }
