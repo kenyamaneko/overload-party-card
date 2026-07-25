@@ -91,30 +91,11 @@ func run() error {
 		internalauth.StaticHS256Resolver([]byte(cfg.InternalAuthSecret), internalauth.DefaultKeyID),
 	)
 
-	r := router.New(cardH, deckH, playerCardH, productH, initiativeH, authVerifier)
+	onboardedSub := pubsubadapter.NewPlayerOnboardedSubscriber(grantInteractor, eventRepo)
+	cardPackPurchasedSub := pubsubadapter.NewCardPackPurchasedSubscriber(grantInteractor, eventRepo)
+	pubsubPushH := rest.NewPubSubPushHandler(onboardedSub.Handle, cardPackPurchasedSub.Handle)
 
-	onboardedStream, err := pubsubadapter.NewStream(ctx, cfg.GoogleCloudProjectID, cfg.PlayerOnboardedSubscription)
-	if err != nil {
-		return fmt.Errorf("player-onboarded stream: %w", err)
-	}
-	defer func() {
-		if cerr := onboardedStream.Close(); cerr != nil {
-			slog.Warn("player-onboarded stream close", "error", cerr)
-		}
-	}()
-
-	cardPackPurchasedStream, err := pubsubadapter.NewStream(ctx, cfg.GoogleCloudProjectID, cfg.CardPackPurchasedSubscription)
-	if err != nil {
-		return fmt.Errorf("card-pack-purchased stream: %w", err)
-	}
-	defer func() {
-		if cerr := cardPackPurchasedStream.Close(); cerr != nil {
-			slog.Warn("card-pack-purchased stream close", "error", cerr)
-		}
-	}()
-
-	onboardedSub := pubsubadapter.NewPlayerOnboardedSubscriber(onboardedStream, grantInteractor, eventRepo)
-	cardPackPurchasedSub := pubsubadapter.NewCardPackPurchasedSubscriber(cardPackPurchasedStream, grantInteractor, eventRepo)
+	r := router.New(cardH, deckH, playerCardH, productH, initiativeH, pubsubPushH, authVerifier)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
@@ -127,15 +108,13 @@ func run() error {
 		"card_cache_size", cardCache.Count(),
 		"product_cache_size", productCache.Count(),
 		"initiative_cache_size", initiativeCache.Count(),
-		"google_cloud_project", cfg.GoogleCloudProjectID,
 	)
 
-	return runHTTPAndSubscribers(ctx, srv, onboardedSub, cardPackPurchasedSub)
+	return runHTTP(ctx, srv)
 }
 
-// runHTTPAndSubscribers は HTTP server と Pub/Sub subscriber 群を並行起動し、
-// どれかの失敗・シグナル到来で全体を graceful に停止する。
-func runHTTPAndSubscribers(ctx context.Context, srv *http.Server, subscribers ...subscriber) error {
+// runHTTP は HTTP server を起動し、ctx キャンセル (シグナル到来) で graceful に停止する。
+func runHTTP(ctx context.Context, srv *http.Server) error {
 	g, gCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
@@ -144,15 +123,6 @@ func runHTTPAndSubscribers(ctx context.Context, srv *http.Server, subscribers ..
 		}
 		return nil
 	})
-
-	for _, sub := range subscribers {
-		g.Go(func() error {
-			if err := sub.Start(gCtx); err != nil && gCtx.Err() == nil {
-				return fmt.Errorf("subscriber: %w", err)
-			}
-			return nil
-		})
-	}
 
 	g.Go(func() error {
 		<-gCtx.Done()
@@ -166,11 +136,6 @@ func runHTTPAndSubscribers(ctx context.Context, srv *http.Server, subscribers ..
 	})
 
 	return g.Wait()
-}
-
-// subscriber は Pub/Sub subscriber の起動インターフェース。
-type subscriber interface {
-	Start(ctx context.Context) error
 }
 
 // setupLogger は ENV に応じてグローバル slog ロガーを初期化する。

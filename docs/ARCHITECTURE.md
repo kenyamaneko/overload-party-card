@@ -82,7 +82,7 @@ CardCache は静的なカードマスターを参照する read-heavy ホット�
 
 ## Pub/Sub subscriber の冪等性
 
-card は `player-onboarded-card-sub` と `card-pack-purchased-card-sub` を購読してパック配布をイベント駆動で実行する (ADR-022 / ADR-031 / ADR-032)。冪等性は `card.processed_events` テーブルに `event_id` を INSERT することで前段ガードとして機能させる。
+card は `player-onboarded-card-sub` と `card-pack-purchased-card-sub` を push 配信で受信し、パック配布をイベント駆動で実行する (ADR-022 / ADR-031 / ADR-032 / ADR-057)。push の受け口は `internal/handler/rest` の `PubSubPushHandler` (`/internal/v1/pubsub/player-onboarded` / `/internal/v1/pubsub/card-pack-purchased`) で、デコードした payload を本節の subscriber (`internal/adapter/pubsub`) にそのまま渡す。到達制御はアプリ層で検証せず Cloud Run の呼び出し IAM に委ねる (ADR-057)。冪等性は `card.processed_events` テーブルに `event_id` を INSERT することで前段ガードとして機能させる。
 
 ただし **完全な idempotency 保証ではない**:
 
@@ -108,6 +108,8 @@ card は `faction-acquired` を購読**しない** (faction 所有権の SSoT �
 旧 `faction-purchased-card-sub` (および `faction-selected-card-sub`) は廃止された。配布の業務文脈 (initial / 購入 / 限定) は subscriber が `pack_id` を組み立てる (or wire payload で受け取る) 形に集約され、配布の SSoT は `card.card_pack` マスターに移管された (ADR-032)。
 
 ### 握りつぶし禁止: 不明イベントも Nack
+
+push 配信では Ack / Nack を SDK 呼び出しではなく HTTP 応答 (2xx / 5xx) で表す。subscriber の `Handle` が nil を返すと `PubSubPushHandler` が 2xx (Ack 相当) を、error を返すと 5xx (Nack 相当、Cloud Pub/Sub が再配信) を返す。
 
 `event_type` が未知の場合、従来は Ack して捨てていたが、現在は **Nack して DLQ に回収する**方針に変えた。理由:
 
@@ -180,9 +182,6 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 - **`PORT`**: 起動ポート。未設定で起動不可
 - **`ENV`**: `dev` / `stg` / `prod` のいずれか。未設定で起動不可。`prod` / `stg` は Cloud Logging 互換の JSON slog、`dev` はテキスト slog にルーティングする
 - **`DATABASE_CONN`**: card スキーマへの接続文字列。未設定で起動不可
-- **`GOOGLE_CLOUD_PROJECT_ID`**: Google Cloud プロジェクト ID。card は `player-onboarded` / `card-pack-purchased` subscriber を持つため必須
-- **`PLAYER_ONBOARDED_SUBSCRIPTION`**: player-onboarded subscription 名。未設定で起動不可
-- **`CARD_PACK_PURCHASED_SUBSCRIPTION`**: card-pack-purchased subscription 名。未設定で起動不可
 - **`INTERNAL_AUTH_SECRET`**: gateway が発行する内部認証 JWT の検証鍵。未設定で起動不可。`/api/v1/cards` 配下の player-scoped API は本鍵で署名された `X-Internal-Auth` header を要求する
 - **`ACCOUNT_SERVICE_URL`**: デッキ作成・更新時に faction 所持を照会する account サービスの URL。未設定で起動不可
 
@@ -211,10 +210,10 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 
 ### Pub/Sub トピックと subscriber
 
-| トピック | 購読名 | publisher |
-|---|---|---|
-| `player-onboarded` | `player-onboarded-card-sub` | scenario |
-| `card-pack-purchased` | `card-pack-purchased-card-sub` | shop (ADR-032 PR 2 で追加予定) |
+| トピック | 購読名 | push 先エンドポイント | publisher |
+|---|---|---|---|
+| `player-onboarded` | `player-onboarded-card-sub` | `/internal/v1/pubsub/player-onboarded` | scenario |
+| `card-pack-purchased` | `card-pack-purchased-card-sub` | `/internal/v1/pubsub/card-pack-purchased` | shop (ADR-032 PR 2 で追加予定) |
 
 publisher 列はこのリポジトリからは導けないので、変更時は各サービスの発行状況も確認すること。
 
