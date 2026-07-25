@@ -146,7 +146,7 @@ func TestPubSubPushHandler_HandleCardPackPurchased(t *testing.T) {
 			assert.Contains(t, w.Body.String(), "base64")
 		})
 
-		t.Run("既知でない event_type のとき、400 とは異なる 500 になり応答本文に unexpected event_type が含まれる", func(t *testing.T) {
+		t.Run("既知でない event_type のとき、400 とは異なる 500 になり、event_type が想定外であることを示すエラーが応答本文に含まれる", func(t *testing.T) {
 			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
 				"faction_set_tuners": pack,
 			}))

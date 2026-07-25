@@ -113,8 +113,8 @@ func TestNew(t *testing.T) {
 				name string
 				path string
 			}{
-				{name: "デッキ一覧の取得は 401 になり応答本文に header is required が含まれる", path: "/api/v1/cards/decks"},
-				{name: "所持カード一覧の取得は 401 になり応答本文に header is required が含まれる", path: "/api/v1/cards/cards"},
+				{name: "デッキ一覧の取得は 401 になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/decks"},
+				{name: "所持カード一覧の取得は 401 になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/cards"},
 			}
 
 			for _, tc := range cases {
@@ -127,7 +127,7 @@ func TestNew(t *testing.T) {
 			}
 		})
 
-		t.Run("認証トークンの検証が失敗するとき、401 になり応答本文に invalid internal auth token が含まれる", func(t *testing.T) {
+		t.Run("認証トークンの検証が失敗するとき、401 になり、トークンの検証に失敗したことを示すエラーが応答本文に含まれる", func(t *testing.T) {
 			r := newTestRouter(fakeRouterVerifier{err: errors.New("invalid token")})
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/api/v1/cards/decks", nil)
