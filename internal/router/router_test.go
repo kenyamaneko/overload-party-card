@@ -113,8 +113,8 @@ func TestNew(t *testing.T) {
 				name string
 				path string
 			}{
-				{name: "/api/v1/cards/decks は 401 になる", path: "/api/v1/cards/decks"},
-				{name: "/api/v1/cards/cards は 401 になる", path: "/api/v1/cards/cards"},
+				{name: "デッキ一覧の取得は 401 になり応答本文に header is required が含まれる", path: "/api/v1/cards/decks"},
+				{name: "所持カード一覧の取得は 401 になり応答本文に header is required が含まれる", path: "/api/v1/cards/cards"},
 			}
 
 			for _, tc := range cases {
@@ -122,17 +122,19 @@ func TestNew(t *testing.T) {
 					w := httptest.NewRecorder()
 					r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, tc.path, nil))
 					assert.Equal(t, http.StatusUnauthorized, w.Code)
+					assert.Contains(t, w.Body.String(), "header is required")
 				})
 			}
 		})
 
-		t.Run("verifier がエラーを返すとき、401 になる", func(t *testing.T) {
+		t.Run("認証トークンの検証が失敗するとき、401 になり応答本文に invalid internal auth token が含まれる", func(t *testing.T) {
 			r := newTestRouter(fakeRouterVerifier{err: errors.New("invalid token")})
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/api/v1/cards/decks", nil)
 			req.Header.Set(internalauth.HeaderName, "any.token")
 			r.ServeHTTP(w, req)
 			assert.Equal(t, http.StatusUnauthorized, w.Code)
+			assert.Contains(t, w.Body.String(), "invalid internal auth token")
 		})
 	})
 }
