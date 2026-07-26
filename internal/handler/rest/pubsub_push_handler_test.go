@@ -228,5 +228,23 @@ func TestPubSubPushHandler_HandlePlayerOnboarded(t *testing.T) {
 			assert.Equal(t, http.StatusBadRequest, w.Code)
 			assert.Contains(t, w.Body.String(), "envelope")
 		})
+
+		t.Run("message フィールドが無いとき、400 になり応答本文に message.data が空であることを示すエラーが含まれる", func(t *testing.T) {
+			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
+
+			w := servePush(t, h.HandlePlayerOnboarded, `{}`)
+
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			assert.Contains(t, w.Body.String(), "message.data is empty")
+		})
+
+		t.Run("message.data が空文字のとき、400 になり応答本文に message.data が空であることを示すエラーが含まれる", func(t *testing.T) {
+			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
+
+			w := servePush(t, h.HandlePlayerOnboarded, `{"message":{"data":""}}`)
+
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			assert.Contains(t, w.Body.String(), "message.data is empty")
+		})
 	})
 }

@@ -48,6 +48,10 @@ func handlePubSubPush(c *gin.Context, handler port.MessageHandler) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "pubsub push: malformed envelope: " + err.Error()})
 		return
 	}
+	if envelope.Message.Data == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "pubsub push: malformed envelope: message.data is empty"})
+		return
+	}
 
 	data, err := base64.StdEncoding.DecodeString(envelope.Message.Data)
 	if err != nil {

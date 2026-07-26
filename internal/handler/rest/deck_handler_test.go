@@ -120,8 +120,8 @@ func TestDeckHandler_MalformedJSONBody(t *testing.T) {
 			name   string
 			invoke func(c *gin.Context)
 		}{
-			{"CreateDeck のとき、400 になる", h.CreateDeck},
-			{"UpdateDeck のとき、400 になる", h.UpdateDeck},
+			{"デッキを作成するとき、400 になり、JSON 構文エラーであることを示すエラーが応答本文に含まれる", h.CreateDeck},
+			{"デッキを更新するとき、400 になり、JSON 構文エラーであることを示すエラーが応答本文に含まれる", h.UpdateDeck},
 		}
 
 		for _, tc := range cases {
@@ -136,7 +136,43 @@ func TestDeckHandler_MalformedJSONBody(t *testing.T) {
 				tc.invoke(c)
 
 				assert.Equal(t, http.StatusBadRequest, w.Code)
-				assert.Contains(t, w.Body.String(), `"error"`)
+				assert.Contains(t, w.Body.String(), "unexpected EOF")
+			})
+		}
+	})
+}
+
+func TestDeckHandler_InvalidFactionBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("選択不可能な陣営を指定したリクエストの拒否", func(t *testing.T) {
+		h, _, _ := newDeckHandlerFixture(t)
+
+		const numericDeckID = "1"
+		invalidFactionBody, err := json.Marshal(apicard.DeckCreateRequest{Faction: "NotASelectableFaction"})
+		require.NoError(t, err)
+
+		cases := []struct {
+			name   string
+			invoke func(c *gin.Context)
+		}{
+			{"デッキを作成するとき、400 になり、デッキバリデーション違反であることを示すエラーが応答本文に含まれる", h.CreateDeck},
+			{"デッキを更新するとき、400 になり、デッキバリデーション違反であることを示すエラーが応答本文に含まれる", h.UpdateDeck},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				w := httptest.NewRecorder()
+				c, _ := gin.CreateTestContext(w)
+				c.Set(internalauth.PlayerIDContextKey, fxPlayerID)
+				c.Params = gin.Params{{Key: "deckId", Value: numericDeckID}}
+				c.Request = httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(invalidFactionBody))
+				c.Request.Header.Set("Content-Type", "application/json")
+
+				tc.invoke(c)
+
+				assert.Equal(t, http.StatusBadRequest, w.Code)
+				assert.Contains(t, w.Body.String(), "invalid deck")
 			})
 		}
 	})
