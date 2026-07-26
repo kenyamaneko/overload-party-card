@@ -104,6 +104,16 @@ func pushEnvelopeBody(t *testing.T, payload []byte) string {
 	return string(b)
 }
 
+// decodeBody は応答本文を JSON として復号する。原因を示す "error" フィールドを
+// 完全一致で確かめるために使う (前置関係にある文言どうしを Contains で
+// 混同しないため)。
+func decodeBody(t *testing.T, w *httptest.ResponseRecorder) map[string]any {
+	t.Helper()
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	return body
+}
+
 func TestPubSubPushHandler_HandleCardPackPurchased(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -136,17 +146,17 @@ func TestPubSubPushHandler_HandleCardPackPurchased(t *testing.T) {
 			assert.Equal(t, 3, cards[0].Count)
 		})
 
-		t.Run("base64 で復号できない data のとき、400 になり応答本文に base64 が含まれる", func(t *testing.T) {
+		t.Run("base64 で復号できない data のとき、400 になり応答本文の error が base64 不正を示す文言と完全に一致する", func(t *testing.T) {
 			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
 			body := `{"message":{"data":"not-valid-base64!!!"}}`
 
 			w := servePush(t, h.HandleCardPackPurchased, body)
 
 			assert.Equal(t, http.StatusBadRequest, w.Code)
-			assert.Contains(t, w.Body.String(), "base64")
+			assert.Equal(t, "pubsub push: malformed base64 data", decodeBody(t, w)["error"])
 		})
 
-		t.Run("既知でない event_type のとき、400 とは異なる 500 になり、event_type が想定外であることを示すエラーが応答本文に含まれる", func(t *testing.T) {
+		t.Run("既知でない event_type のとき、400 とは異なる 500 になり応答本文の error が event_type 想定外を示す文言と完全に一致する", func(t *testing.T) {
 			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
 				"faction_set_tuners": pack,
 			}))
@@ -161,7 +171,7 @@ func TestPubSubPushHandler_HandleCardPackPurchased(t *testing.T) {
 			w := servePush(t, h.HandleCardPackPurchased, pushEnvelopeBody(t, payload))
 
 			assert.Equal(t, http.StatusInternalServerError, w.Code)
-			assert.Contains(t, w.Body.String(), "unexpected event_type")
+			assert.Equal(t, `card-pack-purchased-card: unexpected event_type "unknown"`, decodeBody(t, w)["error"])
 		})
 
 		t.Run("同じイベントを二度投げても、2 回目はカードが二重に付与されない", func(t *testing.T) {
@@ -220,31 +230,31 @@ func TestPubSubPushHandler_HandlePlayerOnboarded(t *testing.T) {
 			}, cards)
 		})
 
-		t.Run("JSON として復号できない body のとき、400 になり応答本文に envelope が含まれる", func(t *testing.T) {
+		t.Run("JSON として復号できない body のとき、400 になり応答本文の error が envelope 不正を示す文言と完全に一致する", func(t *testing.T) {
 			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
 
 			w := servePush(t, h.HandlePlayerOnboarded, `not-json-at-all`)
 
 			assert.Equal(t, http.StatusBadRequest, w.Code)
-			assert.Contains(t, w.Body.String(), "envelope")
+			assert.Equal(t, "pubsub push: malformed envelope", decodeBody(t, w)["error"])
 		})
 
-		t.Run("message フィールドが無いとき、400 になり応答本文に message.data が空であることを示すエラーが含まれる", func(t *testing.T) {
+		t.Run("message フィールドが無いとき、400 になり応答本文の error が envelope 不正を示す文言と完全に一致する", func(t *testing.T) {
 			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
 
 			w := servePush(t, h.HandlePlayerOnboarded, `{}`)
 
 			assert.Equal(t, http.StatusBadRequest, w.Code)
-			assert.Contains(t, w.Body.String(), "message.data is empty")
+			assert.Equal(t, "pubsub push: malformed envelope", decodeBody(t, w)["error"])
 		})
 
-		t.Run("message.data が空文字のとき、400 になり応答本文に message.data が空であることを示すエラーが含まれる", func(t *testing.T) {
+		t.Run("message.data が空文字のとき、400 になり応答本文の error が envelope 不正を示す文言と完全に一致する", func(t *testing.T) {
 			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
 
 			w := servePush(t, h.HandlePlayerOnboarded, `{"message":{"data":""}}`)
 
 			assert.Equal(t, http.StatusBadRequest, w.Code)
-			assert.Contains(t, w.Body.String(), "message.data is empty")
+			assert.Equal(t, "pubsub push: malformed envelope", decodeBody(t, w)["error"])
 		})
 	})
 }

@@ -84,10 +84,10 @@ func TestDeckHandler_NonNumericDeckID(t *testing.T) {
 			name   string
 			invoke func(c *gin.Context)
 		}{
-			{"GetDeck のとき、400 invalid deck_id になる", h.GetDeck},
-			{"UpdateDeck のとき、400 invalid deck_id になる", h.UpdateDeck},
-			{"DeleteDeck のとき、400 invalid deck_id になる", h.DeleteDeck},
-			{"ValidateDeckForBattle のとき、400 invalid deck_id になる", h.ValidateDeckForBattle},
+			{"デッキ取得のとき、400 になり応答本文の error が invalid deck_id と完全に一致する", h.GetDeck},
+			{"デッキ更新のとき、400 になり応答本文の error が invalid deck_id と完全に一致する", h.UpdateDeck},
+			{"デッキ削除のとき、400 になり応答本文の error が invalid deck_id と完全に一致する", h.DeleteDeck},
+			{"デッキのバトル検証のとき、400 になり応答本文の error が invalid deck_id と完全に一致する", h.ValidateDeckForBattle},
 		}
 
 		for _, tc := range cases {
@@ -101,7 +101,7 @@ func TestDeckHandler_NonNumericDeckID(t *testing.T) {
 				tc.invoke(c)
 
 				assert.Equal(t, http.StatusBadRequest, w.Code)
-				assert.Contains(t, w.Body.String(), "invalid deck_id")
+				assert.Equal(t, "invalid deck_id", decodeBody(t, w)["error"])
 			})
 		}
 	})
@@ -120,8 +120,8 @@ func TestDeckHandler_MalformedJSONBody(t *testing.T) {
 			name   string
 			invoke func(c *gin.Context)
 		}{
-			{"デッキを作成するとき、400 になり、リクエスト本文が不正であることを示すエラーが応答本文に含まれる", h.CreateDeck},
-			{"デッキを更新するとき、400 になり、リクエスト本文が不正であることを示すエラーが応答本文に含まれる", h.UpdateDeck},
+			{"デッキを作成するとき、400 になり応答本文の error が malformed request body と完全に一致する", h.CreateDeck},
+			{"デッキを更新するとき、400 になり応答本文の error が malformed request body と完全に一致する", h.UpdateDeck},
 		}
 
 		for _, tc := range cases {
@@ -136,7 +136,7 @@ func TestDeckHandler_MalformedJSONBody(t *testing.T) {
 				tc.invoke(c)
 
 				assert.Equal(t, http.StatusBadRequest, w.Code)
-				assert.Contains(t, w.Body.String(), "malformed request body")
+				assert.Equal(t, "malformed request body", decodeBody(t, w)["error"])
 			})
 		}
 	})
@@ -156,8 +156,8 @@ func TestDeckHandler_InvalidFactionBody(t *testing.T) {
 			name   string
 			invoke func(c *gin.Context)
 		}{
-			{"デッキを作成するとき、400 になり、デッキバリデーション違反であることを示すエラーが応答本文に含まれる", h.CreateDeck},
-			{"デッキを更新するとき、400 になり、デッキバリデーション違反であることを示すエラーが応答本文に含まれる", h.UpdateDeck},
+			{"デッキを作成するとき、400 になり応答本文の error がデッキバリデーション違反を示す文言と完全に一致する", h.CreateDeck},
+			{"デッキを更新するとき、400 になり応答本文の error がデッキバリデーション違反を示す文言と完全に一致する", h.UpdateDeck},
 		}
 
 		for _, tc := range cases {
@@ -172,7 +172,7 @@ func TestDeckHandler_InvalidFactionBody(t *testing.T) {
 				tc.invoke(c)
 
 				assert.Equal(t, http.StatusBadRequest, w.Code)
-				assert.Contains(t, w.Body.String(), "invalid deck")
+				assert.Equal(t, `invalid deck: faction "NotASelectableFaction" is not selectable`, decodeBody(t, w)["error"])
 			})
 		}
 	})

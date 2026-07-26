@@ -10,10 +10,12 @@ import (
 )
 
 // pubsubPushEnvelope は Cloud Pub/Sub push subscription が送るリクエスト本文。
+// data は binding:"required" で空文字も bind エラー扱いにし、message 自体の
+// 欠落・data の欠落・data の空文字を同じ envelope 不正として一本化する。
 type pubsubPushEnvelope struct {
 	Message struct {
-		Data string `json:"data"`
-	} `json:"message"`
+		Data string `json:"data" binding:"required"`
+	} `json:"message" binding:"required"`
 }
 
 // PubSubPushHandler は Cloud Pub/Sub push subscription からの配信を受け取り、
@@ -46,10 +48,6 @@ func handlePubSubPush(c *gin.Context, handler port.MessageHandler) {
 	var envelope pubsubPushEnvelope
 	if err := c.ShouldBindJSON(&envelope); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "pubsub push: malformed envelope"})
-		return
-	}
-	if envelope.Message.Data == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "pubsub push: malformed envelope: message.data is empty"})
 		return
 	}
 
