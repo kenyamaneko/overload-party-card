@@ -25,7 +25,7 @@ func (h *PlayerCardHandler) GetPlayerCards(c *gin.Context) {
 	playerID := c.GetString(internalauth.PlayerIDContextKey)
 	cards, err := h.playerCardInteractor.GetPlayerCards(c.Request.Context(), playerID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, cards)

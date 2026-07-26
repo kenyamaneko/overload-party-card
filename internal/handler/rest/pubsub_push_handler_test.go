@@ -104,16 +104,6 @@ func pushEnvelopeBody(t *testing.T, payload []byte) string {
 	return string(b)
 }
 
-// decodeBody は応答本文を JSON として復号する。原因を示す "error" フィールドを
-// 完全一致で確かめるために使う (前置関係にある文言どうしを Contains で
-// 混同しないため)。
-func decodeBody(t *testing.T, w *httptest.ResponseRecorder) map[string]any {
-	t.Helper()
-	var body map[string]any
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
-	return body
-}
-
 func TestPubSubPushHandler_HandleCardPackPurchased(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

@@ -27,7 +27,7 @@ func NewPgInitiativeRepository(pool *pgxpool.Pool) *PgInitiativeRepository {
 func (r *PgInitiativeRepository) FindAll(ctx context.Context) ([]*domain.Initiative, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT initiative_id, product_id, kind, name, insight_cost, effect_text, effect, is_active
-		 FROM initiatives WHERE is_active = true ORDER BY initiative_id`,
+		 FROM card.initiatives WHERE is_active = true ORDER BY initiative_id`,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("query initiatives: %w", err)

@@ -1,8 +1,11 @@
 package rest
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -116,7 +119,8 @@ func toDeckCards(playerID string, deckID int64, entries []domain.DeckCardEntry) 
 
 // fakePlayerCardRepo は port.PlayerCardRepo のメモリバック実装。
 type fakePlayerCardRepo struct {
-	cards map[string][]*domain.PlayerCard
+	cards  map[string][]*domain.PlayerCard
+	getErr error
 }
 
 // newFakePlayerCardRepo は空の fakePlayerCardRepo を生成します。
@@ -124,8 +128,11 @@ func newFakePlayerCardRepo() *fakePlayerCardRepo {
 	return &fakePlayerCardRepo{cards: make(map[string][]*domain.PlayerCard)}
 }
 
-// GetPlayerCards は指定プレイヤーの所持カードを返します。
+// GetPlayerCards は注入されたエラーがあればそれを優先し、なければ指定プレイヤーの所持カードを返します。
 func (r *fakePlayerCardRepo) GetPlayerCards(_ context.Context, playerID string) ([]*domain.PlayerCard, error) {
+	if r.getErr != nil {
+		return nil, r.getErr
+	}
 	return r.cards[playerID], nil
 }
 
@@ -157,6 +164,25 @@ func (c *fakeFactionClient) ListPlayerFactions(_ context.Context, _ string) ([]s
 	return c.factions, nil
 }
 
+// fakeCardRepo は port.CardRepo のメモリバック実装。
+type fakeCardRepo struct {
+	cards      []*domain.Card
+	findAllErr error
+}
+
+// newFakeCardRepo は空の fakeCardRepo を生成します。
+func newFakeCardRepo() *fakeCardRepo {
+	return &fakeCardRepo{}
+}
+
+// FindAll は注入されたエラーがあればそれを優先し、なければ保持しているカード定義を返します。
+func (r *fakeCardRepo) FindAll(_ context.Context) ([]*domain.Card, error) {
+	if r.findAllErr != nil {
+		return nil, r.findAllErr
+	}
+	return r.cards, nil
+}
+
 // newDeckHandlerFixture は実 DeckInteractor を載せた DeckHandler と、
 // 振る舞いを差し替えるための repo を返す。陣営 SHE のカード・プロダクト・施策を投入済み。
 func newDeckHandlerFixture(t *testing.T) (*DeckHandler, *fakeDeckRepo, *fakePlayerCardRepo) {
@@ -179,4 +205,55 @@ func newDeckHandlerFixture(t *testing.T) (*DeckHandler, *fakeDeckRepo, *fakePlay
 
 	interactor := usecase.NewDeckInteractor(deckRepo, pcRepo, cc, pc, ic, fc)
 	return NewDeckHandler(interactor), deckRepo, pcRepo
+}
+
+// newCardHandlerFixture は実 CardInteractor を載せた CardHandler と、
+// 振る舞いを差し替えるための repo を返す。
+func newCardHandlerFixture() (*CardHandler, *fakeCardRepo, *fakePlayerCardRepo) {
+	cardRepo := newFakeCardRepo()
+	pcRepo := newFakePlayerCardRepo()
+	interactor := usecase.NewCardInteractor(cardRepo, pcRepo)
+	return NewCardHandler(interactor), cardRepo, pcRepo
+}
+
+// newPlayerCardHandlerFixture は実 PlayerCardInteractor を載せた PlayerCardHandler と、
+// 振る舞いを差し替えるための repo を返す。
+func newPlayerCardHandlerFixture() (*PlayerCardHandler, *fakePlayerCardRepo) {
+	pcRepo := newFakePlayerCardRepo()
+	interactor := usecase.NewPlayerCardInteractor(pcRepo, cache.NewCardCache())
+	return NewPlayerCardHandler(interactor), pcRepo
+}
+
+// decodeBody は応答本文を JSON として復号する。原因を示す "error" フィールドを
+// 完全一致で確かめるために使う (sentinel error はラップ元の接頭辞を含んだ
+// 文言になり、部分一致の Contains では別の原因と取り違えるため)。
+func decodeBody(t *testing.T, w *httptest.ResponseRecorder) map[string]any {
+	t.Helper()
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	return body
+}
+
+// captureSlog は既定の slog logger を JSON 出力のテスト用 logger に差し替え、
+// テスト終了後に元へ戻す。ログ出力内容を検証するために使う。
+func captureSlog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	original := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(original) })
+	return &buf
+}
+
+// decodeLogRecords は captureSlog で集めた JSON Lines ログを 1 行 1 レコードとして復号する。
+func decodeLogRecords(t *testing.T, buf *bytes.Buffer) []map[string]any {
+	t.Helper()
+	var records []map[string]any
+	dec := json.NewDecoder(buf)
+	for dec.More() {
+		var rec map[string]any
+		require.NoError(t, dec.Decode(&rec))
+		records = append(records, rec)
+	}
+	return records
 }
