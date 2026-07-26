@@ -12,10 +12,7 @@ import (
 	"github.com/kenyamaneko/overload-party-card/internal/config"
 )
 
-// newDatabasePool は cfg.DatabaseIAMAuthEnabled に応じて pgxpool を構築する。
-// 有効なときは Cloud SQL Go Connector の dialer を通した private IP 経由の自動 IAM
-// データベース認証で接続し、無効なときは cfg.DatabaseConn への直接接続を行う。
-// 返す cleanup は dialer を保持している場合のみそれを閉じ、それ以外は no-op になる。
+// newDatabasePool は設定に応じた接続方式で DB 接続プールを構築する。
 func newDatabasePool(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, func(), error) {
 	if !cfg.DatabaseIAMAuthEnabled {
 		pool, err := pgxpool.New(ctx, cfg.DatabaseConn)
@@ -27,8 +24,6 @@ func newDatabasePool(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, fu
 	return newDatabasePoolWithIAMAuth(ctx, cfg)
 }
 
-// newDatabasePoolWithIAMAuth は Cloud SQL Go Connector の dialer を pgxpool の
-// DialFunc に差し込み、private IP 経由の自動 IAM データベース認証で接続する。
 func newDatabasePoolWithIAMAuth(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, func(), error) {
 	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseConn)
 	if err != nil {
@@ -57,9 +52,8 @@ func newDatabasePoolWithIAMAuth(ctx context.Context, cfg *config.Config) (*pgxpo
 	return pool, func() { closeDialer(dialer) }, nil
 }
 
-// closeDialer は Cloud SQL Go Connector の dialer を閉じる。呼び出し元はプロセス
-// 終了処理の中で呼ぶため、失敗しても処理を継続しログにのみ残す。
 func closeDialer(dialer *cloudsqlconn.Dialer) {
+	// 呼び出し元がプロセス終了処理の中で呼ぶため、失敗をログにとどめて処理を続行する。
 	if err := dialer.Close(); err != nil {
 		slog.Error("cloudsqlconn dialer close failed", "error", err)
 	}
