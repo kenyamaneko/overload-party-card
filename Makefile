@@ -21,7 +21,7 @@ tidy: ## Tidy dependencies
 fmt: ## Format code
 	gofmt -s -w .
 
-run: ## Run card server locally (ENV=dev inline; PORT / DATABASE_CONN / GOOGLE_CLOUD_PROJECT_ID / PLAYER_ONBOARDED_SUBSCRIPTION / CARD_PACK_PURCHASED_SUBSCRIPTION must be exported)
+run: ## Run card server locally (ENV=dev inline; PORT / DATABASE_CONN / DATABASE_IAM_AUTH_ENABLED=false / GOOGLE_CLOUD_PROJECT_ID / PLAYER_ONBOARDED_SUBSCRIPTION / CARD_PACK_PURCHASED_SUBSCRIPTION / INTERNAL_AUTH_SECRET / ACCOUNT_SERVICE_URL must be exported)
 	ENV=dev go run ./cmd/server
 
 generate: ## Regenerate all SSoT-derived outputs (契約型 / schema doc / カード / プロダクト・施策 / カードパック)。oapi-codegen / openapi-typescript / NSwag が必要

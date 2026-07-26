@@ -28,8 +28,8 @@ func (r *PgCardPackRepository) GetPack(ctx context.Context, packID string) (*dom
 	rows, err := r.pool.Query(ctx,
 		`SELECT p.pack_id, p.description, p.is_active, p.created_at, p.updated_at,
 		        c.card_id, c.copies
-		 FROM card_pack p
-		 LEFT JOIN card_pack_cards c ON c.pack_id = p.pack_id
+		 FROM card.card_pack p
+		 LEFT JOIN card.card_pack_cards c ON c.pack_id = p.pack_id
 		 WHERE p.pack_id = $1
 		 ORDER BY c.card_id`,
 		packID,
