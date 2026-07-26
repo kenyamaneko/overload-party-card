@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/kenyamaneko/overload-party-card/internal/port"
 
@@ -25,13 +26,13 @@ func TestDeckHandler_SentinelErrorToStatusAndBody(t *testing.T) {
 			wantStatus int
 			wantBody   string
 		}{
-			{"ErrNotFound のとき、404 になる", port.ErrNotFound, http.StatusNotFound, port.ErrNotFound.Error()},
-			{"ErrUnowned のとき、403 になる", port.ErrUnowned, http.StatusForbidden, port.ErrUnowned.Error()},
-			{"ErrInvalidDeck のとき、400 になる", port.ErrInvalidDeck, http.StatusBadRequest, port.ErrInvalidDeck.Error()},
-			{"ErrRestrictionExceeded のとき、400 になる", port.ErrRestrictionExceeded, http.StatusBadRequest, port.ErrRestrictionExceeded.Error()},
-			{"ErrInvalidArgument のとき、400 になる", port.ErrInvalidArgument, http.StatusBadRequest, port.ErrInvalidArgument.Error()},
-			{"ラップされた ErrNotFound のとき、404 に写像する", fmt.Errorf("db boom: %w", port.ErrNotFound), http.StatusNotFound, port.ErrNotFound.Error()},
-			{"写像対象外の error のとき、500 になる", errors.New("unexpected"), http.StatusInternalServerError, "unexpected"},
+			{"ErrNotFound のとき、404 になる", port.ErrNotFound, http.StatusNotFound, "find deck: " + port.ErrNotFound.Error()},
+			{"ErrUnowned のとき、403 になる", port.ErrUnowned, http.StatusForbidden, "find deck: " + port.ErrUnowned.Error()},
+			{"ErrInvalidDeck のとき、400 になる", port.ErrInvalidDeck, http.StatusBadRequest, "find deck: " + port.ErrInvalidDeck.Error()},
+			{"ErrRestrictionExceeded のとき、400 になる", port.ErrRestrictionExceeded, http.StatusBadRequest, "find deck: " + port.ErrRestrictionExceeded.Error()},
+			{"ErrInvalidArgument のとき、400 になる", port.ErrInvalidArgument, http.StatusBadRequest, "find deck: " + port.ErrInvalidArgument.Error()},
+			{"ラップされた ErrNotFound のとき、404 に写像する", fmt.Errorf("db boom: %w", port.ErrNotFound), http.StatusNotFound, "find deck: db boom: not found"},
+			{"写像対象外の error のとき、500 になり応答本文の error が internal server error と完全に一致する", errors.New("unexpected"), http.StatusInternalServerError, internalErrorMessage},
 		}
 
 		for _, tc := range cases {
@@ -48,9 +49,33 @@ func TestDeckHandler_SentinelErrorToStatusAndBody(t *testing.T) {
 				h.GetDeck(c)
 
 				assert.Equal(t, tc.wantStatus, w.Code)
-				assert.Contains(t, w.Body.String(), `"error"`)
-				assert.Contains(t, w.Body.String(), tc.wantBody)
+				assert.Equal(t, tc.wantBody, decodeBody(t, w)["error"])
 			})
 		}
+	})
+}
+
+func TestRespondError_InternalServerErrorLogging(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("500 になるエラーのログ出力", func(t *testing.T) {
+		t.Run("写像対象外の error のとき、応答本文には出ない原因の文字列と要求パスがログに出る", func(t *testing.T) {
+			buf := captureSlog(t)
+			cause := errors.New("pq: connection refused")
+
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/cards/decks", nil)
+
+			respondError(c, cause)
+
+			assert.Equal(t, http.StatusInternalServerError, w.Code)
+			assert.Equal(t, internalErrorMessage, decodeBody(t, w)["error"])
+
+			records := decodeLogRecords(t, buf)
+			require.Len(t, records, 1)
+			assert.Equal(t, "/api/v1/cards/decks", records[0]["path"])
+			assert.Equal(t, cause.Error(), records[0]["error"])
+		})
 	})
 }

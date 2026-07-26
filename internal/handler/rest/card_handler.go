@@ -25,7 +25,7 @@ func NewCardHandler(cardInteractor *usecase.CardInteractor) *CardHandler {
 func (h *CardHandler) ListAllRaw(c *gin.Context) {
 	cards, err := h.cardInteractor.ListCards(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, cards)
@@ -36,7 +36,7 @@ func (h *CardHandler) ListForPlayer(c *gin.Context) {
 	playerID := c.GetString(internalauth.PlayerIDContextKey)
 	cards, err := h.cardInteractor.ListCardsWithOwnership(c.Request.Context(), playerID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, cards)
