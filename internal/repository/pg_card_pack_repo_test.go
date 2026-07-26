@@ -95,5 +95,22 @@ func TestGetPack(t *testing.T) {
 			require.NotNil(t, got)
 			assert.Empty(t, got.Cards)
 		})
+
+		t.Run("運用停止中の pack を取得すると、停止状態のまま内包カード付きで返る", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedCardPack(t, cardPackSeed{
+				PackID:   "inactive-pack",
+				IsActive: false,
+				Cards:    []domain.CardPackCard{{CardID: "TST-0001", Copies: 2}},
+			})
+
+			repo := repository.NewPgCardPackRepository(sharedPg.Pool)
+			got, err := repo.GetPack(context.Background(), "inactive-pack")
+
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			assert.False(t, got.IsActive)
+			assert.Equal(t, []domain.CardPackCard{{CardID: "TST-0001", Copies: 2}}, got.Cards)
+		})
 	})
 }
