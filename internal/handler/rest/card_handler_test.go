@@ -15,7 +15,7 @@ import (
 func TestCardHandler_RepositoryFailure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("カードマスター取得で内部エラーが起きたときの 500 応答", func(t *testing.T) {
+	t.Run("カードマスター取得", func(t *testing.T) {
 		h, cardRepo, _ := newCardHandlerFixture()
 		cardRepo.findAllErr = errors.New("pq: connection refused")
 
@@ -23,8 +23,8 @@ func TestCardHandler_RepositoryFailure(t *testing.T) {
 			name   string
 			invoke func(c *gin.Context)
 		}{
-			{"カードマスター全件取得のとき、500 になり応答本文の error が internal server error と完全に一致する", h.ListAllRaw},
-			{"プレイヤー所持状態付きカード取得のとき、500 になり応答本文の error が internal server error と完全に一致する", h.ListForPlayer},
+			{"カードマスター全件取得で内部エラーが起きたとき、500 になり応答本文の error が internal server error と完全に一致する", h.ListAllRaw},
+			{"プレイヤー所持状態付きカード取得で内部エラーが起きたとき、500 になり応答本文の error が internal server error と完全に一致する", h.ListForPlayer},
 		}
 
 		for _, tc := range cases {
