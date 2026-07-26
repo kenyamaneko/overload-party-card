@@ -45,7 +45,7 @@ func (h *PubSubPushHandler) HandleCardPackPurchased(c *gin.Context) {
 func handlePubSubPush(c *gin.Context, handler port.MessageHandler) {
 	var envelope pubsubPushEnvelope
 	if err := c.ShouldBindJSON(&envelope); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "pubsub push: malformed envelope: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "pubsub push: malformed envelope"})
 		return
 	}
 	if envelope.Message.Data == "" {
@@ -55,7 +55,7 @@ func handlePubSubPush(c *gin.Context, handler port.MessageHandler) {
 
 	data, err := base64.StdEncoding.DecodeString(envelope.Message.Data)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "pubsub push: malformed base64 data: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "pubsub push: malformed base64 data"})
 		return
 	}
 

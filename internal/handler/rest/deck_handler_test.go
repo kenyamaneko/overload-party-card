@@ -120,8 +120,8 @@ func TestDeckHandler_MalformedJSONBody(t *testing.T) {
 			name   string
 			invoke func(c *gin.Context)
 		}{
-			{"デッキを作成するとき、400 になり、JSON 構文エラーであることを示すエラーが応答本文に含まれる", h.CreateDeck},
-			{"デッキを更新するとき、400 になり、JSON 構文エラーであることを示すエラーが応答本文に含まれる", h.UpdateDeck},
+			{"デッキを作成するとき、400 になり、リクエスト本文が不正であることを示すエラーが応答本文に含まれる", h.CreateDeck},
+			{"デッキを更新するとき、400 になり、リクエスト本文が不正であることを示すエラーが応答本文に含まれる", h.UpdateDeck},
 		}
 
 		for _, tc := range cases {
@@ -136,7 +136,7 @@ func TestDeckHandler_MalformedJSONBody(t *testing.T) {
 				tc.invoke(c)
 
 				assert.Equal(t, http.StatusBadRequest, w.Code)
-				assert.Contains(t, w.Body.String(), "unexpected EOF")
+				assert.Contains(t, w.Body.String(), "malformed request body")
 			})
 		}
 	})
