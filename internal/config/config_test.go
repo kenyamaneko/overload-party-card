@@ -7,8 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// allEnvKeys は FromEnv が読む全 env キー。各テストは毎回これらを明示値（または ""）
-// で上書きし、シェル環境からの漏れで Given が非決定になるのを防ぐ。
 var allEnvKeys = []string{
 	"PORT",
 	"ENV",
@@ -22,9 +20,7 @@ var allEnvKeys = []string{
 	"ACCOUNT_SERVICE_URL",
 }
 
-// setEnv は allEnvKeys を一括で上書きする。envs に無いキーは "" として t.Setenv で
-// 適用する — os.Getenv は "" と unset を区別しないため、空文字指定で required チェックの
-// missing 経路を発火できる。t.Setenv はテスト終了時に復元する。
+// setEnv は os.Getenv が "" と unset を区別しない性質を使い、未指定キーに "" を渡して未設定を再現する。
 func setEnv(t *testing.T, envs map[string]string) {
 	t.Helper()
 	for _, k := range allEnvKeys {
@@ -42,9 +38,6 @@ func mergeEnv(maps ...map[string]string) map[string]string {
 	return out
 }
 
-// validEnv は DATABASE_IAM_AUTH_ENABLED=false での最小構成（必須 env を全て明示）。
-// CLAUDE.md「デフォルト値へのフォールバックを行わない」方針により、全必須 env を
-// 明示的に供給する。各ケースはこれを baseline に override を重ねる。
 var validEnv = map[string]string{
 	"PORT":                             "9003",
 	"ENV":                              "dev",
@@ -98,7 +91,6 @@ func TestFromEnv(t *testing.T) {
 			assert.Equal(t, "overload-party-dev:asia-northeast1:overload-party-db", cfg.CloudSQLConnectionName)
 		})
 
-		// 必須 env が未設定・未定義値のときはデフォルトにフォールバックせず即エラーにする (回帰防止)。
 		invalidCases := []struct {
 			name    string
 			envs    map[string]string
