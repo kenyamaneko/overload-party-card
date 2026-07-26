@@ -66,4 +66,3 @@ func (r *PgCardPackRepository) GetPack(ctx context.Context, packID string) (*dom
 	}
 	return p, nil
 }
-

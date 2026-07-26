@@ -11,9 +11,6 @@ var allEnvKeys = []string{
 	"PORT",
 	"ENV",
 	"DATABASE_CONN",
-	"GOOGLE_CLOUD_PROJECT_ID",
-	"PLAYER_ONBOARDED_SUBSCRIPTION",
-	"CARD_PACK_PURCHASED_SUBSCRIPTION",
 	"DATABASE_IAM_AUTH_ENABLED",
 	"CLOUDSQL_CONNECTION_NAME",
 	"INTERNAL_AUTH_SECRET",
@@ -39,15 +36,12 @@ func mergeEnv(maps ...map[string]string) map[string]string {
 }
 
 var validEnv = map[string]string{
-	"PORT":                             "9003",
-	"ENV":                              "dev",
-	"DATABASE_CONN":                    "host=localhost port=5432 dbname=card user=card password=card sslmode=disable",
-	"GOOGLE_CLOUD_PROJECT_ID":          "card-local",
-	"PLAYER_ONBOARDED_SUBSCRIPTION":    "player-onboarded-card-sub",
-	"CARD_PACK_PURCHASED_SUBSCRIPTION": "card-pack-purchased-card-sub",
-	"DATABASE_IAM_AUTH_ENABLED":        "false",
-	"INTERNAL_AUTH_SECRET":             "test-internal-auth-secret-do-not-use-in-prod-xxxxx",
-	"ACCOUNT_SERVICE_URL":              "http://localhost:9005",
+	"PORT":                      "9003",
+	"ENV":                       "dev",
+	"DATABASE_CONN":             "host=localhost port=5432 dbname=card user=card password=card sslmode=disable",
+	"DATABASE_IAM_AUTH_ENABLED": "false",
+	"INTERNAL_AUTH_SECRET":      "test-internal-auth-secret-do-not-use-in-prod-xxxxx",
+	"ACCOUNT_SERVICE_URL":       "http://localhost:9005",
 }
 
 func TestFromEnv(t *testing.T) {
@@ -61,9 +55,6 @@ func TestFromEnv(t *testing.T) {
 			assert.Equal(t, 9003, cfg.Port)
 			assert.Equal(t, Env("dev"), cfg.Env)
 			assert.Equal(t, "host=localhost port=5432 dbname=card user=card password=card sslmode=disable", cfg.DatabaseConn)
-			assert.Equal(t, "card-local", cfg.GoogleCloudProjectID)
-			assert.Equal(t, "player-onboarded-card-sub", cfg.PlayerOnboardedSubscription)
-			assert.Equal(t, "card-pack-purchased-card-sub", cfg.CardPackPurchasedSubscription)
 			assert.Equal(t, "test-internal-auth-secret-do-not-use-in-prod-xxxxx", cfg.InternalAuthSecret)
 			assert.Equal(t, "http://localhost:9005", cfg.AccountServiceURL)
 		})
@@ -120,21 +111,6 @@ func TestFromEnv(t *testing.T) {
 				name:    "DATABASE_CONN が未設定のとき、エラーになる",
 				envs:    mergeEnv(validEnv, map[string]string{"DATABASE_CONN": ""}),
 				wantErr: "DATABASE_CONN is required",
-			},
-			{
-				name:    "GOOGLE_CLOUD_PROJECT_ID が未設定のとき、エラーになる",
-				envs:    mergeEnv(validEnv, map[string]string{"GOOGLE_CLOUD_PROJECT_ID": ""}),
-				wantErr: "GOOGLE_CLOUD_PROJECT_ID is required",
-			},
-			{
-				name:    "PLAYER_ONBOARDED_SUBSCRIPTION が未設定のとき、エラーになる",
-				envs:    mergeEnv(validEnv, map[string]string{"PLAYER_ONBOARDED_SUBSCRIPTION": ""}),
-				wantErr: "PLAYER_ONBOARDED_SUBSCRIPTION is required",
-			},
-			{
-				name:    "CARD_PACK_PURCHASED_SUBSCRIPTION が未設定のとき、エラーになる",
-				envs:    mergeEnv(validEnv, map[string]string{"CARD_PACK_PURCHASED_SUBSCRIPTION": ""}),
-				wantErr: "CARD_PACK_PURCHASED_SUBSCRIPTION is required",
 			},
 			{
 				name:    "DATABASE_IAM_AUTH_ENABLED が未設定のとき、変数名を含むエラーになる",

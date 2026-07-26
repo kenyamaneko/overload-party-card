@@ -172,6 +172,8 @@ REST 経由の同期配布エンドポイントは ADR-032 で完全廃止され
 
 shop 購入・オンボーディング完了をイベント駆動でパック配布に変換する。`card.processed_events` を使って at-least-once 配信を実質的に一度だけ適用する。
 
+配信は Cloud Pub/Sub の push 経由で `/internal/v1/pubsub/<イベント名>` (`internal/handler/rest.PubSubPushHandler`) が受け、デコードした payload を以下の subscriber へ渡す。以下の `Ack` / `Nack` は subscriber の戻り値 (nil / error) を指し、push handler がそれぞれ HTTP 2xx / 5xx に変換して Cloud Pub/Sub へ応答する。
+
 ### 処理フロー (共通)
 
 1. JSON デシリアライズ → 失敗は `Nack`
