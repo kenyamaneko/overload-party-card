@@ -17,6 +17,5 @@ func TestMain(m *testing.M) {
 	os.Exit(postgrestest.RunMain(m, &sharedPg,
 		postgrestest.WithSchemaFile("db/schema.sql"),
 		postgrestest.WithSchema("card"),
-		postgrestest.WithSearchPath("card, public"),
 	))
 }

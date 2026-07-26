@@ -27,7 +27,7 @@ func NewPgPlayerCardRepository(pool *pgxpool.Pool) *PgPlayerCardRepository {
 func (r *PgPlayerCardRepository) GetPlayerCards(ctx context.Context, playerID string) ([]*domain.PlayerCard, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT player_id, card_id, art_no, count
-		 FROM player_cards WHERE player_id = $1 ORDER BY card_id, art_no`,
+		 FROM card.player_cards WHERE player_id = $1 ORDER BY card_id, art_no`,
 		playerID,
 	)
 	if err != nil {
@@ -58,7 +58,7 @@ func (r *PgPlayerCardRepository) AddCards(ctx context.Context, playerID string, 
 	}
 
 	var sb strings.Builder
-	sb.WriteString(`INSERT INTO player_cards (player_id, card_id, art_no, count) VALUES `)
+	sb.WriteString(`INSERT INTO card.player_cards (player_id, card_id, art_no, count) VALUES `)
 
 	args := make([]any, 0, len(cards)*4)
 	total := 0
