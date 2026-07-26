@@ -1,4 +1,4 @@
-.PHONY: build test vet fmt run tidy generate help
+.PHONY: build test test-integration vet fmt run tidy generate help
 
 APP    := overload-party-card
 MODULE := github.com/kenyamaneko/$(APP)
@@ -6,8 +6,11 @@ MODULE := github.com/kenyamaneko/$(APP)
 build: ## Build Docker image
 	docker build -t $(APP) .
 
-test: ## Run all tests (Testcontainers で Postgres を起動するので Docker 必須)
+test: ## Run unit tests
 	go test ./... -count=1 -race
+
+test-integration: ## Run unit + integration tests (Testcontainers で Postgres を起動するので Docker 必須)
+	go test -tags=integration ./... -count=1 -race
 
 vet: ## Run go vet
 	go vet ./...
