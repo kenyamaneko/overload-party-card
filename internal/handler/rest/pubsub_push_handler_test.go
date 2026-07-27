@@ -146,7 +146,8 @@ func TestPubSubPushHandler_HandleCardPackPurchased(t *testing.T) {
 			assert.Equal(t, "pubsub push: malformed base64 data", decodeBody(t, w)["error"])
 		})
 
-		t.Run("既知でない event_type のとき、400 とは異なる 500 になり、応答本文の error は原因を伏せた固定文言でカードも付与されない", func(t *testing.T) {
+		t.Run("既知でない event_type のとき、400 とは異なる 500 になり、応答本文には出ない event_type 想定外の原因がログに出てカードも付与されない", func(t *testing.T) {
+			buf := captureSlog(t)
 			h, pcRepo := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
 				"faction_set_tuners": pack,
 			}))
@@ -162,6 +163,9 @@ func TestPubSubPushHandler_HandleCardPackPurchased(t *testing.T) {
 
 			assert.Equal(t, http.StatusInternalServerError, w.Code)
 			assert.Equal(t, "internal server error", decodeBody(t, w)["error"])
+			records := decodeLogRecords(t, buf)
+			require.NotEmpty(t, records)
+			assert.Contains(t, records[len(records)-1]["error"], `unexpected event_type "unknown"`)
 			cards, getErr := pcRepo.GetPlayerCards(context.Background(), fxPushPlayerID)
 			require.NoError(t, getErr)
 			assert.Empty(t, cards)
