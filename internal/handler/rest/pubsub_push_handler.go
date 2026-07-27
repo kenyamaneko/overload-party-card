@@ -2,6 +2,7 @@ package rest
 
 import (
 	"encoding/base64"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -58,7 +59,11 @@ func handlePubSubPush(c *gin.Context, handler port.MessageHandler) {
 	}
 
 	if err := handler(c.Request.Context(), data); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		slog.Error("pubsub push handler failed",
+			"path", c.Request.URL.Path,
+			"error", err,
+		)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": internalErrorMessage})
 		return
 	}
 	c.Status(http.StatusOK)

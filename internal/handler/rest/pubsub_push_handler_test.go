@@ -146,8 +146,8 @@ func TestPubSubPushHandler_HandleCardPackPurchased(t *testing.T) {
 			assert.Equal(t, "pubsub push: malformed base64 data", decodeBody(t, w)["error"])
 		})
 
-		t.Run("既知でない event_type のとき、400 とは異なる 500 になり応答本文の error が event_type 想定外を示す文言と完全に一致する", func(t *testing.T) {
-			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
+		t.Run("既知でない event_type のとき、400 とは異なる 500 になり、応答本文の error は原因を伏せた固定文言でカードも付与されない", func(t *testing.T) {
+			h, pcRepo := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
 				"faction_set_tuners": pack,
 			}))
 			payload, err := json.Marshal(apishop.CardPackPurchasedEvent{
@@ -161,7 +161,10 @@ func TestPubSubPushHandler_HandleCardPackPurchased(t *testing.T) {
 			w := servePush(t, h.HandleCardPackPurchased, pushEnvelopeBody(t, payload))
 
 			assert.Equal(t, http.StatusInternalServerError, w.Code)
-			assert.Equal(t, `card-pack-purchased-card: unexpected event_type "unknown"`, decodeBody(t, w)["error"])
+			assert.Equal(t, "internal server error", decodeBody(t, w)["error"])
+			cards, getErr := pcRepo.GetPlayerCards(context.Background(), fxPushPlayerID)
+			require.NoError(t, getErr)
+			assert.Empty(t, cards)
 		})
 
 		t.Run("同じイベントを二度投げても、2 回目はカードが二重に付与されない", func(t *testing.T) {
