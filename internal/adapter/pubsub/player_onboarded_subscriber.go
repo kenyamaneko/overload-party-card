@@ -18,39 +18,32 @@ type packGranter interface {
 	GrantPack(ctx context.Context, playerID, packID string) (int, error)
 }
 
-// PlayerOnboardedSubscriber は player-onboarded subscription からイベントを取得し、
+// PlayerOnboardedSubscriber は player-onboarded-card-sub の push 配信を処理し、
 // オンボーディング完了プレイヤーへ basic pack と選択 faction の基本セットを配布します。
 //
 // 冪等性は event_id ベースの processed_events で担保します。
-// 未知の event_type / malformed payload は Ack ではなく Nack して DLQ
-// (player-onboarded-dlq) に寄せます。
+// 未知の event_type / malformed payload は ack ではなく nack 相当のエラーを返し、
+// DLQ (player-onboarded-dlq) に寄せます。
 type PlayerOnboardedSubscriber struct {
-	stream          port.MessageStream
 	grantInteractor packGranter
 	eventRepo       port.ProcessedEventRepo
 }
 
 // NewPlayerOnboardedSubscriber は PlayerOnboardedSubscriber を生成します。
 func NewPlayerOnboardedSubscriber(
-	stream port.MessageStream,
 	grantInteractor packGranter,
 	eventRepo port.ProcessedEventRepo,
 ) *PlayerOnboardedSubscriber {
 	return &PlayerOnboardedSubscriber{
-		stream:          stream,
 		grantInteractor: grantInteractor,
 		eventRepo:       eventRepo,
 	}
 }
 
-// Start は ctx がキャンセルされるか stream がエラーを返すまでブロックします。
-func (s *PlayerOnboardedSubscriber) Start(ctx context.Context) error {
-	slog.Info("player-onboarded-card subscriber: consuming")
-	return s.stream.Consume(ctx, s.process)
-}
-
-// process は 1 イベントを処理する。戻り値 nil = ack、非 nil = nack。
-func (s *PlayerOnboardedSubscriber) process(ctx context.Context, data []byte) error {
+// Handle は push delivery で届いた 1 イベントの payload (デコード済み bytes) を
+// 処理します。戻り値 nil = ack、非 nil = nack として呼び出し元 (push handler) が
+// 応答ステータスに変換します。port.MessageHandler を満たします。
+func (s *PlayerOnboardedSubscriber) Handle(ctx context.Context, data []byte) error {
 	var event apiscenario.PlayerOnboardedEvent
 	if err := json.Unmarshal(data, &event); err != nil {
 		slog.Error("player-onboarded-card bad payload", "error", err)

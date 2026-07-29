@@ -22,28 +22,22 @@ func (f *fakeCardPackRepo) GetPack(_ context.Context, _ string) (*domain.CardPac
 	return f.pack, f.err
 }
 
-// fakeGrantPlayerCardRepo は PlayerCardRepo の最小スタブ。AddCards の引数を記録する。
-type fakeGrantPlayerCardRepo struct {
-	called      bool
-	gotPlayerID string
-	gotCards    []domain.CardPackCard
-	retAdded    int
+// fakeAddCardsErrorRepo は PlayerCardRepo のテスト用スタブ。AddCards が常に err を返す。
+type fakeAddCardsErrorRepo struct {
+	err error
 }
 
-func (f *fakeGrantPlayerCardRepo) GetPlayerCards(_ context.Context, _ string) ([]*domain.PlayerCard, error) {
+func (f *fakeAddCardsErrorRepo) GetPlayerCards(_ context.Context, _ string) ([]*domain.PlayerCard, error) {
 	return nil, nil
 }
-func (f *fakeGrantPlayerCardRepo) AddCards(_ context.Context, playerID string, cards []domain.CardPackCard) (int, error) {
-	f.called = true
-	f.gotPlayerID = playerID
-	f.gotCards = append([]domain.CardPackCard(nil), cards...)
-	return f.retAdded, nil
+
+func (f *fakeAddCardsErrorRepo) AddCards(_ context.Context, _ string, _ []domain.CardPackCard) (int, error) {
+	return 0, f.err
 }
 
 func TestGrantPack(t *testing.T) {
 	t.Run("パック付与", func(t *testing.T) {
-		t.Run("有効な pack のとき、pack の全カードを AddCards に渡し付与枚数を返す", func(t *testing.T) {
-			// pack 内でカードごとに枚数が異なるケースで、写し漏れを検出する。
+		t.Run("カードパックを配ると、含まれる各カードが枚数分プレイヤーに付与され、付与数は合計枚数になる", func(t *testing.T) {
 			packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
 				IsActive: true,
 				Cards: []domain.CardPackCard{
@@ -51,21 +45,45 @@ func TestGrantPack(t *testing.T) {
 					{CardID: "SH-0002", Copies: 1},
 				},
 			}}
-			pcRepo := &fakeGrantPlayerCardRepo{retAdded: 4}
+			pcRepo := newInMemoryPlayerCardRepo()
 
 			svc := NewGrantInteractor(packRepo, pcRepo)
 			got, err := svc.GrantPack(context.Background(), "player-1", "any")
 
 			require.NoError(t, err)
 			assert.Equal(t, 4, got)
-			assert.Equal(t, "player-1", pcRepo.gotPlayerID)
-			assert.Equal(t, []domain.CardPackCard{
-				{CardID: "SH-0001", Copies: 3},
-				{CardID: "SH-0002", Copies: 1},
-			}, pcRepo.gotCards)
+
+			playerCards, err := pcRepo.GetPlayerCards(context.Background(), "player-1")
+			require.NoError(t, err)
+			assert.ElementsMatch(t, []*domain.PlayerCard{
+				{PlayerID: "player-1", CardID: "SH-0001", Count: 3},
+				{PlayerID: "player-1", CardID: "SH-0002", Count: 1},
+			}, playerCards)
 		})
 
-		// いずれのエラーでも配布は起きない (AddCards は呼ばれない)。
+		t.Run("既に所持しているカードを配ると、所持枚数に加算される", func(t *testing.T) {
+			packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
+				IsActive: true,
+				Cards: []domain.CardPackCard{
+					{CardID: "SH-0001", Copies: 2},
+				},
+			}}
+			pcRepo := newInMemoryPlayerCardRepo()
+			pcRepo.Seed("player-1", []*domain.PlayerCard{{PlayerID: "player-1", CardID: "SH-0001", Count: 5}})
+
+			svc := NewGrantInteractor(packRepo, pcRepo)
+			got, err := svc.GrantPack(context.Background(), "player-1", "any")
+
+			require.NoError(t, err)
+			assert.Equal(t, 2, got)
+
+			playerCards, err := pcRepo.GetPlayerCards(context.Background(), "player-1")
+			require.NoError(t, err)
+			assert.ElementsMatch(t, []*domain.PlayerCard{
+				{PlayerID: "player-1", CardID: "SH-0001", Count: 7},
+			}, playerCards)
+		})
+
 		dbDown := errors.New("db down")
 		errorCases := []struct {
 			name     string
@@ -73,22 +91,22 @@ func TestGrantPack(t *testing.T) {
 			wantErr  error
 		}{
 			{
-				name:     "is_active=false の pack のとき、ErrPackInactive になり AddCards を呼ばない",
+				name:     "無効化されたカードパックのとき、ErrPackInactive になり何も付与されない",
 				packRepo: &fakeCardPackRepo{pack: &domain.CardPack{IsActive: false, Cards: []domain.CardPackCard{{CardID: "SH-0001", Copies: 3}}}},
 				wantErr:  port.ErrPackInactive,
 			},
 			{
-				name:     "pack が存在しないとき、ErrNotFound を伝播し AddCards を呼ばない",
+				name:     "存在しないカードパックのとき、ErrNotFound になり何も付与されない",
 				packRepo: &fakeCardPackRepo{err: port.ErrNotFound},
 				wantErr:  port.ErrNotFound,
 			},
 			{
-				name:     "内包カードが 0 件のとき、ErrEmptyPack になり AddCards を呼ばない",
+				name:     "中身が空のカードパックのとき、ErrEmptyPack になり何も付与されない",
 				packRepo: &fakeCardPackRepo{pack: &domain.CardPack{IsActive: true, Cards: nil}},
 				wantErr:  port.ErrEmptyPack,
 			},
 			{
-				name:     "pack repo が任意エラーのとき、それを伝播し AddCards を呼ばない",
+				name:     "カードパックの取得が失敗したとき、そのエラーになり何も付与されない",
 				packRepo: &fakeCardPackRepo{err: dbDown},
 				wantErr:  dbDown,
 			},
@@ -96,13 +114,30 @@ func TestGrantPack(t *testing.T) {
 
 		for _, tc := range errorCases {
 			t.Run(tc.name, func(t *testing.T) {
-				pcRepo := &fakeGrantPlayerCardRepo{}
+				pcRepo := newInMemoryPlayerCardRepo()
 				svc := NewGrantInteractor(tc.packRepo, pcRepo)
 				_, err := svc.GrantPack(context.Background(), "player-1", "any")
 
 				require.ErrorIs(t, err, tc.wantErr)
-				assert.False(t, pcRepo.called)
+				playerCards, err := pcRepo.GetPlayerCards(context.Background(), "player-1")
+				require.NoError(t, err)
+				assert.Empty(t, playerCards)
 			})
 		}
+
+		t.Run("配布先への加算が失敗したとき、そのエラーが返り付与数は0になる", func(t *testing.T) {
+			packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
+				IsActive: true,
+				Cards:    []domain.CardPackCard{{CardID: "TST-0001", Copies: 3}},
+			}}
+			addErr := errors.New("add cards failed")
+			pcRepo := &fakeAddCardsErrorRepo{err: addErr}
+
+			svc := NewGrantInteractor(packRepo, pcRepo)
+			got, err := svc.GrantPack(context.Background(), "player-1", "any")
+
+			require.ErrorIs(t, err, addErr)
+			assert.Equal(t, 0, got)
+		})
 	})
 }

@@ -2,9 +2,11 @@ package router
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +23,13 @@ import (
 
 func init() {
 	gin.SetMode(gin.TestMode)
+}
+
+// nullVerifier は auth 経路を通らない (health / internal master) の検証用に Verify を呼ばれてはならないことを示す。
+type nullVerifier struct{}
+
+func (nullVerifier) Verify(string) (string, error) {
+	panic("Verify should not be called for routes outside /api/v1/cards")
 }
 
 // stubCardRepo は固定のカードマスター 1 件を返す port.CardRepo スタブ。
@@ -90,6 +99,11 @@ const stubInitiativeJSON = `[{"initiative_id":"IN-TST-0001","product_id":"PR-TST
 	`"kind":"TST-KIND","name":"TST initiative","insight_cost":1,"effect_text":"",` +
 	`"effect":null,"is_active":true}]`
 
+// stubMessageHandler は push 受け口の配線先。常に ack (nil) を返す。
+func stubMessageHandler(context.Context, []byte) error {
+	return nil
+}
+
 // newTestRouter はスタブ repository で組んだ実 interactor / handler で router を構築する。
 func newTestRouter(t *testing.T, verifier internalauth.Verifier) *gin.Engine {
 	t.Helper()
@@ -111,8 +125,15 @@ func newTestRouter(t *testing.T, verifier internalauth.Verifier) *gin.Engine {
 		rest.NewPlayerCardHandler(playerCardI),
 		rest.NewProductHandler(productCache, initiativeCache),
 		rest.NewInitiativeHandler(initiativeCache),
+		rest.NewPubSubPushHandler(stubMessageHandler, stubMessageHandler),
 		verifier,
 	)
+}
+
+// newPubSubPushRequest は push subscription が送る envelope を模した POST body を返す。
+func newPubSubPushRequest(path string) *http.Request {
+	body := `{"message":{"data":"` + base64.StdEncoding.EncodeToString([]byte(`{}`)) + `"}}`
+	return httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
 }
 
 func TestNew(t *testing.T) {
@@ -146,6 +167,29 @@ func TestNew(t *testing.T) {
 			}
 		})
 
+		t.Run("/internal/v1/pubsub 配下 (push 受け口) は auth header なしで handler の成功応答まで到達する", func(t *testing.T) {
+			// nullVerifier を使うと、もし auth middleware を経由してしまった場合は
+			// Verify 呼び出しで panic し gin.Recovery が 500 に丸めるため、
+			// stubMessageHandler の ack (200) との差で到達有無を検出できる。
+			r := newTestRouter(t, nullVerifier{})
+
+			cases := []struct {
+				name string
+				path string
+			}{
+				{name: "/internal/v1/pubsub/player-onboarded は 200 を返す", path: "/internal/v1/pubsub/player-onboarded"},
+				{name: "/internal/v1/pubsub/card-pack-purchased は 200 を返す", path: "/internal/v1/pubsub/card-pack-purchased"},
+			}
+
+			for _, tc := range cases {
+				t.Run(tc.name, func(t *testing.T) {
+					w := httptest.NewRecorder()
+					r.ServeHTTP(w, newPubSubPushRequest(tc.path))
+					assert.Equal(t, http.StatusOK, w.Code)
+				})
+			}
+		})
+
 		t.Run("/api/v1/cards 配下は auth header 欠落で 401 になる", func(t *testing.T) {
 			// VerifyFn 未設定: header 欠落時は middleware が verifier に到達しないことの検出を兼ねる
 			r := newTestRouter(t, &internalauth.MockVerifier{})
@@ -154,8 +198,8 @@ func TestNew(t *testing.T) {
 				name string
 				path string
 			}{
-				{name: "/api/v1/cards/decks は 401 になる", path: "/api/v1/cards/decks"},
-				{name: "/api/v1/cards/cards は 401 になる", path: "/api/v1/cards/cards"},
+				{name: "デッキ一覧の取得は 401 になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/decks"},
+				{name: "所持カード一覧の取得は 401 になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/cards"},
 			}
 
 			for _, tc := range cases {
@@ -163,11 +207,12 @@ func TestNew(t *testing.T) {
 					w := httptest.NewRecorder()
 					r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, tc.path, nil))
 					assert.Equal(t, http.StatusUnauthorized, w.Code)
+					assert.Contains(t, w.Body.String(), "header is required")
 				})
 			}
 		})
 
-		t.Run("verifier がエラーを返すとき、401 になる", func(t *testing.T) {
+		t.Run("認証トークンの検証が失敗するとき、401 になり、トークンの検証に失敗したことを示すエラーが応答本文に含まれる", func(t *testing.T) {
 			r := newTestRouter(t, &internalauth.MockVerifier{
 				VerifyFn: func(string) (string, error) { return "", errors.New("invalid token") },
 			})
@@ -176,6 +221,7 @@ func TestNew(t *testing.T) {
 			req.Header.Set(internalauth.HeaderName, "any.token")
 			r.ServeHTTP(w, req)
 			assert.Equal(t, http.StatusUnauthorized, w.Code)
+			assert.Contains(t, w.Body.String(), "invalid internal auth token")
 		})
 
 		t.Run("verifier を通過したとき、handler の成功応答まで到達する", func(t *testing.T) {

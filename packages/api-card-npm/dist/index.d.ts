@@ -1,0 +1,25 @@
+import type { components, paths } from "./openapi.gen";
+export type { components, paths };
+type Schemas = components["schemas"];
+export type HealthResponse = Schemas["HealthResponse"];
+export type CardDefinition = Schemas["CardDefinition"];
+export type CardWithOwnership = Schemas["CardWithOwnership"];
+export type PlayerCardWithDef = Schemas["PlayerCardWithDef"];
+export type ComputeStats = Schemas["ComputeStats"];
+export type DataStats = Schemas["DataStats"];
+export type PassiveEffect = Schemas["PassiveEffect"];
+export type PlatformEffect = Schemas["PlatformEffect"];
+export type AttachmentEffect = Schemas["AttachmentEffect"];
+export type Deck = Schemas["Deck"];
+export type DeckCard = Schemas["DeckCard"];
+export type DeckCardEntry = Schemas["DeckCardEntry"];
+export type DeckCreateRequest = Schemas["DeckCreateRequest"];
+export type DeckUpdateRequest = Schemas["DeckUpdateRequest"];
+export type DeckDetailResponse = Schemas["DeckDetailResponse"];
+export type Product = Schemas["Product"];
+export type Initiative = Schemas["Initiative"];
+export type InitiativeKind = Schemas["InitiativeKind"];
+export type PassiveEffectType = Schemas["PassiveEffectType"];
+export type PlatformEffectType = Schemas["PlatformEffectType"];
+export type AttachmentEffectType = Schemas["AttachmentEffectType"];
+//# sourceMappingURL=index.d.ts.map

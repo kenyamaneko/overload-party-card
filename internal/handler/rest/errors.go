@@ -2,12 +2,17 @@ package rest
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/kenyamaneko/overload-party-card/internal/port"
 )
+
+// internalErrorMessage は 500 応答本文に返す固定文言。呼び出し側が対処できない
+// 障害のため原因を応答へ載せず、構造化ログにのみ記録する。
+const internalErrorMessage = "internal server error"
 
 func toHTTPStatus(err error) int {
 	switch {
@@ -25,5 +30,15 @@ func toHTTPStatus(err error) int {
 }
 
 func respondError(c *gin.Context, err error) {
-	c.JSON(toHTTPStatus(err), gin.H{"error": err.Error()})
+	status := toHTTPStatus(err)
+	if status != http.StatusInternalServerError {
+		c.JSON(status, gin.H{"error": err.Error()})
+		return
+	}
+	slog.Error("internal server error",
+		"path", c.Request.URL.Path,
+		"method", c.Request.Method,
+		"error", err,
+	)
+	c.JSON(status, gin.H{"error": internalErrorMessage})
 }

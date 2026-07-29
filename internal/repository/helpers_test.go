@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
@@ -42,6 +43,37 @@ func seedCards(t *testing.T, cards []cardSeed) {
 	for _, c := range cards {
 		seedCard(t, c)
 	}
+}
+
+// fullCardSeed は card.card_definitions への全列シード入力。scanCard の全フィールド
+// 写像を検証するテスト用に、省略可能なカラムも含め明示的に指定する。
+type fullCardSeed struct {
+	CardID        string
+	CardName      string
+	ResourceLabel string
+	Faction       string
+	CardType      string
+	Subtype       string
+	Resizable     bool
+	Elastic       bool
+	Stats         string
+	EffectText    string
+	Effects       string
+	Restriction   string
+	IsActive      bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+func seedFullCard(t *testing.T, s fullCardSeed) {
+	t.Helper()
+	_, err := sharedPg.Pool.Exec(context.Background(),
+		`INSERT INTO card.card_definitions
+		   (card_id, card_name, resource_label, faction, card_type, subtype, resizable, elastic, stats, effect_text, effects, restriction, is_active, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+		s.CardID, s.CardName, s.ResourceLabel, s.Faction, s.CardType, s.Subtype, s.Resizable, s.Elastic,
+		json.RawMessage(s.Stats), s.EffectText, json.RawMessage(s.Effects), s.Restriction, s.IsActive, s.CreatedAt, s.UpdatedAt)
+	require.NoError(t, err)
 }
 
 // productSeed は card.products への最小シード入力。

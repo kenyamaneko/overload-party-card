@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -80,16 +81,45 @@ func TestListCardsWithOwnership(t *testing.T) {
 
 func TestListCards(t *testing.T) {
 	t.Run("カード一覧", func(t *testing.T) {
-		t.Run("マスターにカードがあるとき、全件返る", func(t *testing.T) {
+		t.Run("マスターにカードがあるとき、全件が ID 昇順で名前とともに返る", func(t *testing.T) {
 			cards := map[string]*domain.Card{
-				"C-001": {CardID: "C-001", CardName: "Fireball"},
 				"C-002": {CardID: "C-002", CardName: "Shield"},
+				"C-001": {CardID: "C-001", CardName: "Fireball"},
 			}
 			svc := NewCardInteractor(newInMemoryCardRepo(cards), newInMemoryPlayerCardRepo())
 
 			result, err := svc.ListCards(context.Background())
 			require.NoError(t, err)
 			require.Len(t, result, 2)
+			assert.Equal(t, "C-001", result[0].CardID)
+			assert.Equal(t, "Fireball", result[0].CardName)
+			assert.Equal(t, "C-002", result[1].CardID)
+			assert.Equal(t, "Shield", result[1].CardName)
+		})
+
+		t.Run("効果定義を持たないカードのとき、効果フィールドが省略される", func(t *testing.T) {
+			cards := map[string]*domain.Card{
+				"TST-0001": {CardID: "TST-0001", CardName: "Test Card"},
+			}
+			svc := NewCardInteractor(newInMemoryCardRepo(cards), newInMemoryPlayerCardRepo())
+
+			result, err := svc.ListCards(context.Background())
+			require.NoError(t, err)
+			require.Len(t, result, 1)
+			assert.Nil(t, result[0].Effects)
+		})
+
+		t.Run("効果定義を持つカードのとき、定義がそのまま返る", func(t *testing.T) {
+			cards := map[string]*domain.Card{
+				"TST-0001": {CardID: "TST-0001", CardName: "Test Card", Effects: json.RawMessage(`{"ops":[]}`)},
+			}
+			svc := NewCardInteractor(newInMemoryCardRepo(cards), newInMemoryPlayerCardRepo())
+
+			result, err := svc.ListCards(context.Background())
+			require.NoError(t, err)
+			require.Len(t, result, 1)
+			require.NotNil(t, result[0].Effects)
+			assert.JSONEq(t, `{"ops":[]}`, string(*result[0].Effects))
 		})
 	})
 }

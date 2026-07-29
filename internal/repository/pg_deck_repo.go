@@ -36,7 +36,7 @@ func (r *PgDeckRepository) Create(ctx context.Context, deck domain.Deck, deckCar
 
 	var deckID int64
 	err = tx.QueryRow(ctx,
-		`INSERT INTO decks (player_id, deck_name, faction, product_id, routine_id, special_id, playmat_no, sleeve_no, created_at, updated_at)
+		`INSERT INTO card.decks (player_id, deck_name, faction, product_id, routine_id, special_id, playmat_no, sleeve_no, created_at, updated_at)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING deck_id`,
 		deck.PlayerID,
 		deck.DeckName,
@@ -67,7 +67,7 @@ func (r *PgDeckRepository) Create(ctx context.Context, deck domain.Deck, deckCar
 func (r *PgDeckRepository) FindByPlayerID(ctx context.Context, playerID string) ([]*domain.Deck, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT player_id, deck_id, deck_name, faction, product_id, routine_id, special_id, playmat_no, sleeve_no, created_at, updated_at
-		 FROM decks WHERE player_id = $1 ORDER BY updated_at DESC`,
+		 FROM card.decks WHERE player_id = $1 ORDER BY updated_at DESC`,
 		playerID,
 	)
 	if err != nil {
@@ -93,7 +93,7 @@ func (r *PgDeckRepository) FindByPlayerID(ctx context.Context, playerID string) 
 func (r *PgDeckRepository) FindByID(ctx context.Context, playerID string, deckID int64) (*domain.Deck, error) {
 	row := r.pool.QueryRow(ctx,
 		`SELECT player_id, deck_id, deck_name, faction, product_id, routine_id, special_id, playmat_no, sleeve_no, created_at, updated_at
-		 FROM decks WHERE player_id = $1 AND deck_id = $2`,
+		 FROM card.decks WHERE player_id = $1 AND deck_id = $2`,
 		playerID, deckID,
 	)
 
@@ -111,7 +111,7 @@ func (r *PgDeckRepository) FindByID(ctx context.Context, playerID string, deckID
 func (r *PgDeckRepository) GetDeckCards(ctx context.Context, playerID string, deckID int64) ([]domain.DeckCard, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT player_id, deck_id, card_id, art_no, count
-		 FROM deck_cards WHERE player_id = $1 AND deck_id = $2`,
+		 FROM card.deck_cards WHERE player_id = $1 AND deck_id = $2`,
 		playerID, deckID,
 	)
 	if err != nil {
@@ -143,7 +143,7 @@ func (r *PgDeckRepository) Update(ctx context.Context, deck domain.Deck, deckCar
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	_, err = tx.Exec(ctx,
-		`DELETE FROM deck_cards WHERE player_id = $1 AND deck_id = $2`,
+		`DELETE FROM card.deck_cards WHERE player_id = $1 AND deck_id = $2`,
 		deck.PlayerID, deck.DeckID,
 	)
 	if err != nil {
@@ -151,7 +151,7 @@ func (r *PgDeckRepository) Update(ctx context.Context, deck domain.Deck, deckCar
 	}
 
 	_, err = tx.Exec(ctx,
-		`UPDATE decks SET deck_name = $1, faction = $2, product_id = $3, routine_id = $4, special_id = $5, playmat_no = $6, sleeve_no = $7, updated_at = $8
+		`UPDATE card.decks SET deck_name = $1, faction = $2, product_id = $3, routine_id = $4, special_id = $5, playmat_no = $6, sleeve_no = $7, updated_at = $8
 		 WHERE player_id = $9 AND deck_id = $10`,
 		deck.DeckName,
 		deck.Faction,
@@ -178,7 +178,7 @@ func (r *PgDeckRepository) Update(ctx context.Context, deck domain.Deck, deckCar
 // Delete は指定デッキを削除します。
 func (r *PgDeckRepository) Delete(ctx context.Context, playerID string, deckID int64) error {
 	_, err := r.pool.Exec(ctx,
-		`DELETE FROM decks WHERE player_id = $1 AND deck_id = $2`,
+		`DELETE FROM card.decks WHERE player_id = $1 AND deck_id = $2`,
 		playerID, deckID,
 	)
 	if err != nil {
@@ -230,7 +230,7 @@ func bulkInsertDeckCards(ctx context.Context, db dbtx, cards []domain.DeckCard) 
 	}
 
 	var sb strings.Builder
-	sb.WriteString("INSERT INTO deck_cards (player_id, deck_id, card_id, art_no, count) VALUES ")
+	sb.WriteString("INSERT INTO card.deck_cards (player_id, deck_id, card_id, art_no, count) VALUES ")
 
 	args := make([]interface{}, 0, len(cards)*5)
 	for i, c := range cards {

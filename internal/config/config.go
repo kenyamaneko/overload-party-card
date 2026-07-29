@@ -24,9 +24,13 @@ type Config struct {
 	Env          Env
 	DatabaseConn string
 
-	GoogleCloudProjectID          string
-	PlayerOnboardedSubscription   string
-	CardPackPurchasedSubscription string
+	// DatabaseIAMAuthEnabled は Cloud SQL への接続を Cloud SQL Go Connector 経由の
+	// 自動 IAM データベース認証で行うかどうかを表す。
+	DatabaseIAMAuthEnabled bool
+
+	// CloudSQLConnectionName は Cloud SQL インスタンスの接続名 (project:region:instance)。
+	// DatabaseIAMAuthEnabled が true のときのみ必須。
+	CloudSQLConnectionName string
 
 	// InternalAuthSecret は内部サービス間 JWT (HS256) 検証の共有秘密鍵。
 	InternalAuthSecret string
@@ -39,12 +43,9 @@ type Config struct {
 // 未設定の必須環境変数があれば即エラーで返し、デフォルトへの暗黙 fallback は行いません。
 func FromEnv() (*Config, error) {
 	cfg := &Config{
-		DatabaseConn:                  os.Getenv("DATABASE_CONN"),
-		GoogleCloudProjectID:          os.Getenv("GOOGLE_CLOUD_PROJECT_ID"),
-		PlayerOnboardedSubscription:   os.Getenv("PLAYER_ONBOARDED_SUBSCRIPTION"),
-		CardPackPurchasedSubscription: os.Getenv("CARD_PACK_PURCHASED_SUBSCRIPTION"),
-		InternalAuthSecret:            os.Getenv("INTERNAL_AUTH_SECRET"),
-		AccountServiceURL:             os.Getenv("ACCOUNT_SERVICE_URL"),
+		DatabaseConn:       os.Getenv("DATABASE_CONN"),
+		InternalAuthSecret: os.Getenv("INTERNAL_AUTH_SECRET"),
+		AccountServiceURL:  os.Getenv("ACCOUNT_SERVICE_URL"),
 	}
 
 	rawPort := os.Getenv("PORT")
@@ -71,15 +72,23 @@ func FromEnv() (*Config, error) {
 	if cfg.DatabaseConn == "" {
 		return nil, fmt.Errorf("config: DATABASE_CONN is required")
 	}
-	if cfg.GoogleCloudProjectID == "" {
-		return nil, fmt.Errorf("config: GOOGLE_CLOUD_PROJECT_ID is required (card subscribes to player-onboarded / card-pack-purchased events)")
+
+	rawIAMAuth := os.Getenv("DATABASE_IAM_AUTH_ENABLED")
+	switch rawIAMAuth {
+	case "true":
+		cfg.DatabaseIAMAuthEnabled = true
+	case "false":
+		cfg.DatabaseIAMAuthEnabled = false
+	default:
+		return nil, fmt.Errorf("config: DATABASE_IAM_AUTH_ENABLED must be %q or %q, got %q", "true", "false", rawIAMAuth)
 	}
-	if cfg.PlayerOnboardedSubscription == "" {
-		return nil, fmt.Errorf("config: PLAYER_ONBOARDED_SUBSCRIPTION is required")
+	if cfg.DatabaseIAMAuthEnabled {
+		cfg.CloudSQLConnectionName = os.Getenv("CLOUDSQL_CONNECTION_NAME")
+		if cfg.CloudSQLConnectionName == "" {
+			return nil, fmt.Errorf("config: CLOUDSQL_CONNECTION_NAME is required when DATABASE_IAM_AUTH_ENABLED is true")
+		}
 	}
-	if cfg.CardPackPurchasedSubscription == "" {
-		return nil, fmt.Errorf("config: CARD_PACK_PURCHASED_SUBSCRIPTION is required")
-	}
+
 	if cfg.InternalAuthSecret == "" {
 		return nil, fmt.Errorf("config: INTERNAL_AUTH_SECRET is required")
 	}
