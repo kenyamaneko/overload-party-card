@@ -25,13 +25,6 @@ func init() {
 	gin.SetMode(gin.TestMode)
 }
 
-// nullVerifier は auth 経路を通らない (health / internal master) の検証用に Verify を呼ばれてはならないことを示す。
-type nullVerifier struct{}
-
-func (nullVerifier) Verify(string) (string, error) {
-	panic("Verify should not be called for routes outside /api/v1/cards")
-}
-
 // stubCardRepo は固定のカードマスター 1 件を返す port.CardRepo スタブ。
 type stubCardRepo struct{}
 
@@ -151,11 +144,20 @@ func TestNew(t *testing.T) {
 			r := newTestRouter(t, &internalauth.MockVerifier{})
 
 			cases := []struct {
-				name string
-				path string
+				name     string
+				path     string
+				wantBody string
 			}{
-				{name: "/internal/v1/cards は 200 でカードマスターを返す", path: "/internal/v1/cards"},
-				{name: "/internal/v1/initiatives は 200 で施策マスターを返す", path: "/internal/v1/initiatives"},
+				{
+					name:     "/internal/v1/cards は 200 でカードマスターを返す",
+					path:     "/internal/v1/cards",
+					wantBody: "TST-0001",
+				},
+				{
+					name:     "/internal/v1/initiatives は 200 で施策マスターを返す",
+					path:     "/internal/v1/initiatives",
+					wantBody: "IN-TST-0001",
+				},
 			}
 
 			for _, tc := range cases {
@@ -163,15 +165,13 @@ func TestNew(t *testing.T) {
 					w := httptest.NewRecorder()
 					r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, tc.path, nil))
 					assert.Equal(t, http.StatusOK, w.Code)
+					assert.Contains(t, w.Body.String(), tc.wantBody)
 				})
 			}
 		})
 
 		t.Run("/internal/v1/pubsub 配下 (push 受け口) は auth header なしで handler の成功応答まで到達する", func(t *testing.T) {
-			// nullVerifier を使うと、もし auth middleware を経由してしまった場合は
-			// Verify 呼び出しで panic し gin.Recovery が 500 に丸めるため、
-			// stubMessageHandler の ack (200) との差で到達有無を検出できる。
-			r := newTestRouter(t, nullVerifier{})
+			r := newTestRouter(t, &internalauth.MockVerifier{})
 
 			cases := []struct {
 				name string
