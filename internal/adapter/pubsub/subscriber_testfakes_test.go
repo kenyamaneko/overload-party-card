@@ -11,25 +11,34 @@ import (
 )
 
 // fakeProcessedEventRepo は port.ProcessedEventRepo のテスト用スタブ。
-// Insert は insertResult / insertErr の固定値で振る舞いを制御し、subscriber の
-// fast-path dedup 分岐を確定的にテストできる。
+// event_id ごとの挿入済み状態を追跡し、同じ event_id への 2 回目以降の Insert が
+// false を返す実 DB の UNIQUE 制約相当の挙動を再現する。insertErr を設定すると
+// event_id によらず常にエラーを返す。
 type fakeProcessedEventRepo struct {
-	insertResult bool
-	insertErr    error
+	insertErr error
+	inserted  map[string]bool
 }
 
 var _ port.ProcessedEventRepo = (*fakeProcessedEventRepo)(nil)
 
-func (r *fakeProcessedEventRepo) Insert(_ context.Context, _, _ string) (bool, error) {
+// newFakeProcessedEventRepo は空の fakeProcessedEventRepo を生成する。
+func newFakeProcessedEventRepo() *fakeProcessedEventRepo {
+	return &fakeProcessedEventRepo{inserted: make(map[string]bool)}
+}
+
+func (r *fakeProcessedEventRepo) Insert(_ context.Context, eventID, _ string) (bool, error) {
 	if r.insertErr != nil {
 		return false, r.insertErr
 	}
-	return r.insertResult, nil
+	if r.inserted[eventID] {
+		return false, nil
+	}
+	r.inserted[eventID] = true
+	return true, nil
 }
 
-// mustMarshal は json.Marshal の testing 版。event_type 欠落など typed helper
-// (apishopfake.PublishXxx / apiscenariofake.PublishXxx) で表現できない壊れた
-// ペイロードをテストケースに含めるためのヘルパ。
+// mustMarshal は json.Marshal の testing 版。event_type 不一致など、意図的に
+// 壊れた値を持つ typed event のペイロードをテストケースに含めるためのヘルパ。
 func mustMarshal(t *testing.T, v any) []byte {
 	t.Helper()
 	b, err := json.Marshal(v)

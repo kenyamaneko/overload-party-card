@@ -57,7 +57,7 @@ func (h *DeckHandler) CreateDeck(c *gin.Context) {
 
 	var req apicard.DeckCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed request body"})
 		return
 	}
 
@@ -80,7 +80,7 @@ func (h *DeckHandler) UpdateDeck(c *gin.Context) {
 
 	var req apicard.DeckUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "malformed request body"})
 		return
 	}
 

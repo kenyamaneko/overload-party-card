@@ -1,77 +1,154 @@
-package config_test
+package config
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/kenyamaneko/overload-party-card/internal/config"
 )
 
-func setRequiredEnv(t *testing.T, overrides map[string]string) {
+var allEnvKeys = []string{
+	"PORT",
+	"ENV",
+	"DATABASE_CONN",
+	"DATABASE_IAM_AUTH_ENABLED",
+	"CLOUDSQL_CONNECTION_NAME",
+	"INTERNAL_AUTH_SECRET",
+	"ACCOUNT_SERVICE_URL",
+}
+
+// setEnv は os.Getenv が "" と unset を区別しない性質を使い、未指定キーに "" を渡して未設定を再現する。
+func setEnv(t *testing.T, envs map[string]string) {
 	t.Helper()
-	defaults := map[string]string{
-		"PORT":                             "8080",
-		"ENV":                              "dev",
-		"DATABASE_CONN":                    "postgres://test",
-		"GOOGLE_CLOUD_PROJECT_ID":          "test-project",
-		"PLAYER_ONBOARDED_SUBSCRIPTION":    "test-player-onboarded-sub",
-		"CARD_PACK_PURCHASED_SUBSCRIPTION": "test-card-pack-purchased-sub",
-		"INTERNAL_AUTH_SECRET":             "test-internal-auth-secret",
-		"ACCOUNT_SERVICE_URL":              "http://account.test",
-	}
-	for k, v := range defaults {
-		t.Setenv(k, v)
-	}
-	for k, v := range overrides {
-		t.Setenv(k, v)
+	for _, k := range allEnvKeys {
+		t.Setenv(k, envs[k])
 	}
 }
 
-func TestFromEnv(t *testing.T) {
-	t.Run("環境変数からの設定構築", func(t *testing.T) {
-		t.Run("必須の環境変数が全て設定されているとき、設定が構築される", func(t *testing.T) {
-			setRequiredEnv(t, nil)
+func mergeEnv(maps ...map[string]string) map[string]string {
+	out := map[string]string{}
+	for _, m := range maps {
+		for k, v := range m {
+			out[k] = v
+		}
+	}
+	return out
+}
 
-			cfg, err := config.FromEnv()
+var validEnv = map[string]string{
+	"PORT":                      "9003",
+	"ENV":                       "dev",
+	"DATABASE_CONN":             "host=localhost port=5432 dbname=card user=card password=card sslmode=disable",
+	"DATABASE_IAM_AUTH_ENABLED": "false",
+	"INTERNAL_AUTH_SECRET":      "test-internal-auth-secret-do-not-use-in-prod-xxxxx",
+	"ACCOUNT_SERVICE_URL":       "http://localhost:9005",
+}
+
+func TestFromEnv(t *testing.T) {
+	t.Run("環境変数からの Config 構築", func(t *testing.T) {
+		t.Run("必須 env が揃うとき、全フィールドが Config に伝搬する", func(t *testing.T) {
+			setEnv(t, validEnv)
+
+			cfg, err := FromEnv()
 
 			require.NoError(t, err)
-			assert.Equal(t, 8080, cfg.Port)
-			assert.Equal(t, config.EnvDev, cfg.Env)
-			assert.Equal(t, "postgres://test", cfg.DatabaseConn)
-			assert.Equal(t, "test-project", cfg.GoogleCloudProjectID)
-			assert.Equal(t, "test-player-onboarded-sub", cfg.PlayerOnboardedSubscription)
-			assert.Equal(t, "test-card-pack-purchased-sub", cfg.CardPackPurchasedSubscription)
-			assert.Equal(t, "test-internal-auth-secret", cfg.InternalAuthSecret)
-			assert.Equal(t, "http://account.test", cfg.AccountServiceURL)
+			assert.Equal(t, 9003, cfg.Port)
+			assert.Equal(t, Env("dev"), cfg.Env)
+			assert.Equal(t, "host=localhost port=5432 dbname=card user=card password=card sslmode=disable", cfg.DatabaseConn)
+			assert.Equal(t, "test-internal-auth-secret-do-not-use-in-prod-xxxxx", cfg.InternalAuthSecret)
+			assert.Equal(t, "http://localhost:9005", cfg.AccountServiceURL)
 		})
 
-		tests := []struct {
-			name       string
-			override   map[string]string
-			wantErrMsg string
+		t.Run("DATABASE_IAM_AUTH_ENABLED が false のとき、CLOUDSQL_CONNECTION_NAME が未設定でも成功する", func(t *testing.T) {
+			setEnv(t, validEnv)
+
+			cfg, err := FromEnv()
+
+			require.NoError(t, err)
+			assert.False(t, cfg.DatabaseIAMAuthEnabled)
+			assert.Empty(t, cfg.CloudSQLConnectionName)
+		})
+
+		t.Run("DATABASE_IAM_AUTH_ENABLED が true かつ CLOUDSQL_CONNECTION_NAME が指定されるとき、両方の値が Config に反映される", func(t *testing.T) {
+			setEnv(t, mergeEnv(validEnv, map[string]string{
+				"DATABASE_IAM_AUTH_ENABLED": "true",
+				"CLOUDSQL_CONNECTION_NAME":  "overload-party-dev:asia-northeast1:overload-party-db",
+			}))
+
+			cfg, err := FromEnv()
+
+			require.NoError(t, err)
+			assert.True(t, cfg.DatabaseIAMAuthEnabled)
+			assert.Equal(t, "overload-party-dev:asia-northeast1:overload-party-db", cfg.CloudSQLConnectionName)
+		})
+
+		invalidCases := []struct {
+			name    string
+			envs    map[string]string
+			wantErr string
 		}{
-			{"PORT が未設定のとき、エラーになる", map[string]string{"PORT": ""}, "PORT is required"},
-			{"PORT が数値でないとき、エラーになる", map[string]string{"PORT": "abc"}, `PORT "abc"`},
-			{"ENV が未設定のとき、エラーになる", map[string]string{"ENV": ""}, "ENV is required"},
-			{"ENV が未知の値のとき、エラーになる", map[string]string{"ENV": "local"}, "ENV must be"},
-			{"DATABASE_CONN が未設定のとき、エラーになる", map[string]string{"DATABASE_CONN": ""}, "DATABASE_CONN is required"},
-			{"GOOGLE_CLOUD_PROJECT_ID が未設定のとき、エラーになる", map[string]string{"GOOGLE_CLOUD_PROJECT_ID": ""}, "GOOGLE_CLOUD_PROJECT_ID is required"},
-			{"PLAYER_ONBOARDED_SUBSCRIPTION が未設定のとき、エラーになる", map[string]string{"PLAYER_ONBOARDED_SUBSCRIPTION": ""}, "PLAYER_ONBOARDED_SUBSCRIPTION is required"},
-			{"CARD_PACK_PURCHASED_SUBSCRIPTION が未設定のとき、エラーになる", map[string]string{"CARD_PACK_PURCHASED_SUBSCRIPTION": ""}, "CARD_PACK_PURCHASED_SUBSCRIPTION is required"},
-			{"INTERNAL_AUTH_SECRET が未設定のとき、エラーになる", map[string]string{"INTERNAL_AUTH_SECRET": ""}, "INTERNAL_AUTH_SECRET is required"},
-			{"ACCOUNT_SERVICE_URL が未設定のとき、エラーになる", map[string]string{"ACCOUNT_SERVICE_URL": ""}, "ACCOUNT_SERVICE_URL is required"},
+			{
+				name:    "PORT が未設定のとき、エラーになる",
+				envs:    mergeEnv(validEnv, map[string]string{"PORT": ""}),
+				wantErr: "PORT is required",
+			},
+			{
+				name:    "PORT が数値でないとき、エラーになる",
+				envs:    mergeEnv(validEnv, map[string]string{"PORT": "not-a-number"}),
+				wantErr: "PORT",
+			},
+			{
+				name:    "ENV が未設定のとき、エラーになる",
+				envs:    mergeEnv(validEnv, map[string]string{"ENV": ""}),
+				wantErr: "ENV is required",
+			},
+			{
+				name:    "ENV が未定義値のとき、エラーになる",
+				envs:    mergeEnv(validEnv, map[string]string{"ENV": "staging"}),
+				wantErr: "ENV must be",
+			},
+			{
+				name:    "DATABASE_CONN が未設定のとき、エラーになる",
+				envs:    mergeEnv(validEnv, map[string]string{"DATABASE_CONN": ""}),
+				wantErr: "DATABASE_CONN is required",
+			},
+			{
+				name:    "DATABASE_IAM_AUTH_ENABLED が未設定のとき、変数名を含むエラーになる",
+				envs:    mergeEnv(validEnv, map[string]string{"DATABASE_IAM_AUTH_ENABLED": ""}),
+				wantErr: "DATABASE_IAM_AUTH_ENABLED must be",
+			},
+			{
+				name:    `DATABASE_IAM_AUTH_ENABLED が "true"/"false" 以外の "yes" のとき、変数名を含むエラーになる`,
+				envs:    mergeEnv(validEnv, map[string]string{"DATABASE_IAM_AUTH_ENABLED": "yes"}),
+				wantErr: "DATABASE_IAM_AUTH_ENABLED must be",
+			},
+			{
+				name: "DATABASE_IAM_AUTH_ENABLED が true かつ CLOUDSQL_CONNECTION_NAME が未設定のとき、CLOUDSQL_CONNECTION_NAME を含むエラーになる",
+				envs: mergeEnv(validEnv, map[string]string{
+					"DATABASE_IAM_AUTH_ENABLED": "true",
+					"CLOUDSQL_CONNECTION_NAME":  "",
+				}),
+				wantErr: "CLOUDSQL_CONNECTION_NAME is required",
+			},
+			{
+				name:    "INTERNAL_AUTH_SECRET が未設定のとき、エラーになる",
+				envs:    mergeEnv(validEnv, map[string]string{"INTERNAL_AUTH_SECRET": ""}),
+				wantErr: "INTERNAL_AUTH_SECRET is required",
+			},
+			{
+				name:    "ACCOUNT_SERVICE_URL が未設定のとき、エラーになる",
+				envs:    mergeEnv(validEnv, map[string]string{"ACCOUNT_SERVICE_URL": ""}),
+				wantErr: "ACCOUNT_SERVICE_URL is required",
+			},
 		}
+		for _, tc := range invalidCases {
+			t.Run(tc.name, func(t *testing.T) {
+				setEnv(t, tc.envs)
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				setRequiredEnv(t, tt.override)
-
-				_, err := config.FromEnv()
+				_, err := FromEnv()
 
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.wantErrMsg)
+				assert.Contains(t, err.Error(), tc.wantErr)
 			})
 		}
 	})

@@ -133,6 +133,29 @@ jobs:
           json-path: go-test-integration.json
           title: 結合テスト結果
 
+  test-python:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Python dependencies
+        run: pip install pyyaml pytest
+      - name: Run scripts tests
+        run: python3 -m pytest scripts/tests/ -v --junitxml=pytest-scripts.xml
+      - name: Report test results
+        if: ${{ !cancelled() }}
+        uses: kenyamaneko/overload-party-common/.github/actions/python-test-report@main
+        with:
+          xml-path: pytest-scripts.xml
+          title: scripts テスト結果
+
   codegen-sync:
     needs: changes
     if: needs.changes.outputs.code == 'true'

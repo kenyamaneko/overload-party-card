@@ -22,6 +22,19 @@ func (f *fakeCardPackRepo) GetPack(_ context.Context, _ string) (*domain.CardPac
 	return f.pack, f.err
 }
 
+// fakeAddCardsErrorRepo は PlayerCardRepo のテスト用スタブ。AddCards が常に err を返す。
+type fakeAddCardsErrorRepo struct {
+	err error
+}
+
+func (f *fakeAddCardsErrorRepo) GetPlayerCards(_ context.Context, _ string) ([]*domain.PlayerCard, error) {
+	return nil, nil
+}
+
+func (f *fakeAddCardsErrorRepo) AddCards(_ context.Context, _ string, _ []domain.CardPackCard) (int, error) {
+	return 0, f.err
+}
+
 func TestGrantPack(t *testing.T) {
 	t.Run("パック付与", func(t *testing.T) {
 		t.Run("カードパックを配ると、含まれる各カードが枚数分プレイヤーに付与され、付与数は合計枚数になる", func(t *testing.T) {
@@ -111,5 +124,20 @@ func TestGrantPack(t *testing.T) {
 				assert.Empty(t, playerCards)
 			})
 		}
+
+		t.Run("配布先への加算が失敗したとき、そのエラーが返り付与数は0になる", func(t *testing.T) {
+			packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
+				IsActive: true,
+				Cards:    []domain.CardPackCard{{CardID: "TST-0001", Copies: 3}},
+			}}
+			addErr := errors.New("add cards failed")
+			pcRepo := &fakeAddCardsErrorRepo{err: addErr}
+
+			svc := NewGrantInteractor(packRepo, pcRepo)
+			got, err := svc.GrantPack(context.Background(), "player-1", "any")
+
+			require.ErrorIs(t, err, addErr)
+			assert.Equal(t, 0, got)
+		})
 	})
 }

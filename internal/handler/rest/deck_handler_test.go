@@ -84,10 +84,10 @@ func TestDeckHandler_NonNumericDeckID(t *testing.T) {
 			name   string
 			invoke func(c *gin.Context)
 		}{
-			{"GetDeck のとき、400 invalid deck_id になる", h.GetDeck},
-			{"UpdateDeck のとき、400 invalid deck_id になる", h.UpdateDeck},
-			{"DeleteDeck のとき、400 invalid deck_id になる", h.DeleteDeck},
-			{"ValidateDeckForBattle のとき、400 invalid deck_id になる", h.ValidateDeckForBattle},
+			{"デッキ取得のとき、400 になり応答本文の error が invalid deck_id と完全に一致する", h.GetDeck},
+			{"デッキ更新のとき、400 になり応答本文の error が invalid deck_id と完全に一致する", h.UpdateDeck},
+			{"デッキ削除のとき、400 になり応答本文の error が invalid deck_id と完全に一致する", h.DeleteDeck},
+			{"デッキのバトル検証のとき、400 になり応答本文の error が invalid deck_id と完全に一致する", h.ValidateDeckForBattle},
 		}
 
 		for _, tc := range cases {
@@ -101,7 +101,7 @@ func TestDeckHandler_NonNumericDeckID(t *testing.T) {
 				tc.invoke(c)
 
 				assert.Equal(t, http.StatusBadRequest, w.Code)
-				assert.Contains(t, w.Body.String(), "invalid deck_id")
+				assert.Equal(t, "invalid deck_id", decodeBody(t, w)["error"])
 			})
 		}
 	})
@@ -120,8 +120,8 @@ func TestDeckHandler_MalformedJSONBody(t *testing.T) {
 			name   string
 			invoke func(c *gin.Context)
 		}{
-			{"CreateDeck のとき、400 になる", h.CreateDeck},
-			{"UpdateDeck のとき、400 になる", h.UpdateDeck},
+			{"デッキを作成するとき、400 になり応答本文の error が malformed request body と完全に一致する", h.CreateDeck},
+			{"デッキを更新するとき、400 になり応答本文の error が malformed request body と完全に一致する", h.UpdateDeck},
 		}
 
 		for _, tc := range cases {
@@ -136,7 +136,43 @@ func TestDeckHandler_MalformedJSONBody(t *testing.T) {
 				tc.invoke(c)
 
 				assert.Equal(t, http.StatusBadRequest, w.Code)
-				assert.Contains(t, w.Body.String(), `"error"`)
+				assert.Equal(t, "malformed request body", decodeBody(t, w)["error"])
+			})
+		}
+	})
+}
+
+func TestDeckHandler_InvalidFactionBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("選択不可能な陣営を指定したリクエストの拒否", func(t *testing.T) {
+		h, _, _ := newDeckHandlerFixture(t)
+
+		const numericDeckID = "1"
+		invalidFactionBody, err := json.Marshal(apicard.DeckCreateRequest{Faction: "NotASelectableFaction"})
+		require.NoError(t, err)
+
+		cases := []struct {
+			name   string
+			invoke func(c *gin.Context)
+		}{
+			{"デッキを作成するとき、400 になり応答本文の error がデッキバリデーション違反を示す文言と完全に一致する", h.CreateDeck},
+			{"デッキを更新するとき、400 になり応答本文の error がデッキバリデーション違反を示す文言と完全に一致する", h.UpdateDeck},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				w := httptest.NewRecorder()
+				c, _ := gin.CreateTestContext(w)
+				c.Set(internalauth.PlayerIDContextKey, fxPlayerID)
+				c.Params = gin.Params{{Key: "deckId", Value: numericDeckID}}
+				c.Request = httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(invalidFactionBody))
+				c.Request.Header.Set("Content-Type", "application/json")
+
+				tc.invoke(c)
+
+				assert.Equal(t, http.StatusBadRequest, w.Code)
+				assert.Equal(t, `invalid deck: faction "NotASelectableFaction" is not selectable`, decodeBody(t, w)["error"])
 			})
 		}
 	})
