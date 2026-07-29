@@ -87,6 +87,18 @@ jobs:
         with:
           json-path: go-test-unit.json
           title: 単体テスト結果
+      # packages/api-card は別 go.mod (公開 SDK モジュール) のため go.work 上の
+      # ワークスペース参照だけではルートの `go test ./...` に含まれず、明示的に走らせる。
+      - name: Run api-card unit tests
+        working-directory: packages/api-card
+        run: go test -race -count=1 ./... -json | tee go-test-unit.json
+      - name: Report api-card test results
+        if: ${{ !cancelled() }}
+        uses: kenyamaneko/overload-party-common/.github/actions/go-test-report@main
+        with:
+          json-path: packages/api-card/go-test-unit.json
+          title: api-card 単体テスト結果
+          module-dir: packages/api-card
 
   test-integration:
     needs: changes
@@ -120,6 +132,29 @@ jobs:
         with:
           json-path: go-test-integration.json
           title: 結合テスト結果
+
+  test-python:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Python dependencies
+        run: pip install pyyaml pytest
+      - name: Run scripts tests
+        run: python3 -m pytest scripts/tests/ -v --junitxml=pytest-scripts.xml
+      - name: Report test results
+        if: ${{ !cancelled() }}
+        uses: kenyamaneko/overload-party-common/.github/actions/python-test-report@main
+        with:
+          xml-path: pytest-scripts.xml
+          title: scripts テスト結果
 
   codegen-sync:
     needs: changes

@@ -75,6 +75,33 @@ func TestCreate(t *testing.T) {
 				}
 			})
 		}
+
+		t.Run("同一カード・同一アートが重複した構成で作成すると、エラーになりデッキ本体も保存されない", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			repo := repository.NewPgDeckRepository(sharedPg.Pool)
+			ctx := context.Background()
+
+			now := time.Now().UTC().Truncate(time.Microsecond)
+			deck := domain.Deck{
+				PlayerID:  playerA,
+				DeckName:  "Broken",
+				Faction:   "SHE",
+				ProductID: "PD-TST",
+				RoutineID: "IN-TST-R",
+				SpecialID: "IN-TST-S",
+				CreatedAt: now,
+				UpdatedAt: now,
+			}
+
+			_, err := repo.Create(ctx, deck, []domain.DeckCardEntry{
+				{CardID: "TST-0001", ArtNo: 0, Count: 1},
+				{CardID: "TST-0001", ArtNo: 0, Count: 1},
+			})
+
+			require.Error(t, err)
+			assert.Equal(t, 0, countRows(t, "card.decks"))
+			assert.Equal(t, 0, countRows(t, "card.deck_cards"))
+		})
 	})
 }
 

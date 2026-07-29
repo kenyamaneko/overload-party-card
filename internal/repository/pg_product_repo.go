@@ -26,7 +26,7 @@ func NewPgProductRepository(pool *pgxpool.Pool) *PgProductRepository {
 func (r *PgProductRepository) FindAll(ctx context.Context) ([]*domain.Product, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT product_id, faction, product_name, is_active
-		 FROM products WHERE is_active = true ORDER BY product_id`,
+		 FROM card.products WHERE is_active = true ORDER BY product_id`,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("query products: %w", err)

@@ -1,18 +1,27 @@
 package cache
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	gencache "github.com/kenyamaneko/overload-party-card/data/cache"
-	gamedesign "github.com/kenyamaneko/overload-party-common/packages/game-design-constants"
+	"github.com/kenyamaneko/overload-party-card/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var resourceCardTypes = map[string]bool{
-	gamedesign.CardTypeCompute:      true,
-	gamedesign.CardTypeDataResource: true,
+// stubCardRepo は port.CardRepo のテスト用スタブ。
+type stubCardRepo struct {
+	cards []*domain.Card
+	err   error
 }
+
+func (r *stubCardRepo) FindAll(_ context.Context) ([]*domain.Card, error) {
+	return r.cards, r.err
+}
+
+var resourceCardTypes = map[string]bool{"Compute": true, "DataResource": true}
 
 func isResourceType(cardType string) bool {
 	return resourceCardTypes[cardType]
@@ -26,15 +35,21 @@ func loadTestCache(t *testing.T) *CardCache {
 	return cc
 }
 
-// controlCardsJSON は既知カード 2 件の制御フィクスチャ。生成データの件数・並びに
-// 依存せず「LoadFromBytes した各カードを card_id で引ける」ことを固定する。
-const controlCardsJSON = `[
-	{"card_id":"TST-0001","card_name":"Alpha","card_type":"Compute","resource_label":"S"},
-	{"card_id":"TST-0002","card_name":"Beta","card_type":"Support"}
-]`
-
 func TestLoadFromBytes(t *testing.T) {
 	t.Run("生成カードキャッシュのロード", func(t *testing.T) {
+		t.Run("0 件 JSON のとき、マスター欠落としてエラーになる", func(t *testing.T) {
+			cc := NewCardCache()
+			err := cc.LoadFromBytes([]byte(`[]`))
+			assert.Error(t, err)
+		})
+
+		t.Run("JSON として不正なバイト列のとき、読み込みがエラーになる", func(t *testing.T) {
+			cc := NewCardCache()
+			err := cc.LoadFromBytes([]byte(`{`))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "parse card data")
+		})
+
 		t.Run("全カードで resource 種別なら resource_label があり、support 種別なら無い", func(t *testing.T) {
 			// リソース種別か否かと label 有無を 1 枚ごとに等式で突き合わせ、if 分岐なしで網羅する。
 			cc := loadTestCache(t)
@@ -47,26 +62,43 @@ func TestLoadFromBytes(t *testing.T) {
 			}
 		})
 	})
+}
 
-	t.Run("既知カード 2 件の制御フィクスチャをロードしたとき", func(t *testing.T) {
-		cc := NewCardCache()
-		require.NoError(t, cc.LoadFromBytes([]byte(controlCardsJSON)))
+func TestLoad(t *testing.T) {
+	t.Run("DB からのカードキャッシュ読み込み", func(t *testing.T) {
+		t.Run("DB に定義があるとき、読み込んだ定義が検索で引けるようになる", func(t *testing.T) {
+			repo := &stubCardRepo{cards: []*domain.Card{
+				{CardID: "TST-0001", CardName: "Test Card"},
+			}}
+			cc := NewCardCache()
 
-		t.Run("件数と card_id ごとの主要フィールドが保たれる", func(t *testing.T) {
-			assert.Equal(t, 2, cc.Count())
+			err := cc.Load(context.Background(), repo)
 
-			alpha := cc.Get("TST-0001")
-			require.NotNil(t, alpha)
-			assert.Equal(t, "Alpha", alpha.CardName)
-			assert.Equal(t, gamedesign.CardTypeCompute, alpha.CardType)
-
-			beta := cc.Get("TST-0002")
-			require.NotNil(t, beta)
-			assert.Equal(t, "Beta", beta.CardName)
+			require.NoError(t, err)
+			got := cc.Get("TST-0001")
+			require.NotNil(t, got)
+			assert.Equal(t, "Test Card", got.CardName)
 		})
 
-		t.Run("未知の card_id では nil が返る", func(t *testing.T) {
-			assert.Nil(t, cc.Get("TST-9999"))
+		t.Run("DB が 0 件のとき、マスター欠落としてエラーになる", func(t *testing.T) {
+			repo := &stubCardRepo{cards: nil}
+			cc := NewCardCache()
+
+			err := cc.Load(context.Background(), repo)
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "0 cards loaded")
+		})
+
+		t.Run("DB 読み込みが失敗したとき、そのエラーが伝播する", func(t *testing.T) {
+			dbErr := errors.New("db down")
+			repo := &stubCardRepo{err: dbErr}
+			cc := NewCardCache()
+
+			err := cc.Load(context.Background(), repo)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, dbErr)
 		})
 	})
 }

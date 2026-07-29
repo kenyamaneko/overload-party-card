@@ -151,5 +151,23 @@ func TestAddCards(t *testing.T) {
 				}
 			})
 		}
+
+		t.Run("別アート(art_no=1)のみ所持するカードを配布すると、加算ではなく通常アート(art_no=0)の行が新規作成される", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedPlayerCard(t, playerCardSeed{playerA, "TST-0001", 1, 2})
+
+			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
+			got, err := repo.AddCards(context.Background(), playerA, []domain.CardPackCard{{CardID: "TST-0001", Copies: 3}})
+			require.NoError(t, err)
+			assert.Equal(t, 3, got)
+
+			count0, ok0 := fetchPlayerCardCount(t, playerA, "TST-0001", 0)
+			assert.True(t, ok0)
+			assert.Equal(t, 3, count0)
+
+			count1, ok1 := fetchPlayerCardCount(t, playerA, "TST-0001", 1)
+			assert.True(t, ok1)
+			assert.Equal(t, 2, count1)
+		})
 	})
 }

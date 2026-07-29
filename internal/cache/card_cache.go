@@ -80,6 +80,9 @@ func (c *CardCache) LoadFromBytes(data []byte) error {
 	if err := json.Unmarshal(data, &cards); err != nil {
 		return fmt.Errorf("parse card data: %w", err)
 	}
+	if len(cards) == 0 {
+		return fmt.Errorf("cache.LoadFromBytes: 0 cards loaded, check cards_gen.json")
+	}
 
 	c.mu.Lock()
 	defer c.mu.Unlock()

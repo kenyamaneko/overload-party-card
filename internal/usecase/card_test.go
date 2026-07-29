@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,18 +27,18 @@ func TestListCardsWithOwnership(t *testing.T) {
 			{
 				name: "一部のカードを所持するとき、所持フラグが対応して返る",
 				cards: map[string]*domain.Card{
-					"TST-0001": {CardID: "TST-0001", CardName: "Fireball"},
-					"TST-0002": {CardID: "TST-0002", CardName: "Shield"},
-					"TST-0003": {CardID: "TST-0003", CardName: "Heal"},
+					"C-001": {CardID: "C-001", CardName: "Fireball"},
+					"C-002": {CardID: "C-002", CardName: "Shield"},
+					"C-003": {CardID: "C-003", CardName: "Heal"},
 				},
 				seed: []*domain.PlayerCard{
-					{PlayerID: "p1", CardID: "TST-0001", ArtNo: 1, Count: 1},
-					{PlayerID: "p1", CardID: "TST-0003", ArtNo: 1, Count: 2},
+					{PlayerID: "p1", CardID: "C-001", ArtNo: 1, Count: 1},
+					{PlayerID: "p1", CardID: "C-003", ArtNo: 1, Count: 2},
 				},
 				want: []ownershipExpectation{
-					{"TST-0001", true},
-					{"TST-0002", false},
-					{"TST-0003", true},
+					{"C-001", true},
+					{"C-002", false},
+					{"C-003", true},
 				},
 			},
 			{
@@ -49,13 +50,13 @@ func TestListCardsWithOwnership(t *testing.T) {
 			{
 				name: "所持カードが無いとき、全て未所持で返る",
 				cards: map[string]*domain.Card{
-					"TST-0001": {CardID: "TST-0001", CardName: "Fireball"},
-					"TST-0002": {CardID: "TST-0002", CardName: "Shield"},
+					"C-001": {CardID: "C-001", CardName: "Fireball"},
+					"C-002": {CardID: "C-002", CardName: "Shield"},
 				},
 				seed: nil,
 				want: []ownershipExpectation{
-					{"TST-0001", false},
-					{"TST-0002", false},
+					{"C-001", false},
+					{"C-002", false},
 				},
 			},
 		}
@@ -80,21 +81,45 @@ func TestListCardsWithOwnership(t *testing.T) {
 
 func TestListCards(t *testing.T) {
 	t.Run("カード一覧", func(t *testing.T) {
-		t.Run("マスターにカードがあるとき、card_id 昇順で全件返る", func(t *testing.T) {
+		t.Run("マスターにカードがあるとき、全件が ID 昇順で名前とともに返る", func(t *testing.T) {
 			cards := map[string]*domain.Card{
-				"TST-0001": {CardID: "TST-0001", CardName: "Fireball"},
-				"TST-0002": {CardID: "TST-0002", CardName: "Shield"},
+				"C-002": {CardID: "C-002", CardName: "Shield"},
+				"C-001": {CardID: "C-001", CardName: "Fireball"},
 			}
 			svc := NewCardInteractor(newInMemoryCardRepo(cards), newInMemoryPlayerCardRepo())
 
 			result, err := svc.ListCards(context.Background())
 			require.NoError(t, err)
+			require.Len(t, result, 2)
+			assert.Equal(t, "C-001", result[0].CardID)
+			assert.Equal(t, "Fireball", result[0].CardName)
+			assert.Equal(t, "C-002", result[1].CardID)
+			assert.Equal(t, "Shield", result[1].CardName)
+		})
 
-			gotIDs := make([]string, len(result))
-			for i, c := range result {
-				gotIDs[i] = c.CardID
+		t.Run("効果定義を持たないカードのとき、効果フィールドが省略される", func(t *testing.T) {
+			cards := map[string]*domain.Card{
+				"TST-0001": {CardID: "TST-0001", CardName: "Test Card"},
 			}
-			assert.Equal(t, []string{"TST-0001", "TST-0002"}, gotIDs)
+			svc := NewCardInteractor(newInMemoryCardRepo(cards), newInMemoryPlayerCardRepo())
+
+			result, err := svc.ListCards(context.Background())
+			require.NoError(t, err)
+			require.Len(t, result, 1)
+			assert.Nil(t, result[0].Effects)
+		})
+
+		t.Run("効果定義を持つカードのとき、定義がそのまま返る", func(t *testing.T) {
+			cards := map[string]*domain.Card{
+				"TST-0001": {CardID: "TST-0001", CardName: "Test Card", Effects: json.RawMessage(`{"ops":[]}`)},
+			}
+			svc := NewCardInteractor(newInMemoryCardRepo(cards), newInMemoryPlayerCardRepo())
+
+			result, err := svc.ListCards(context.Background())
+			require.NoError(t, err)
+			require.Len(t, result, 1)
+			require.NotNil(t, result[0].Effects)
+			assert.JSONEq(t, `{"ops":[]}`, string(*result[0].Effects))
 		})
 	})
 }

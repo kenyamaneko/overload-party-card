@@ -17,6 +17,7 @@ func New(
 	playerCardH *rest.PlayerCardHandler,
 	productH *rest.ProductHandler,
 	initiativeH *rest.InitiativeHandler,
+	pubsubPushH *rest.PubSubPushHandler,
 	authVerifier internalauth.Verifier,
 ) *gin.Engine {
 	r := gin.New()
@@ -26,12 +27,15 @@ func New(
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	// 内部 master 配信 (battle / gateway 起動時のキャッシュロード用)。
-	// player_id を要求しないため認証なしで開放する。
+	// 内部 master 配信 (battle / gateway 起動時のキャッシュロード用) と
+	// Cloud Pub/Sub push 受け口。到達制御は Cloud Run の呼び出し IAM が担うため、
+	// アプリ層では認証なしで開放する。
 	internal := r.Group("/internal/v1")
 	{
 		internal.GET("/cards", cardH.ListAllRaw)
 		internal.GET("/initiatives", initiativeH.ListAll)
+		internal.POST("/pubsub/player-onboarded", pubsubPushH.HandlePlayerOnboarded)
+		internal.POST("/pubsub/card-pack-purchased", pubsubPushH.HandleCardPackPurchased)
 	}
 
 	// gateway 経由の player-scoped API。internalauth middleware が JWT 検証して

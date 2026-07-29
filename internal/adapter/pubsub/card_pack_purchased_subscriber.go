@@ -11,35 +11,28 @@ import (
 	"github.com/kenyamaneko/overload-party-card/internal/port"
 )
 
-// CardPackPurchasedSubscriber は card-pack-purchased subscription を消費し、
-// 購入された card_pack をプレイヤーに配布する。配布 SSoT は card.card_pack マスター。
+// CardPackPurchasedSubscriber は card-pack-purchased-card-sub の push 配信を
+// 処理し、購入された card_pack をプレイヤーに配布する。配布 SSoT は card.card_pack マスター。
 type CardPackPurchasedSubscriber struct {
-	stream          port.MessageStream
 	grantInteractor packGranter
 	eventRepo       port.ProcessedEventRepo
 }
 
 // NewCardPackPurchasedSubscriber は CardPackPurchasedSubscriber を生成する。
 func NewCardPackPurchasedSubscriber(
-	stream port.MessageStream,
 	grantInteractor packGranter,
 	eventRepo port.ProcessedEventRepo,
 ) *CardPackPurchasedSubscriber {
 	return &CardPackPurchasedSubscriber{
-		stream:          stream,
 		grantInteractor: grantInteractor,
 		eventRepo:       eventRepo,
 	}
 }
 
-// Start は ctx がキャンセルされるか stream がエラーを返すまでブロックする。
-func (s *CardPackPurchasedSubscriber) Start(ctx context.Context) error {
-	slog.Info("card-pack-purchased-card subscriber: consuming")
-	return s.stream.Consume(ctx, s.process)
-}
-
-// process は 1 イベントを処理する。戻り値 nil = ack、非 nil = nack。
-func (s *CardPackPurchasedSubscriber) process(ctx context.Context, data []byte) error {
+// Handle は push delivery で届いた 1 イベントの payload (デコード済み bytes) を
+// 処理する。戻り値 nil = ack、非 nil = nack として呼び出し元 (push handler) が
+// 応答ステータスに変換する。port.MessageHandler を満たす。
+func (s *CardPackPurchasedSubscriber) Handle(ctx context.Context, data []byte) error {
 	var event apishop.CardPackPurchasedEvent
 	if err := json.Unmarshal(data, &event); err != nil {
 		slog.Error("card-pack-purchased-card bad payload", "error", err)

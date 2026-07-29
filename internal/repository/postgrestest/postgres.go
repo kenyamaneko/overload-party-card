@@ -18,7 +18,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -35,7 +34,6 @@ type Postgres struct {
 type config struct {
 	schemaFiles []string
 	schemas     []string
-	searchPath  string
 }
 
 // Option は Start の振る舞いを構成する。
@@ -53,15 +51,6 @@ func WithSchemaFile(repoRelativePath string) Option {
 func WithSchema(name string) Option {
 	return func(c *config) {
 		c.schemas = append(c.schemas, name)
-	}
-}
-
-// WithSearchPath は接続プールのデフォルト search_path を設定する。
-// 未修飾テーブル参照（FROM card_definitions 等）がスキーマ配下で解決されるよう、
-// pgxpool の AfterConnect フックで全接続に対して SET search_path を実行する。
-func WithSearchPath(path string) Option {
-	return func(c *config) {
-		c.searchPath = path
 	}
 }
 
@@ -107,14 +96,6 @@ func Start(ctx context.Context, opts ...Option) (*Postgres, error) {
 	poolCfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, errors.Join(fmt.Errorf("parse pool config: %w", err), container.Terminate(ctx))
-	}
-	searchPath := cfg.searchPath
-	poolCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
-		if searchPath == "" {
-			return nil
-		}
-		_, serr := conn.Exec(ctx, "SET search_path TO "+searchPath)
-		return serr
 	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
