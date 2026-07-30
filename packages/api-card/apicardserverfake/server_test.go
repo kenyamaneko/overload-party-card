@@ -3,6 +3,7 @@ package apicardserverfake_test
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"testing"
 
@@ -21,16 +22,77 @@ func TestServer(t *testing.T) {
 				path       string
 				reqBody    []byte
 				wantStatus int
+				verifyBody func(t *testing.T, body []byte)
 			}{
-				{name: "ListAllCards (Fn 未設定) のとき、200 になる", method: http.MethodGet, path: "/internal/v1/cards", reqBody: nil, wantStatus: http.StatusOK},
-				{name: "ListCardsWithOwnership (Fn 未設定) のとき、200 になる", method: http.MethodGet, path: "/api/v1/cards/cards/with-ownership", reqBody: nil, wantStatus: http.StatusOK},
-				{name: "ListPlayerCards (Fn 未設定) のとき、200 になる", method: http.MethodGet, path: "/api/v1/cards/cards", reqBody: nil, wantStatus: http.StatusOK},
-				{name: "ListDecks (Fn 未設定) のとき、200 になる", method: http.MethodGet, path: "/api/v1/cards/decks", reqBody: nil, wantStatus: http.StatusOK},
-				{name: "GetDeck (Fn 未設定) のとき、200 になる", method: http.MethodGet, path: "/api/v1/cards/decks/1", reqBody: nil, wantStatus: http.StatusOK},
-				{name: "CreateDeck (Fn 未設定) のとき、200 になる", method: http.MethodPost, path: "/api/v1/cards/decks", reqBody: []byte(`{}`), wantStatus: http.StatusOK},
-				{name: "UpdateDeck (Fn 未設定) のとき、200 になる", method: http.MethodPut, path: "/api/v1/cards/decks/1", reqBody: []byte(`{}`), wantStatus: http.StatusOK},
-				{name: "DeleteDeck (Fn 未設定) のとき、204 になる", method: http.MethodDelete, path: "/api/v1/cards/decks/1", reqBody: nil, wantStatus: http.StatusNoContent},
-				{name: "ValidateDeckForBattle (Fn 未設定) のとき、200 になる", method: http.MethodPost, path: "/api/v1/cards/decks/1/validate-for-battle", reqBody: nil, wantStatus: http.StatusOK},
+				{
+					name: "ListAllCards (Fn 未設定) のとき、200 になる", method: http.MethodGet, path: "/internal/v1/cards", wantStatus: http.StatusOK,
+					verifyBody: func(t *testing.T, body []byte) {
+						var cards []*apicard.CardDefinition
+						require.NoError(t, json.Unmarshal(body, &cards))
+						assert.Empty(t, cards)
+					},
+				},
+				{
+					name: "ListCardsWithOwnership (Fn 未設定) のとき、200 になる", method: http.MethodGet, path: "/api/v1/cards/cards/with-ownership", wantStatus: http.StatusOK,
+					verifyBody: func(t *testing.T, body []byte) {
+						var cards []*apicard.CardWithOwnership
+						require.NoError(t, json.Unmarshal(body, &cards))
+						assert.Empty(t, cards)
+					},
+				},
+				{
+					name: "ListPlayerCards (Fn 未設定) のとき、200 になる", method: http.MethodGet, path: "/api/v1/cards/cards", wantStatus: http.StatusOK,
+					verifyBody: func(t *testing.T, body []byte) {
+						var cards []*apicard.PlayerCardWithDef
+						require.NoError(t, json.Unmarshal(body, &cards))
+						assert.Empty(t, cards)
+					},
+				},
+				{
+					name: "ListDecks (Fn 未設定) のとき、200 になる", method: http.MethodGet, path: "/api/v1/cards/decks", wantStatus: http.StatusOK,
+					verifyBody: func(t *testing.T, body []byte) {
+						var decks []*apicard.Deck
+						require.NoError(t, json.Unmarshal(body, &decks))
+						assert.Empty(t, decks)
+					},
+				},
+				{
+					name: "GetDeck (Fn 未設定) のとき、200 になる", method: http.MethodGet, path: "/api/v1/cards/decks/1", wantStatus: http.StatusOK,
+					verifyBody: func(t *testing.T, body []byte) {
+						var got apicardserverfake.DeckWithCardsResponse
+						require.NoError(t, json.Unmarshal(body, &got))
+						assert.Nil(t, got.Deck)
+						assert.Empty(t, got.Cards)
+					},
+				},
+				{
+					name: "CreateDeck (Fn 未設定) のとき、200 になる", method: http.MethodPost, path: "/api/v1/cards/decks", reqBody: []byte(`{}`), wantStatus: http.StatusOK,
+					verifyBody: func(t *testing.T, body []byte) {
+						var deck apicard.Deck
+						require.NoError(t, json.Unmarshal(body, &deck))
+						assert.Equal(t, apicard.Deck{}, deck)
+					},
+				},
+				{
+					name: "UpdateDeck (Fn 未設定) のとき、200 になる", method: http.MethodPut, path: "/api/v1/cards/decks/1", reqBody: []byte(`{}`), wantStatus: http.StatusOK,
+					verifyBody: func(t *testing.T, body []byte) {
+						var deck apicard.Deck
+						require.NoError(t, json.Unmarshal(body, &deck))
+						assert.Equal(t, apicard.Deck{}, deck)
+					},
+				},
+				{
+					name: "DeleteDeck (Fn 未設定) のとき、204 になる", method: http.MethodDelete, path: "/api/v1/cards/decks/1", wantStatus: http.StatusNoContent,
+					verifyBody: func(t *testing.T, body []byte) {
+						assert.Empty(t, body)
+					},
+				},
+				{
+					name: "ValidateDeckForBattle (Fn 未設定) のとき、200 になる", method: http.MethodPost, path: "/api/v1/cards/decks/1/validate-for-battle", wantStatus: http.StatusOK,
+					verifyBody: func(t *testing.T, body []byte) {
+						assert.Empty(t, body)
+					},
+				},
 			}
 
 			for _, tt := range tests {
@@ -38,13 +100,18 @@ func TestServer(t *testing.T) {
 					srv := apicardserverfake.NewServer()
 					defer srv.Close()
 
-					req, _ := http.NewRequest(tt.method, srv.URL()+tt.path, bytes.NewReader(tt.reqBody))
+					req, err := http.NewRequest(tt.method, srv.URL()+tt.path, bytes.NewReader(tt.reqBody))
+					require.NoError(t, err)
 					req.Header.Set("Content-Type", "application/json")
 					resp, err := http.DefaultClient.Do(req)
 					require.NoError(t, err)
 					defer resp.Body.Close()
 
+					body, err := io.ReadAll(resp.Body)
+					require.NoError(t, err)
+
 					assert.Equal(t, tt.wantStatus, resp.StatusCode)
+					tt.verifyBody(t, body)
 				})
 			}
 		})

@@ -27,7 +27,7 @@ func TestPlayerCardInteractor_GetPlayerCards(t *testing.T) {
 		t.Run("所持カードがあるとき、所持枚数は player_cards・カード定義は CardCache から構成して返す", func(t *testing.T) {
 			effectText := "対象を 1 体破壊する"
 			def := &domain.Card{
-				CardID: "SH-0001", CardName: "Fireball", ResourceLabel: "mana",
+				CardID: "TST-0001", CardName: "Fireball", ResourceLabel: "mana",
 				Faction: "SHE", CardType: "spell", Resizable: true, Elastic: false,
 				Stats: json.RawMessage(`{"atk":3}`), EffectText: &effectText, Restriction: "limited",
 			}
@@ -68,20 +68,20 @@ func TestPlayerCardInteractor_GetPlayerCards(t *testing.T) {
 					name:  "唯一の所持カードが cache に無いとき、そのカード ID を含むエラーになる",
 					cache: nil,
 					seed: []*domain.PlayerCard{
-						{PlayerID: "player-1", CardID: "SH-0001", ArtNo: 1, Count: 1},
+						{PlayerID: "player-1", CardID: "TST-0001", ArtNo: 1, Count: 1},
 					},
-					missingCard: "SH-0001",
+					missingCard: "TST-0001",
 				},
 				{
 					name: "複数所持のうち 1 枚が cache に無いとき、そのカード ID を含むエラーになる",
 					cache: []*domain.Card{
-						{CardID: "SH-0001", CardName: "Fireball"},
+						{CardID: "TST-0001", CardName: "Fireball"},
 					},
 					seed: []*domain.PlayerCard{
-						{PlayerID: "player-1", CardID: "SH-0001", ArtNo: 1, Count: 1},
-						{PlayerID: "player-1", CardID: "SH-9999", ArtNo: 1, Count: 1},
+						{PlayerID: "player-1", CardID: "TST-0001", ArtNo: 1, Count: 1},
+						{PlayerID: "player-1", CardID: "TST-9999", ArtNo: 1, Count: 1},
 					},
-					missingCard: "SH-9999",
+					missingCard: "TST-9999",
 				},
 			}
 
