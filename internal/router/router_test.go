@@ -200,6 +200,8 @@ func TestNew(t *testing.T) {
 			}{
 				{name: "デッキ一覧の取得は 401 になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/decks"},
 				{name: "所持カード一覧の取得は 401 になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/cards"},
+				{name: "プロダクト一覧の取得は 401 になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/products"},
+				{name: "所持状態付きカード一覧の取得は 401 になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/cards/with-ownership"},
 			}
 
 			for _, tc := range cases {
