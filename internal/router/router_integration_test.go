@@ -68,7 +68,7 @@ func newIntegrationRouter(t *testing.T, playerID string) *gin.Engine {
 	initiativeH := rest.NewInitiativeHandler(initiativeCache)
 	pubsubPushH := rest.NewPubSubPushHandler(stubMessageHandler, stubMessageHandler)
 
-	return New(cardH, deckH, playerCardH, productH, initiativeH, pubsubPushH, fakeRouterVerifier{playerID: playerID})
+	return New(cardH, deckH, playerCardH, productH, initiativeH, pubsubPushH, &internalauth.MockVerifier{VerifyFn: func(string) (string, error) { return playerID, nil }})
 }
 
 // doAuthedGet は internalauth ヘッダを付与して GET を実行する。
