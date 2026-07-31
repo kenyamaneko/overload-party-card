@@ -7,13 +7,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testPublicKeyPEM は config が値をそのまま保持することの確認にだけ使うダミー。
+// 鍵としての妥当性は検証しないため、PEM の体裁だけ揃えている。
+const testPublicKeyPEM = "-----BEGIN PUBLIC KEY-----\ndummy-not-a-real-key\n-----END PUBLIC KEY-----\n"
+
 var allEnvKeys = []string{
 	"PORT",
 	"ENV",
 	"DATABASE_CONN",
 	"DATABASE_IAM_AUTH_ENABLED",
 	"CLOUDSQL_CONNECTION_NAME",
-	"INTERNAL_AUTH_SECRET",
+	"INTERNAL_AUTH_PUBLIC_KEY",
 	"ACCOUNT_SERVICE_URL",
 }
 
@@ -40,7 +44,7 @@ var validEnv = map[string]string{
 	"ENV":                       "dev",
 	"DATABASE_CONN":             "host=localhost port=5432 dbname=card user=card password=card sslmode=disable",
 	"DATABASE_IAM_AUTH_ENABLED": "false",
-	"INTERNAL_AUTH_SECRET":      "test-internal-auth-secret-do-not-use-in-prod-xxxxx",
+	"INTERNAL_AUTH_PUBLIC_KEY":  testPublicKeyPEM,
 	"ACCOUNT_SERVICE_URL":       "http://localhost:9005",
 }
 
@@ -55,7 +59,7 @@ func TestFromEnv(t *testing.T) {
 			assert.Equal(t, 9003, cfg.Port)
 			assert.Equal(t, Env("dev"), cfg.Env)
 			assert.Equal(t, "host=localhost port=5432 dbname=card user=card password=card sslmode=disable", cfg.DatabaseConn)
-			assert.Equal(t, "test-internal-auth-secret-do-not-use-in-prod-xxxxx", cfg.InternalAuthSecret)
+			assert.Equal(t, testPublicKeyPEM, cfg.InternalAuthPublicKey)
 			assert.Equal(t, "http://localhost:9005", cfg.AccountServiceURL)
 		})
 
@@ -131,9 +135,9 @@ func TestFromEnv(t *testing.T) {
 				wantErr: "CLOUDSQL_CONNECTION_NAME is required",
 			},
 			{
-				name:    "INTERNAL_AUTH_SECRET が未設定のとき、エラーになる",
-				envs:    mergeEnv(validEnv, map[string]string{"INTERNAL_AUTH_SECRET": ""}),
-				wantErr: "INTERNAL_AUTH_SECRET is required",
+				name:    "INTERNAL_AUTH_PUBLIC_KEY が未設定のとき、エラーになる",
+				envs:    mergeEnv(validEnv, map[string]string{"INTERNAL_AUTH_PUBLIC_KEY": ""}),
+				wantErr: "INTERNAL_AUTH_PUBLIC_KEY is required",
 			},
 			{
 				name:    "ACCOUNT_SERVICE_URL が未設定のとき、エラーになる",

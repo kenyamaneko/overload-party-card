@@ -32,8 +32,8 @@ type Config struct {
 	// DatabaseIAMAuthEnabled が true のときのみ必須。
 	CloudSQLConnectionName string
 
-	// InternalAuthSecret は内部サービス間 JWT (HS256) 検証の共有秘密鍵。
-	InternalAuthSecret string
+	// InternalAuthPublicKey は内部サービス間 JWT (RS256) を検証する gateway の公開鍵。PEM 形式。
+	InternalAuthPublicKey string
 
 	// AccountServiceURL はデッキ検証時に faction 所持を照会する account サービスの URL。
 	AccountServiceURL string
@@ -43,9 +43,9 @@ type Config struct {
 // 未設定の必須環境変数があれば即エラーで返し、デフォルトへの暗黙 fallback は行いません。
 func FromEnv() (*Config, error) {
 	cfg := &Config{
-		DatabaseConn:       os.Getenv("DATABASE_CONN"),
-		InternalAuthSecret: os.Getenv("INTERNAL_AUTH_SECRET"),
-		AccountServiceURL:  os.Getenv("ACCOUNT_SERVICE_URL"),
+		DatabaseConn:          os.Getenv("DATABASE_CONN"),
+		InternalAuthPublicKey: os.Getenv("INTERNAL_AUTH_PUBLIC_KEY"),
+		AccountServiceURL:     os.Getenv("ACCOUNT_SERVICE_URL"),
 	}
 
 	rawPort := os.Getenv("PORT")
@@ -89,8 +89,8 @@ func FromEnv() (*Config, error) {
 		}
 	}
 
-	if cfg.InternalAuthSecret == "" {
-		return nil, fmt.Errorf("config: INTERNAL_AUTH_SECRET is required")
+	if cfg.InternalAuthPublicKey == "" {
+		return nil, fmt.Errorf("config: INTERNAL_AUTH_PUBLIC_KEY is required")
 	}
 	if cfg.AccountServiceURL == "" {
 		return nil, fmt.Errorf("config: ACCOUNT_SERVICE_URL is required (card validates deck faction ownership via account)")
