@@ -48,10 +48,10 @@ jobs:
           sections: |
             外から見た振る舞い:単体テスト:go-json:go-test-unit.json:github.com/kenyamaneko/overload-party-card/internal/handler/,github.com/kenyamaneko/overload-party-card/internal/router
             内部の挙動:単体テスト:go-json:go-test-unit.json:github.com/kenyamaneko/overload-party-card/internal/adapter/,github.com/kenyamaneko/overload-party-card/internal/cache,github.com/kenyamaneko/overload-party-card/internal/config,github.com/kenyamaneko/overload-party-card/internal/domain,github.com/kenyamaneko/overload-party-card/internal/repository,github.com/kenyamaneko/overload-party-card/internal/usecase
-            外から見た振る舞い:API パッケージ:go-json:go-test-unit-api-card.json
+            外から見た振る舞い:API パッケージ:go-json:go-test-unit-extra.json
             外から見た振る舞い:結合テスト:go-json:go-test-integration.json:github.com/kenyamaneko/overload-party-card/internal/handler/,github.com/kenyamaneko/overload-party-card/internal/router
             内部の挙動:結合テスト:go-json:go-test-integration.json:github.com/kenyamaneko/overload-party-card/internal/adapter/,github.com/kenyamaneko/overload-party-card/internal/cache,github.com/kenyamaneko/overload-party-card/internal/config,github.com/kenyamaneko/overload-party-card/internal/domain,github.com/kenyamaneko/overload-party-card/internal/repository,github.com/kenyamaneko/overload-party-card/internal/usecase
-            内部の挙動:カードデータの生成:pytest-junit:pytest-scripts.xml
+            内部の挙動:カードデータの生成:pytest-junit:pytest-report.xml
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
