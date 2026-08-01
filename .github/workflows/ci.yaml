@@ -16,7 +16,6 @@ concurrency:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   ci:
@@ -25,4 +24,5 @@ jobs:
       extra-test-module-dir: packages/api-card
       codegen-needs-node: true
       codegen-needs-dotnet: true
+      has-python-tests: true
     secrets: inherit
