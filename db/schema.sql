@@ -69,7 +69,7 @@ CREATE TABLE card.products (
   is_active    BOOLEAN      NOT NULL DEFAULT true,   -- 有効フラグ（論理削除）
   created_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),  -- 作成日時
   updated_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),  -- 更新日時
-  CHECK (faction IN ('SHE', 'Tenki', 'Sugar', 'Tuners')),
+  CONSTRAINT products_faction_check CHECK (faction IN ('SHE', 'Tenki', 'Sugar', 'Tuners')),
   PRIMARY KEY (product_id)
 );
 
@@ -87,10 +87,10 @@ CREATE TABLE card.initiatives (
   is_active     BOOLEAN      NOT NULL DEFAULT true,   -- 有効フラグ（論理削除）
   created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),  -- 作成日時
   updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),  -- 更新日時
-  CHECK (kind IN ('routine', 'special')),
-  CHECK (insight_cost >= 0),
+  CONSTRAINT initiatives_kind_check CHECK (kind IN ('routine', 'special')),
+  CONSTRAINT initiatives_insight_cost_check CHECK (insight_cost >= 0),
   PRIMARY KEY (initiative_id),
-  FOREIGN KEY (product_id) REFERENCES card.products(product_id) ON DELETE CASCADE
+  CONSTRAINT initiatives_product_id_fkey FOREIGN KEY (product_id) REFERENCES card.products(product_id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_initiatives_product ON card.initiatives(product_id);
@@ -133,7 +133,7 @@ CREATE TABLE card.deck_cards (
   art_no     BIGINT NOT NULL,                        -- アート番号
   count      INT NOT NULL,                           -- 枚数
   PRIMARY KEY (player_id, deck_id, card_id, art_no),
-  FOREIGN KEY (player_id, deck_id) REFERENCES card.decks(player_id, deck_id) ON DELETE CASCADE
+  CONSTRAINT deck_cards_player_id_deck_id_fkey FOREIGN KEY (player_id, deck_id) REFERENCES card.decks(player_id, deck_id) ON DELETE CASCADE
 );
 
 -- =============================================================================
@@ -159,7 +159,7 @@ CREATE TABLE card.card_pack_cards (
   card_id VARCHAR(10) NOT NULL,                            -- 配布対象カード識別子
   copies  INT         NOT NULL CHECK (copies > 0),         -- 当該パック当該カードの配布枚数
   PRIMARY KEY (pack_id, card_id),
-  FOREIGN KEY (pack_id) REFERENCES card.card_pack(pack_id) ON DELETE CASCADE
+  CONSTRAINT card_pack_cards_pack_id_fkey FOREIGN KEY (pack_id) REFERENCES card.card_pack(pack_id) ON DELETE CASCADE
 );
 
 -- =============================================================================
