@@ -184,7 +184,7 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 - **`DATABASE_CONN`**: card スキーマへの接続文字列。未設定で起動不可
 - **`DATABASE_IAM_AUTH_ENABLED`**: Cloud SQL への接続を Cloud SQL Go Connector 経由の自動 IAM データベース認証で行うかどうか。`true` / `false` のいずれか必須で、フォールバックは無い
 - **`CLOUDSQL_CONNECTION_NAME`**: Cloud SQL インスタンスの接続名 (`project:region:instance`)。`DATABASE_IAM_AUTH_ENABLED=true` のときのみ必須
-- **`INTERNAL_AUTH_SECRET`**: gateway が発行する内部認証 JWT の検証鍵。未設定で起動不可。`/api/v1/cards` 配下の player-scoped API は本鍵で署名された `X-Internal-Auth` header を要求する
+- **`INTERNAL_AUTH_PUBLIC_KEY`**: gateway が発行する内部認証 JWT (RS256) を検証する公開鍵。PEM 形式。未設定で起動不可。`/api/v1/cards` 配下の player-scoped API は、対応する秘密鍵で署名された `X-Internal-Auth` header を要求する
 - **`ACCOUNT_SERVICE_URL`**: デッキ作成・更新時に faction 所持を照会する account サービスの URL。未設定で起動不可
 
 ### カードデータ変更時
