@@ -153,21 +153,23 @@ GitHub Rulesets で以下を設定する。
 - PR マージのみ許可（linear history）
 - force push 禁止、削除禁止
 - 履歴書き換え禁止
-- 必須ステータスチェック: CI / lint, CI / test-unit, CI / test-integration, CI / codegen-sync, CI / check-source-branch が green
+- 必須ステータスチェック: ci / lint, ci / test-unit, ci / test-integration, ci / image-scan, ci / codegen-sync, ci / test-python が green
 - required reviews: 1（self-approve 不可）
-- マージ元ブランチ制限: `release/*` と `hotfix/*` のみ（CI / check-source-branch で機械的に強制）
+- マージ元ブランチ制限: `release/*` と `hotfix/*` のみ
+
+チェック名の `ci` は `ci.yaml` の呼び出し側ジョブ名で、続く名前は common の `go-service-ci.yaml` のジョブ名。
 
 ### release/*
 
 - 直 push 禁止。PR 経由のマージのみ
 - force push 禁止、削除は手動で可
-- 必須ステータスチェック: CI / lint, CI / test-unit, CI / test-integration, CI / codegen-sync が green
+- 必須ステータスチェック: ci / lint, ci / test-unit, ci / test-integration, ci / codegen-sync が green
 
 ### develop
 
 - 直 push 禁止
 - PR マージのみ許可
-- 必須ステータスチェック: CI / lint, CI / test-unit, CI / test-integration, CI / codegen-sync が green
+- 必須ステータスチェック: ci / lint, ci / test-unit, ci / test-integration, ci / codegen-sync が green
 - required reviews: 不要（一人開発での速度優先）
 
 ## CI/CD パイプライン
@@ -176,7 +178,8 @@ GitHub Rulesets で以下を設定する。
 
 | ワークフロー | トリガー | 役割 |
 |---|---|---|
-| [ci.yaml](../.github/workflows/ci.yaml) | PR: main | lint + test-unit + test-integration + codegen-sync（codegen drift 検出） |
+| [ci.yaml](../.github/workflows/ci.yaml) | PR: main | lint + テスト + 脆弱性スキャン + codegen drift 検出。中身は common の `go-service-ci.yaml` に集約している |
+| [test-catalog.yaml](../.github/workflows/test-catalog.yaml) | push: main | `ci.yaml` を呼び、そのテスト結果からテスト観点カタログを生成して GitHub Pages に公開 |
 | [deploy.yaml](../.github/workflows/deploy.yaml) | push: main | Docker イメージのビルド・push |
 | [publish.yaml](../.github/workflows/publish.yaml) | workflow_dispatch | api-card (Go) / api-card-npm (npm) / api-card-dotnet (NuGet) のタグ付け・公開 |
 
