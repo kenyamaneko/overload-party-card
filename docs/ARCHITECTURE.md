@@ -180,7 +180,7 @@ helper は [internal/repository/postgrestest/postgres.go](../internal/repository
 運用上の注意点のみ:
 
 - **`PORT`**: 起動ポート。未設定で起動不可
-- **`ENV`**: `dev` / `stg` / `prod` のいずれか。未設定で起動不可。`prod` / `stg` は Cloud Logging 互換の JSON slog、`dev` はテキスト slog にルーティングする
+- **`ENV`**: `local` / `dev` / `stg` / `prod` のいずれか。未設定で起動不可。`prod` / `stg` は Cloud Logging 互換の JSON slog、`local` / `dev` はテキスト slog にルーティングする
 - **`DATABASE_CONN`**: card スキーマへの接続文字列。未設定で起動不可
 - **`DATABASE_IAM_AUTH_ENABLED`**: Cloud SQL への接続を Cloud SQL Go Connector 経由の自動 IAM データベース認証で行うかどうか。`true` / `false` のいずれか必須で、フォールバックは無い
 - **`CLOUDSQL_CONNECTION_NAME`**: Cloud SQL インスタンスの接続名 (`project:region:instance`)。`DATABASE_IAM_AUTH_ENABLED=true` のときのみ必須

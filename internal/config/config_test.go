@@ -86,6 +86,27 @@ func TestFromEnv(t *testing.T) {
 			assert.Equal(t, "overload-party-dev:asia-northeast1:overload-party-db", cfg.CloudSQLConnectionName)
 		})
 
+		acceptedEnvCases := []struct {
+			name string
+			env  string
+			want Env
+		}{
+			{name: `ENV が "local" のとき、Config の環境が local になる`, env: "local", want: Env("local")},
+			{name: `ENV が "dev" のとき、Config の環境が dev になる`, env: "dev", want: Env("dev")},
+			{name: `ENV が "stg" のとき、Config の環境が stg になる`, env: "stg", want: Env("stg")},
+			{name: `ENV が "prod" のとき、Config の環境が prod になる`, env: "prod", want: Env("prod")},
+		}
+		for _, tc := range acceptedEnvCases {
+			t.Run(tc.name, func(t *testing.T) {
+				setEnv(t, mergeEnv(validEnv, map[string]string{"ENV": tc.env}))
+
+				cfg, err := FromEnv()
+
+				require.NoError(t, err)
+				assert.Equal(t, tc.want, cfg.Env)
+			})
+		}
+
 		invalidCases := []struct {
 			name    string
 			envs    map[string]string
