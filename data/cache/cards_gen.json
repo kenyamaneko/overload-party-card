@@ -236,12 +236,12 @@
       {
         "trigger": "ignition",
         "use_limit": "once_per_turn",
-        "custom": "deck_top_keep_one",
+        "custom": "keep_one_from_deck_top",
         "meta": {
           "categories": [
             "draw"
           ],
-          "count": 2
+          "peek": 2
         }
       }
     ]
