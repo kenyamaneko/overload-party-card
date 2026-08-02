@@ -34,7 +34,7 @@ make vet   # go vet
 make fmt   # gofmt -s -w
 ```
 
-`ENV` (`dev` / `stg` / `prod`) をはじめとする必須環境変数（一覧は [internal/config/config.go](internal/config/config.go)）は未設定なら起動時に fail する（デフォルトへの暗黙 fallback を行わない）。`make run` は `ENV=dev` をインラインで設定するので、残りの必須環境変数を export すればよい。
+`ENV` (`local` / `dev` / `stg` / `prod`) をはじめとする必須環境変数（一覧は [internal/config/config.go](internal/config/config.go)）は未設定なら起動時に fail する（デフォルトへの暗黙 fallback を行わない）。`make run` は `ENV=dev` をインラインで設定するので、残りの必須環境変数を export すればよい。
 
 ## 公開パッケージ
 

@@ -10,7 +10,9 @@ import (
 type Env string
 
 const (
-	// EnvDev は dev 環境。ローカル開発・CI も含む。
+	// EnvLocal は開発機のローカルスタック。
+	EnvLocal Env = "local"
+	// EnvDev は dev 環境。
 	EnvDev Env = "dev"
 	// EnvStg は stg 環境。
 	EnvStg Env = "stg"
@@ -60,13 +62,13 @@ func FromEnv() (*Config, error) {
 
 	envRaw := os.Getenv("ENV")
 	if envRaw == "" {
-		return nil, fmt.Errorf("config: ENV is required (one of %q, %q, %q)", EnvDev, EnvStg, EnvProd)
+		return nil, fmt.Errorf("config: ENV is required (one of %q, %q, %q, %q)", EnvLocal, EnvDev, EnvStg, EnvProd)
 	}
 	switch Env(envRaw) {
-	case EnvDev, EnvStg, EnvProd:
+	case EnvLocal, EnvDev, EnvStg, EnvProd:
 		cfg.Env = Env(envRaw)
 	default:
-		return nil, fmt.Errorf("config: ENV must be %q, %q, or %q, got %q", EnvDev, EnvStg, EnvProd, envRaw)
+		return nil, fmt.Errorf("config: ENV must be one of %q, %q, %q, %q, got %q", EnvLocal, EnvDev, EnvStg, EnvProd, envRaw)
 	}
 
 	if cfg.DatabaseConn == "" {

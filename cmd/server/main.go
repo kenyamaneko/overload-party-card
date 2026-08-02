@@ -143,12 +143,11 @@ func runHTTP(ctx context.Context, srv *http.Server) error {
 }
 
 // setupLogger は ENV に応じてグローバル slog ロガーを初期化する。
-// prod/stg は Cloud Logging 互換 JSON、dev は人間可読なテキストで出力する。
 func setupLogger(env config.Env) error {
 	switch env {
 	case config.EnvProd, config.EnvStg:
 		slog.SetDefault(slog.New(newCloudLoggingHandler()).With("service", "card"))
-	case config.EnvDev:
+	case config.EnvLocal, config.EnvDev:
 		h := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})
 		slog.SetDefault(slog.New(h).With("service", "card"))
 	default:
