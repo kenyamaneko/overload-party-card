@@ -37,6 +37,46 @@ jobs:
       project-id: ${{ vars.DEV_PROJECT_ID }}
       region: ${{ vars.RUN_REGION }}
 
+  publish-master-data-dev:
+    needs: deploy-dev
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 15
+    concurrency:
+      group: publish-master-data-dev-${{ github.repository }}
+      # 反映の中断で古いマスターデータが残るのを避けるため、実行中の処理を中止しない
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install generator dependencies
+        run: pip install pyyaml
+
+      - name: Regenerate master data
+        run: .github/scripts/deploy/generate-master-data.sh
+
+      - name: Check for drift
+        run: .github/scripts/ci/check-codegen-drift.sh
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.CI_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Upload master data to Cloud Storage (dev)
+        env:
+          MASTER_DATA_BUCKET: ${{ vars.DEV_MASTER_DATA_BUCKET }}
+        run: .github/scripts/deploy/upload-master-data.sh
+
   deploy-stg:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     concurrency:
@@ -52,6 +92,46 @@ jobs:
       region: ${{ vars.RUN_REGION }}
       version: ${{ github.ref_name }}
 
+  publish-master-data-stg:
+    needs: deploy-stg
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 15
+    concurrency:
+      group: publish-master-data-stg-${{ github.repository }}
+      # 反映の中断で古いマスターデータが残るのを避けるため、実行中の処理を中止しない
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install generator dependencies
+        run: pip install pyyaml
+
+      - name: Regenerate master data
+        run: .github/scripts/deploy/generate-master-data.sh
+
+      - name: Check for drift
+        run: .github/scripts/ci/check-codegen-drift.sh
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.CI_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Upload master data to Cloud Storage (stg)
+        env:
+          MASTER_DATA_BUCKET: ${{ vars.STG_MASTER_DATA_BUCKET }}
+        run: .github/scripts/deploy/upload-master-data.sh
+
   deploy-prod:
     if: github.event_name == 'workflow_dispatch'
     concurrency:
@@ -66,3 +146,46 @@ jobs:
       project-id: ${{ vars.PROD_PROJECT_ID }}
       region: ${{ vars.RUN_REGION }}
       version: ${{ inputs.version }}
+
+  publish-master-data-prod:
+    needs: deploy-prod
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 15
+    concurrency:
+      group: publish-master-data-prod-${{ github.repository }}
+      # 反映の中断で古いマスターデータが残るのを避けるため、実行中の処理を中止しない
+      cancel-in-progress: false
+    steps:
+      # 昇格したイメージと同じコミットのマスターデータを反映するため、指定されたタグを取得する
+      - name: Checkout target version
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install generator dependencies
+        run: pip install pyyaml
+
+      - name: Regenerate master data
+        run: .github/scripts/deploy/generate-master-data.sh
+
+      - name: Check for drift
+        run: .github/scripts/ci/check-codegen-drift.sh
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.CI_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Upload master data to Cloud Storage (prod)
+        env:
+          MASTER_DATA_BUCKET: ${{ vars.PROD_MASTER_DATA_BUCKET }}
+        run: .github/scripts/deploy/upload-master-data.sh
