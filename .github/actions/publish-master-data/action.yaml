@@ -1,0 +1,50 @@
+name: Publish master data
+description: 'Regenerate the master data from its SSoT, fail on any drift, and copy cards.json and initiatives.json to the target bucket.'
+
+inputs:
+  bucket:
+    description: Cloud Storage bucket that receives cards.json and initiatives.json.
+    required: true
+  wif-provider:
+    description: Workload Identity Federation provider used to authenticate to Google Cloud.
+    required: true
+  service-account:
+    description: Service account impersonated to write to the bucket.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install generator dependencies
+      shell: bash
+      # 生成物との突き合わせ結果が pyyaml の更新で変わらないよう、バージョンを固定する
+      run: pip install pyyaml==6.0.3
+
+    - name: Regenerate master data
+      shell: bash
+      run: .github/scripts/deploy/generate-master-data.sh
+
+    - name: Check for drift
+      shell: bash
+      run: .github/scripts/ci/check-codegen-drift.sh
+
+    # 生成物が古いときに認証情報を取らずに落とすため、差分検出の後に認証する
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ inputs.wif-provider }}
+        service_account: ${{ inputs.service-account }}
+
+    - name: Set up gcloud
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Upload master data to Cloud Storage
+      shell: bash
+      env:
+        MASTER_DATA_BUCKET: ${{ inputs.bucket }}
+      run: .github/scripts/deploy/upload-master-data.sh
