@@ -284,7 +284,7 @@ VALUES
 
   ('SH-0013', 'SHE Guard', '', 'SHE', 'Platform', NULL,
    false, false, '{}'::jsonb,
-   '相手フィールドのサポートゾーンの裏側のカード 1枚を選択して確認する。',
+   '相手フィールドの裏向きリアクティブカードを1枚選び、確認する。',
    '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"reveal_reactive": {}}]}]'::jsonb,
    'unlimited', true),
 
