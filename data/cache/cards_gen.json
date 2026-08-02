@@ -1682,7 +1682,7 @@
     "stats": {},
     "restriction": "unlimited",
     "is_active": true,
-    "effect_text": "相手フィールドのサポートゾーンの裏側のカード 1枚を選択して確認する。",
+    "effect_text": "相手フィールドの裏向きリアクティブカードを1枚選び、確認する。",
     "effects": [
       {
         "trigger": "ignition",
