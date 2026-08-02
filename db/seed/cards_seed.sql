@@ -49,7 +49,7 @@ VALUES
   ('NT-0008', 'クラウドアーキテクト', '', 'Neutral', 'Strategy', NULL,
    false, false, '{}'::jsonb,
    'リポジトリから2枚ドローし、選択した1枚を手札に加える。残り1枚はトラッシュに送る',
-   '[{"trigger": "ignition", "use_limit": "once_per_turn", "custom": "deck_top_keep_one", "meta": {"categories": ["draw"], "count": 2}}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_turn", "custom": "keep_one_from_deck_top", "meta": {"categories": ["draw"], "peek": 2}}]'::jsonb,
    'limited', true),
 
   ('NT-0009', '寺リフォーム', '', 'Neutral', 'Strategy', NULL,
