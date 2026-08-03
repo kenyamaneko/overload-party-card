@@ -194,7 +194,7 @@ VALUES
    false, false, '{"throughput": 400, "availability": 800, "sla_penalty": 300, "maintenance_cost": 100}'::jsonb,
    '**Cloud First:** このカードはスターティングリソースとしてのみデプロイできる。
 **Cloud Shift:** 手札から 天気使い コンピュート系リソースをデプロイコスト -500 でデプロイできる。その後、このカードをトラッシュに送る。',
-   '[{"trigger": "ignition", "use_limit": "once_per_game", "custom": "cloud_shift", "meta": {"faction": "Tenki", "card_type": ["Compute", "Container", "Orchestrator", "Serverless", "AI/ML"], "deploy_discount": 500}}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_game", "custom": "cloud_shift", "meta": {"faction": "Tenki", "card_type": "Compute", "deploy_discount": 500}}]'::jsonb,
    'unlimited', true),
 
   ('NT-0033', '調律部 DB', 'On-premises', 'Neutral', 'DataResource', 'Database',
@@ -279,7 +279,7 @@ VALUES
   ('SH-0012', 'SHE Front', '', 'SHE', 'Platform', NULL,
    false, false, '{}'::jsonb,
    '自分のフィールドの全ての SHE コンピュート系リソースのスループットを +200 する。',
-   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "myself", "faction": "SHE", "card_type": ["Compute", "AI/ML", "Orchestrator", "Container", "Serverless"]}, "buff": "tp", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
+   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "myself", "faction": "SHE", "card_type": "Compute"}, "buff": "tp", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
    'unlimited', true),
 
   ('SH-0013', 'SHE Guard', '', 'SHE', 'Platform', NULL,
@@ -448,7 +448,7 @@ VALUES
   ('SL-0015', 'しゅがーらぼ CDN', '', 'Sugar', 'Platform', NULL,
    false, false, '{}'::jsonb,
    '自分のフィールドの全ての しゅがーらぼ コンピュート系リソースのスループットを +200 する。',
-   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "myself", "faction": "Sugar", "card_type": ["Compute", "AI/ML", "Orchestrator", "Container", "Serverless"]}, "buff": "tp", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
+   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "myself", "faction": "Sugar", "card_type": "Compute"}, "buff": "tp", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
    'unlimited', true),
 
   ('SL-0016', 'しゅがーらぼ アイスクエリム Analytics', '', 'Sugar', 'Platform', NULL,
@@ -490,7 +490,7 @@ VALUES
   ('SL-0022', 'しゅがーらぼ バター君 Batch', '', 'Sugar', 'Strategy', NULL,
    false, false, '{}'::jsonb,
    'Budget 300 を払って発動できる。コンピュート系リソース1体を選択する。このターン、そのカードのスループットを2倍にする。',
-   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"apply_buff": {"selector": {"owner": "myself", "zone": "frontend", "card_type": ["Compute", "AI/ML", "Orchestrator", "Container", "Serverless"], "pick": "choice"}, "buff": "tp", "amount": {"ref": "target.tp", "multiply": 1}, "duration": "this_turn"}}]}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"apply_buff": {"selector": {"owner": "myself", "zone": "frontend", "card_type": "Compute", "pick": "choice"}, "buff": "tp", "amount": {"ref": "target.tp", "multiply": 1}, "duration": "this_turn"}}]}]'::jsonb,
    'unlimited', true),
 
   ('SL-0023', 'しゅがーらぼ Knowledge', '', 'Sugar', 'Strategy', NULL,
@@ -581,7 +581,7 @@ VALUES
   ('TK-0013', '天気使い CDN', '', 'Tenki', 'Platform', NULL,
    false, false, '{}'::jsonb,
    '自分のフィールドの全ての 天気使い コンピュート系リソースのスループットを +200 する。',
-   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "myself", "faction": "Tenki", "card_type": ["Compute", "AI/ML", "Orchestrator", "Container", "Serverless"]}, "buff": "tp", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
+   '[{"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "myself", "faction": "Tenki", "card_type": "Compute"}, "buff": "tp", "amount": 200, "duration": "while_on_field"}}]}]'::jsonb,
    'unlimited', true),
 
   ('TK-0014', '天気使い Protection', '', 'Tenki', 'Platform', NULL,
@@ -647,7 +647,7 @@ VALUES
   ('TK-0024', '天気使い Traffic', '', 'Tenki', 'Reactive', NULL,
    false, false, '{}'::jsonb,
    '自分の 天気使い コンピュート系リソースが破壊された時に発動する。手札から 天気使い コンピュート系リソース1枚をデプロイコストなしでデプロイする。',
-   '[{"trigger": "on_destroy", "guard": [{"match": {"selector": "target", "faction": "Tenki", "card_type": ["Compute", "Container", "Orchestrator", "Serverless", "AI/ML"]}}], "ops": [{"deploy_from_hand": {"filter": {"faction": "Tenki", "card_type": ["Compute", "Container", "Orchestrator", "Serverless", "AI/ML"]}}}]}]'::jsonb,
+   '[{"trigger": "on_destroy", "guard": [{"match": {"selector": "target", "faction": "Tenki", "card_type": "Compute"}}], "ops": [{"deploy_from_hand": {"filter": {"faction": "Tenki", "card_type": "Compute"}}}]}]'::jsonb,
    'unlimited', true),
 
   ('TK-0025', '天気使い ファンネル', '', 'Tenki', 'Reactive', NULL,

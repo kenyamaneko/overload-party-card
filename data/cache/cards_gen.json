@@ -1117,13 +1117,7 @@
         "custom": "cloud_shift",
         "meta": {
           "faction": "Tenki",
-          "card_type": [
-            "Compute",
-            "Container",
-            "Orchestrator",
-            "Serverless",
-            "AI/ML"
-          ],
+          "card_type": "Compute",
           "deploy_discount": 500
         }
       }
@@ -1650,13 +1644,7 @@
               "selector": {
                 "owner": "myself",
                 "faction": "SHE",
-                "card_type": [
-                  "Compute",
-                  "AI/ML",
-                  "Orchestrator",
-                  "Container",
-                  "Serverless"
-                ]
+                "card_type": "Compute"
               },
               "buff": "tp",
               "amount": 200,
@@ -2661,13 +2649,7 @@
               "selector": {
                 "owner": "myself",
                 "faction": "Sugar",
-                "card_type": [
-                  "Compute",
-                  "AI/ML",
-                  "Orchestrator",
-                  "Container",
-                  "Serverless"
-                ]
+                "card_type": "Compute"
               },
               "buff": "tp",
               "amount": 200,
@@ -2908,13 +2890,7 @@
               "selector": {
                 "owner": "myself",
                 "zone": "frontend",
-                "card_type": [
-                  "Compute",
-                  "AI/ML",
-                  "Orchestrator",
-                  "Container",
-                  "Serverless"
-                ],
+                "card_type": "Compute",
                 "pick": "choice"
               },
               "buff": "tp",
@@ -3435,13 +3411,7 @@
               "selector": {
                 "owner": "myself",
                 "faction": "Tenki",
-                "card_type": [
-                  "Compute",
-                  "AI/ML",
-                  "Orchestrator",
-                  "Container",
-                  "Serverless"
-                ]
+                "card_type": "Compute"
               },
               "buff": "tp",
               "amount": 200,
@@ -3837,13 +3807,7 @@
             "match": {
               "selector": "target",
               "faction": "Tenki",
-              "card_type": [
-                "Compute",
-                "Container",
-                "Orchestrator",
-                "Serverless",
-                "AI/ML"
-              ]
+              "card_type": "Compute"
             }
           }
         ],
@@ -3852,13 +3816,7 @@
             "deploy_from_hand": {
               "filter": {
                 "faction": "Tenki",
-                "card_type": [
-                  "Compute",
-                  "Container",
-                  "Orchestrator",
-                  "Serverless",
-                  "AI/ML"
-                ]
+                "card_type": "Compute"
               }
             }
           }

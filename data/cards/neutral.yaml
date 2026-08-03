@@ -718,7 +718,7 @@ cards:
         custom: cloud_shift
         meta:
           faction: Tenki
-          card_type: [Compute, Container, Orchestrator, Serverless, "AI/ML"]
+          card_type: Compute
           deploy_discount: 500
 
   - card_no: 130

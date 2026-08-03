@@ -337,7 +337,7 @@ cards:
       - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: myself, faction: Tenki, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless] }
+              selector: { owner: myself, faction: Tenki, card_type: Compute }
               buff: tp
               amount: 200
               duration: while_on_field
@@ -590,12 +590,12 @@ cards:
           - match:
               selector: target
               faction: Tenki
-              card_type: [Compute, Container, Orchestrator, Serverless, "AI/ML"]
+              card_type: Compute
         ops:
           - deploy_from_hand:
               filter:
                 faction: Tenki
-                card_type: [Compute, Container, Orchestrator, Serverless, "AI/ML"]
+                card_type: Compute
 
   - card_no: 36
     card_id: "TK-0025"

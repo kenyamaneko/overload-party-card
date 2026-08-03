@@ -322,7 +322,7 @@ cards:
       - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: myself, faction: SHE, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless] }
+              selector: { owner: myself, faction: SHE, card_type: Compute }
               buff: tp
               amount: 200
               duration: while_on_field
