@@ -106,7 +106,7 @@ cards:
       maintenance_cost: 100
     effect_text: "デプロイ時に「自動操縦」か「標準」を選択する。自動操縦: デプロイターンを 1 短縮する。標準: 維持費を -200 する。"
     effects:
-      - trigger: on_deploy
+      - trigger: on_set
         choice:
           autopilot:
             - reduce_deploy_turns: { amount: 1 }

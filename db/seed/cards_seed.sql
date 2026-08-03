@@ -243,7 +243,7 @@ VALUES
   ('SH-0006', 'アデリース', 'RDB', 'SHE', 'DataResource', 'Database',
    true, false, '{"yield": 500, "availability": 1300, "sla_penalty": 500, "maintenance_cost": 150}'::jsonb,
    '**予約契約:** このカードのデプロイ時に発動できる。デプロイ時のコストを -200 する。この効果を使用してデプロイした場合、他のリソースをデプロイするためにこのカードをトラッシュすることはできない。',
-   '[{"trigger": "on_deploy", "choice": {"use": [{"gain_budget": {"target": "myself", "amount": 200}}, {"apply_buff": {"selector": "source", "buff": "reserved_instance", "amount": 1, "duration": "permanent"}}], "skip": []}}]'::jsonb,
+   '[{"trigger": "on_set", "choice": {"use": [{"gain_budget": {"target": "myself", "amount": 200}}, {"apply_buff": {"selector": "source", "buff": "reserved_instance", "amount": 1, "duration": "permanent"}}], "skip": []}}]'::jsonb,
    'unlimited', true),
 
   ('SH-0007', 'オオロバ', 'DistributedDB', 'SHE', 'DataResource', 'Database',
@@ -381,7 +381,7 @@ VALUES
   ('SL-0004', 'クーヘンバウムティス', 'Orchestrator', 'Sugar', 'Compute', 'Orchestrator',
    true, true, '{"throughput": 700, "availability": 1300, "sla_penalty": 600, "maintenance_cost": 100}'::jsonb,
    'デプロイ時に「自動操縦」か「標準」を選択する。自動操縦: デプロイターンを 1 短縮する。標準: 維持費を -200 する。',
-   '[{"trigger": "on_deploy", "choice": {"autopilot": [{"reduce_deploy_turns": {"amount": 1}}], "standard": [{"apply_buff": {"selector": "source", "buff": "maintenance_reduction", "amount": 200, "duration": "while_on_field"}}]}}]'::jsonb,
+   '[{"trigger": "on_set", "choice": {"autopilot": [{"reduce_deploy_turns": {"amount": 1}}], "standard": [{"apply_buff": {"selector": "source", "buff": "maintenance_reduction", "amount": 200, "duration": "while_on_field"}}]}}]'::jsonb,
    'unlimited', true),
 
   ('SL-0005', 'クラン', 'Functions', 'Sugar', 'Compute', 'Serverless',
