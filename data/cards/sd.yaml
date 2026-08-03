@@ -145,7 +145,7 @@ cards:
       maintenance_cost: 150
     effect_text: "**予約契約:** このカードのデプロイ時に発動できる。デプロイ時のコストを -200 する。この効果を使用してデプロイした場合、他のリソースをデプロイするためにこのカードをトラッシュすることはできない。"
     effects:
-      - trigger: on_deploy
+      - trigger: on_set
         choice:
           use:
             - gain_budget: { target: myself, amount: 200 }
