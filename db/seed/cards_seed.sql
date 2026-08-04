@@ -650,7 +650,7 @@ VALUES
    '[{"trigger": "on_destroy", "guard": [{"match": {"selector": "target", "faction": "Tenki", "card_type": "Compute"}}], "ops": [{"deploy_from_hand": {"filter": {"faction": "Tenki", "card_type": "Compute"}}}]}]'::jsonb,
    'unlimited', true),
 
-  ('TK-0025', '天気使い ファンネル', '', 'Tenki', 'Reactive', NULL,
+  ('TK-0025', '天気使い ファンネル', '', 'Tenki', 'Platform', NULL,
    false, false, '{}'::jsonb,
    '①デプロイ時、相手フィールドの裏向きリアクティブカードを1枚選び、確認する。②このカードがフィールドに存在する限り、インシデントカードによる自分のリソースへのダメージを300軽減する',
    '[{"trigger": "on_deploy", "ops": [{"peek_reactive": {}}]}, {"trigger": "on_deploy", "ops": [{"apply_buff": {"selector": {"owner": "myself"}, "buff": "incident_reduction", "amount": 300, "duration": "while_on_field"}}]}]'::jsonb,

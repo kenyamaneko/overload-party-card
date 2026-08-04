@@ -3831,7 +3831,7 @@
     "card_name": "天気使い ファンネル",
     "resource_label": "",
     "faction": "Tenki",
-    "card_type": "Reactive",
+    "card_type": "Platform",
     "deploy_turns": 0,
     "resizable": false,
     "elastic": false,

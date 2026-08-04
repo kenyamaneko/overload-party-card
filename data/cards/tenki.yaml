@@ -601,7 +601,7 @@ cards:
     card_id: "TK-0025"
     card_name: "天気使い ファンネル"
     const_name: TenkiFunnel
-    card_type: Reactive
+    card_type: Platform
     deploy_turns: 0
     resizable: false
     elastic: false
