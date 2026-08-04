@@ -14,6 +14,7 @@ on:
       - ".github/scripts/deploy/generate-master-data.sh"
       - ".github/scripts/deploy/upload-master-data.sh"
       - ".github/scripts/deploy/resolve-master-data-bucket.sh"
+      - ".github/scripts/ci/check-codegen-drift.sh"
       - ".github/workflows/publish-master-data.yaml"
   workflow_dispatch:
     inputs:
@@ -64,6 +65,7 @@ jobs:
         id: target
         env:
           ENVIRONMENT: ${{ inputs.environment || 'dev' }}
+          VERSION: ${{ inputs.version }}
           DEV_BUCKET: ${{ vars.DEV_MASTER_DATA_BUCKET }}
           STG_BUCKET: ${{ vars.STG_MASTER_DATA_BUCKET }}
           PROD_BUCKET: ${{ vars.PROD_MASTER_DATA_BUCKET }}

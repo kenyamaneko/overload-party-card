@@ -55,6 +55,10 @@ jobs:
   # 昇格したイメージと同じコミットのマスターデータを反映するため、デプロイの後に続けて呼ぶ。
   publish-master-data-stg:
     needs: deploy-stg
+    concurrency:
+      group: publish-master-data-stg-${{ github.repository }}
+      # 反映の中断で古いマスターデータが残るのを避けるため、実行中の処理を中止しない
+      cancel-in-progress: false
     uses: ./.github/workflows/publish-master-data.yaml
     with:
       environment: stg
@@ -77,6 +81,10 @@ jobs:
 
   publish-master-data-prod:
     needs: deploy-prod
+    concurrency:
+      group: publish-master-data-prod-${{ github.repository }}
+      # 反映の中断で古いマスターデータが残るのを避けるため、実行中の処理を中止しない
+      cancel-in-progress: false
     uses: ./.github/workflows/publish-master-data.yaml
     with:
       environment: prod
