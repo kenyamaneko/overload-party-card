@@ -1117,7 +1117,9 @@
         "custom": "cloud_shift",
         "meta": {
           "faction": "Tenki",
-          "card_type": "Compute",
+          "card_type": [
+            "Compute"
+          ],
           "deploy_discount": 500
         }
       }

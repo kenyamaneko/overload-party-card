@@ -194,7 +194,7 @@ VALUES
    false, false, '{"throughput": 400, "availability": 800, "sla_penalty": 300, "maintenance_cost": 100}'::jsonb,
    '**Cloud First:** このカードはスターティングリソースとしてのみデプロイできる。
 **Cloud Shift:** 手札から 天気使い コンピュート系リソースをデプロイコスト -500 でデプロイできる。その後、このカードをトラッシュに送る。',
-   '[{"trigger": "ignition", "use_limit": "once_per_game", "custom": "cloud_shift", "meta": {"faction": "Tenki", "card_type": "Compute", "deploy_discount": 500}}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_game", "custom": "cloud_shift", "meta": {"faction": "Tenki", "card_type": ["Compute"], "deploy_discount": 500}}]'::jsonb,
    'unlimited', true),
 
   ('NT-0033', '調律部 DB', 'On-premises', 'Neutral', 'DataResource', 'Database',
