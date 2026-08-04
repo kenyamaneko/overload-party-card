@@ -1,0 +1,77 @@
+name: Publish master data
+
+# battle は起動時にこのバケットからカード定義を読む。battle が新しいリビジョンになる
+# タイミングは card のデプロイと独立しているため、publish もデプロイから切り離して
+# 単独で実行できるようにする。
+on:
+  push:
+    branches: [main]
+    paths:
+      - "data/**"
+      - "scripts/generate_cards.py"
+      - "scripts/generate_products.py"
+      - ".github/actions/publish-master-data/**"
+      - ".github/scripts/deploy/generate-master-data.sh"
+      - ".github/scripts/deploy/upload-master-data.sh"
+      - ".github/scripts/deploy/resolve-master-data-bucket.sh"
+      - ".github/workflows/publish-master-data.yaml"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "dev"
+        type: choice
+        options: [dev, stg, prod]
+      version:
+        description: "Git tag to publish from. Defaults to the current branch when omitted."
+        required: false
+        type: string
+        default: ""
+  workflow_call:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: string
+      version:
+        description: "Git tag to publish from. Defaults to the current branch when omitted."
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  # Workload Identity Federation で Google Cloud に認証するために OIDC トークンの発行権限が必要
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 15
+    concurrency:
+      # 反映の中断で古いマスターデータが残るのを避けるため、実行中の処理を中止しない
+      group: publish-master-data-${{ inputs.environment || 'dev' }}-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      # 昇格したイメージと同じコミットのマスターデータを反映するため、指定されたタグを取得する
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version || github.ref }}
+
+      - name: Resolve target bucket
+        id: target
+        env:
+          ENVIRONMENT: ${{ inputs.environment || 'dev' }}
+          DEV_BUCKET: ${{ vars.DEV_MASTER_DATA_BUCKET }}
+          STG_BUCKET: ${{ vars.STG_MASTER_DATA_BUCKET }}
+          PROD_BUCKET: ${{ vars.PROD_MASTER_DATA_BUCKET }}
+        run: .github/scripts/deploy/resolve-master-data-bucket.sh
+
+      - name: Publish master data
+        uses: ./.github/actions/publish-master-data
+        with:
+          bucket: ${{ steps.target.outputs.bucket }}
+          wif-provider: ${{ vars.WIF_PROVIDER }}
+          service-account: ${{ vars.CI_SERVICE_ACCOUNT }}
