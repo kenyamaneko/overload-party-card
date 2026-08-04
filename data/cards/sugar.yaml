@@ -395,7 +395,7 @@ cards:
       - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: myself, faction: Sugar, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless] }
+              selector: { owner: myself, faction: Sugar, card_type: Compute }
               buff: tp
               amount: 200
               duration: while_on_field
@@ -557,7 +557,7 @@ cards:
         use_limit: once_per_turn
         ops:
           - apply_buff:
-              selector: { owner: myself, zone: frontend, card_type: [Compute, "AI/ML", Orchestrator, Container, Serverless], pick: choice }
+              selector: { owner: myself, zone: frontend, card_type: Compute, pick: choice }
               buff: tp
               amount: { ref: target.tp, multiply: 1 }
               duration: this_turn

@@ -718,7 +718,8 @@ cards:
         custom: cloud_shift
         meta:
           faction: Tenki
-          card_type: [Compute, Container, Orchestrator, Serverless, "AI/ML"]
+          # custom 効果の meta は配列しか受けないため、1 要素でも配列で書く。
+          card_type: [Compute]
           deploy_discount: 500
 
   - card_no: 130
