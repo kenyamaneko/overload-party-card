@@ -131,7 +131,7 @@ func newPubSubPushRequest(path string) *http.Request {
 
 func TestNew(t *testing.T) {
 	t.Run("ルーターの認証配線", func(t *testing.T) {
-		t.Run("/health は auth middleware を通らず 200 を返す", func(t *testing.T) {
+		t.Run("/healthはauth middlewareを通らず200を返す", func(t *testing.T) {
 			// VerifyFn 未設定: /health が verifier に到達しないことの検出を兼ねる
 			r := newTestRouter(t, &internalauth.MockVerifier{})
 			w := httptest.NewRecorder()
@@ -139,7 +139,7 @@ func TestNew(t *testing.T) {
 			assert.Equal(t, http.StatusOK, w.Code)
 		})
 
-		t.Run("/internal/v1 配下は auth header なしで handler の成功応答まで到達する", func(t *testing.T) {
+		t.Run("/internal/v1配下はauth headerなしでhandlerの成功応答まで到達する", func(t *testing.T) {
 			// VerifyFn 未設定: auth-free ルートが verifier に到達しないことの検出を兼ねる
 			r := newTestRouter(t, &internalauth.MockVerifier{})
 
@@ -149,12 +149,12 @@ func TestNew(t *testing.T) {
 				wantBody string
 			}{
 				{
-					name:     "/internal/v1/cards は 200 でカードマスターを返す",
+					name:     "/internal/v1/cardsは200でカードマスターを返す",
 					path:     "/internal/v1/cards",
 					wantBody: "TST-0001",
 				},
 				{
-					name:     "/internal/v1/initiatives は 200 で施策マスターを返す",
+					name:     "/internal/v1/initiativesは200で施策マスターを返す",
 					path:     "/internal/v1/initiatives",
 					wantBody: "IN-TST-0001",
 				},
@@ -170,15 +170,15 @@ func TestNew(t *testing.T) {
 			}
 		})
 
-		t.Run("/internal/v1/pubsub 配下 (push 受け口) は auth header なしで handler の成功応答まで到達する", func(t *testing.T) {
+		t.Run("/internal/v1/pubsub配下 (push受け口)はauth headerなしでhandlerの成功応答まで到達する", func(t *testing.T) {
 			r := newTestRouter(t, &internalauth.MockVerifier{})
 
 			cases := []struct {
 				name string
 				path string
 			}{
-				{name: "/internal/v1/pubsub/player-onboarded は 200 を返す", path: "/internal/v1/pubsub/player-onboarded"},
-				{name: "/internal/v1/pubsub/card-pack-purchased は 200 を返す", path: "/internal/v1/pubsub/card-pack-purchased"},
+				{name: "/internal/v1/pubsub/player-onboardedは200を返す", path: "/internal/v1/pubsub/player-onboarded"},
+				{name: "/internal/v1/pubsub/card-pack-purchasedは200を返す", path: "/internal/v1/pubsub/card-pack-purchased"},
 			}
 
 			for _, tc := range cases {
@@ -190,7 +190,7 @@ func TestNew(t *testing.T) {
 			}
 		})
 
-		t.Run("/api/v1/cards 配下は auth header 欠落で 401 になる", func(t *testing.T) {
+		t.Run("/api/v1/cards配下はauth header欠落で401になる", func(t *testing.T) {
 			// VerifyFn 未設定: header 欠落時は middleware が verifier に到達しないことの検出を兼ねる
 			r := newTestRouter(t, &internalauth.MockVerifier{})
 
@@ -198,10 +198,10 @@ func TestNew(t *testing.T) {
 				name string
 				path string
 			}{
-				{name: "デッキ一覧の取得は 401 になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/decks"},
-				{name: "所持カード一覧の取得は 401 になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/cards"},
-				{name: "プロダクト一覧の取得は 401 になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/products"},
-				{name: "所持状態付きカード一覧の取得は 401 になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/cards/with-ownership"},
+				{name: "デッキ一覧の取得は401になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/decks"},
+				{name: "所持カード一覧の取得は401になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/cards"},
+				{name: "プロダクト一覧の取得は401になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/products"},
+				{name: "所持状態付きカード一覧の取得は401になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/cards/with-ownership"},
 			}
 
 			for _, tc := range cases {
@@ -214,7 +214,7 @@ func TestNew(t *testing.T) {
 			}
 		})
 
-		t.Run("認証トークンの検証が失敗するとき、401 になり、トークンの検証に失敗したことを示すエラーが応答本文に含まれる", func(t *testing.T) {
+		t.Run("認証トークンの検証が失敗するとき、401になり、トークンの検証に失敗したことを示すエラーが応答本文に含まれる", func(t *testing.T) {
 			r := newTestRouter(t, &internalauth.MockVerifier{
 				VerifyFn: func(string) (string, error) { return "", errors.New("invalid token") },
 			})
@@ -226,7 +226,7 @@ func TestNew(t *testing.T) {
 			assert.Contains(t, w.Body.String(), "invalid internal auth token")
 		})
 
-		t.Run("verifier を通過したとき、handler の成功応答まで到達する", func(t *testing.T) {
+		t.Run("verifierを通過したとき、handlerの成功応答まで到達する", func(t *testing.T) {
 			r := newTestRouter(t, &internalauth.MockVerifier{
 				VerifyFn: func(string) (string, error) { return "TST-PLAYER-1", nil },
 			})

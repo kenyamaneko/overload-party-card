@@ -12,7 +12,7 @@ import (
 
 func TestListPlayerFactions(t *testing.T) {
 	t.Run("プレイヤー所持ファクションの取得", func(t *testing.T) {
-		t.Run("200 応答のとき、内部エンドポイントへ GET し factions を返す", func(t *testing.T) {
+		t.Run("200応答のとき、内部エンドポイントへGETしfactionsを返す", func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, "/internal/v1/players/p-1/factions", r.URL.Path)
 				w.Header().Set("Content-Type", "application/json")
@@ -26,7 +26,7 @@ func TestListPlayerFactions(t *testing.T) {
 			assert.Equal(t, []string{"SHE", "Tenki"}, got)
 		})
 
-		t.Run("非 200 応答 (500) のとき、エラーになる", func(t *testing.T) {
+		t.Run("非200応答 (500)のとき、エラーになる", func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 			}))

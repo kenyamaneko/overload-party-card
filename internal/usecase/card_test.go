@@ -81,7 +81,7 @@ func TestListCardsWithOwnership(t *testing.T) {
 
 func TestListCards(t *testing.T) {
 	t.Run("カード一覧", func(t *testing.T) {
-		t.Run("マスターにカードがあるとき、全件が ID 昇順で名前とともに返る", func(t *testing.T) {
+		t.Run("マスターにカードがあるとき、全件がID昇順で名前とともに返る", func(t *testing.T) {
 			cards := map[string]*domain.Card{
 				"C-002": {CardID: "C-002", CardName: "Shield"},
 				"C-001": {CardID: "C-001", CardName: "Fireball"},

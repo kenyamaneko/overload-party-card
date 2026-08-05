@@ -15,7 +15,7 @@ import (
 
 func TestClient_ListCards(t *testing.T) {
 	t.Run("ListCards", func(t *testing.T) {
-		t.Run("500 を受けたとき、ErrInternalServer になる", func(t *testing.T) {
+		t.Run("500を受けたとき、ErrInternalServerになる", func(t *testing.T) {
 			srv := apicardserverfake.NewServer()
 			defer srv.Close()
 			srv.ListAllCardsFn = func() (int, any) { return http.StatusInternalServerError, nil }
@@ -25,7 +25,7 @@ func TestClient_ListCards(t *testing.T) {
 			assertSentinel(t, err, apicardclient.ErrInternalServer)
 		})
 
-		t.Run("契約に無い 302 を受けたとき、unexpected status エラーになる", func(t *testing.T) {
+		t.Run("契約に無い302を受けたとき、unexpected statusエラーになる", func(t *testing.T) {
 			srv := apicardserverfake.NewServer()
 			defer srv.Close()
 			srv.ListAllCardsFn = func() (int, any) { return http.StatusFound, nil }
@@ -46,12 +46,12 @@ func TestClient_ListPlayerCards(t *testing.T) {
 			wantTarget error
 		}{
 			{
-				name:       "401 を受けたとき、ErrUnauthorized になる",
+				name:       "401を受けたとき、ErrUnauthorizedになる",
 				status:     http.StatusUnauthorized,
 				wantTarget: apicardclient.ErrUnauthorized,
 			},
 			{
-				name:       "500 を受けたとき、ErrInternalServer になる",
+				name:       "500を受けたとき、ErrInternalServerになる",
 				status:     http.StatusInternalServerError,
 				wantTarget: apicardclient.ErrInternalServer,
 			},
@@ -78,12 +78,12 @@ func TestClient_ListCardsWithOwnership(t *testing.T) {
 			wantTarget error
 		}{
 			{
-				name:       "401 を受けたとき、ErrUnauthorized になる",
+				name:       "401を受けたとき、ErrUnauthorizedになる",
 				status:     http.StatusUnauthorized,
 				wantTarget: apicardclient.ErrUnauthorized,
 			},
 			{
-				name:       "500 を受けたとき、ErrInternalServer になる",
+				name:       "500を受けたとき、ErrInternalServerになる",
 				status:     http.StatusInternalServerError,
 				wantTarget: apicardclient.ErrInternalServer,
 			},
@@ -110,17 +110,17 @@ func TestClient_ListDecks(t *testing.T) {
 			wantTarget error
 		}{
 			{
-				name:       "401 を受けたとき、ErrUnauthorized になる",
+				name:       "401を受けたとき、ErrUnauthorizedになる",
 				status:     http.StatusUnauthorized,
 				wantTarget: apicardclient.ErrUnauthorized,
 			},
 			{
-				name:       "404 を受けたとき、ErrNotFound になる",
+				name:       "404を受けたとき、ErrNotFoundになる",
 				status:     http.StatusNotFound,
 				wantTarget: apicardclient.ErrNotFound,
 			},
 			{
-				name:       "500 を受けたとき、ErrInternalServer になる",
+				name:       "500を受けたとき、ErrInternalServerになる",
 				status:     http.StatusInternalServerError,
 				wantTarget: apicardclient.ErrInternalServer,
 			},
@@ -147,22 +147,22 @@ func TestClient_CreateDeck(t *testing.T) {
 			wantTarget error
 		}{
 			{
-				name:       "400 を受けたとき、ErrBadRequest になる",
+				name:       "400を受けたとき、ErrBadRequestになる",
 				status:     http.StatusBadRequest,
 				wantTarget: apicardclient.ErrBadRequest,
 			},
 			{
-				name:       "401 を受けたとき、ErrUnauthorized になる",
+				name:       "401を受けたとき、ErrUnauthorizedになる",
 				status:     http.StatusUnauthorized,
 				wantTarget: apicardclient.ErrUnauthorized,
 			},
 			{
-				name:       "403 を受けたとき、ErrForbidden になる",
+				name:       "403を受けたとき、ErrForbiddenになる",
 				status:     http.StatusForbidden,
 				wantTarget: apicardclient.ErrForbidden,
 			},
 			{
-				name:       "500 を受けたとき、ErrInternalServer になる",
+				name:       "500を受けたとき、ErrInternalServerになる",
 				status:     http.StatusInternalServerError,
 				wantTarget: apicardclient.ErrInternalServer,
 			},
@@ -189,22 +189,22 @@ func TestClient_GetDeck(t *testing.T) {
 			wantTarget error
 		}{
 			{
-				name:       "400 を受けたとき、ErrBadRequest になる",
+				name:       "400を受けたとき、ErrBadRequestになる",
 				status:     http.StatusBadRequest,
 				wantTarget: apicardclient.ErrBadRequest,
 			},
 			{
-				name:       "401 を受けたとき、ErrUnauthorized になる",
+				name:       "401を受けたとき、ErrUnauthorizedになる",
 				status:     http.StatusUnauthorized,
 				wantTarget: apicardclient.ErrUnauthorized,
 			},
 			{
-				name:       "404 を受けたとき、ErrNotFound になる",
+				name:       "404を受けたとき、ErrNotFoundになる",
 				status:     http.StatusNotFound,
 				wantTarget: apicardclient.ErrNotFound,
 			},
 			{
-				name:       "500 を受けたとき、ErrInternalServer になる",
+				name:       "500を受けたとき、ErrInternalServerになる",
 				status:     http.StatusInternalServerError,
 				wantTarget: apicardclient.ErrInternalServer,
 			},
@@ -231,27 +231,27 @@ func TestClient_UpdateDeck(t *testing.T) {
 			wantTarget error
 		}{
 			{
-				name:       "400 を受けたとき、ErrBadRequest になる",
+				name:       "400を受けたとき、ErrBadRequestになる",
 				status:     http.StatusBadRequest,
 				wantTarget: apicardclient.ErrBadRequest,
 			},
 			{
-				name:       "401 を受けたとき、ErrUnauthorized になる",
+				name:       "401を受けたとき、ErrUnauthorizedになる",
 				status:     http.StatusUnauthorized,
 				wantTarget: apicardclient.ErrUnauthorized,
 			},
 			{
-				name:       "403 を受けたとき、ErrForbidden になる",
+				name:       "403を受けたとき、ErrForbiddenになる",
 				status:     http.StatusForbidden,
 				wantTarget: apicardclient.ErrForbidden,
 			},
 			{
-				name:       "404 を受けたとき、ErrNotFound になる",
+				name:       "404を受けたとき、ErrNotFoundになる",
 				status:     http.StatusNotFound,
 				wantTarget: apicardclient.ErrNotFound,
 			},
 			{
-				name:       "500 を受けたとき、ErrInternalServer になる",
+				name:       "500を受けたとき、ErrInternalServerになる",
 				status:     http.StatusInternalServerError,
 				wantTarget: apicardclient.ErrInternalServer,
 			},
@@ -278,22 +278,22 @@ func TestClient_DeleteDeck(t *testing.T) {
 			wantTarget error
 		}{
 			{
-				name:       "400 を受けたとき、ErrBadRequest になる",
+				name:       "400を受けたとき、ErrBadRequestになる",
 				status:     http.StatusBadRequest,
 				wantTarget: apicardclient.ErrBadRequest,
 			},
 			{
-				name:       "401 を受けたとき、ErrUnauthorized になる",
+				name:       "401を受けたとき、ErrUnauthorizedになる",
 				status:     http.StatusUnauthorized,
 				wantTarget: apicardclient.ErrUnauthorized,
 			},
 			{
-				name:       "404 を受けたとき、ErrNotFound になる",
+				name:       "404を受けたとき、ErrNotFoundになる",
 				status:     http.StatusNotFound,
 				wantTarget: apicardclient.ErrNotFound,
 			},
 			{
-				name:       "500 を受けたとき、ErrInternalServer になる",
+				name:       "500を受けたとき、ErrInternalServerになる",
 				status:     http.StatusInternalServerError,
 				wantTarget: apicardclient.ErrInternalServer,
 			},
@@ -321,27 +321,27 @@ func TestClient_ValidateDeckForBattle(t *testing.T) {
 			wantTarget error
 		}{
 			{
-				name:       "400 を受けたとき、ErrBadRequest ではなく ErrDeckInvalid になる",
+				name:       "400を受けたとき、ErrBadRequestではなくErrDeckInvalidになる",
 				status:     http.StatusBadRequest,
 				wantTarget: apicardclient.ErrDeckInvalid,
 			},
 			{
-				name:       "401 を受けたとき、ErrUnauthorized になる",
+				name:       "401を受けたとき、ErrUnauthorizedになる",
 				status:     http.StatusUnauthorized,
 				wantTarget: apicardclient.ErrUnauthorized,
 			},
 			{
-				name:       "403 を受けたとき、ErrForbidden になる",
+				name:       "403を受けたとき、ErrForbiddenになる",
 				status:     http.StatusForbidden,
 				wantTarget: apicardclient.ErrForbidden,
 			},
 			{
-				name:       "404 を受けたとき、ErrNotFound になる",
+				name:       "404を受けたとき、ErrNotFoundになる",
 				status:     http.StatusNotFound,
 				wantTarget: apicardclient.ErrNotFound,
 			},
 			{
-				name:       "500 を受けたとき、ErrInternalServer になる",
+				name:       "500を受けたとき、ErrInternalServerになる",
 				status:     http.StatusInternalServerError,
 				wantTarget: apicardclient.ErrInternalServer,
 			},

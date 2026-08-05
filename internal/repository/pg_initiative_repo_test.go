@@ -14,7 +14,7 @@ import (
 
 func TestInitiativeFindAll(t *testing.T) {
 	t.Run("施策一覧の取得", func(t *testing.T) {
-		t.Run("複数施策のとき、initiative_id 昇順で親 product_id 付きで返る", func(t *testing.T) {
+		t.Run("複数施策のとき、initiative_id昇順で親product_id付きで返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedProduct(t, productSeed{"PD-TST1", "SHE", "P1"})
 			seedProduct(t, productSeed{"PD-TST2", "Tenki", "P2"})
@@ -38,7 +38,7 @@ func TestInitiativeFindAll(t *testing.T) {
 			assert.Equal(t, "PD-TST2", productByID["IN-TST-R2"])
 		})
 
-		t.Run("is_active=false の施策があるとき、除外される", func(t *testing.T) {
+		t.Run("is_active=falseの施策があるとき、除外される", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedProduct(t, productSeed{"PD-TST1", "SHE", "P1"})
 			seedInitiative(t, initiativeSeed{"IN-TST-R1", "PD-TST1", "routine", "R1", 100, "", `{"ops":[]}`})

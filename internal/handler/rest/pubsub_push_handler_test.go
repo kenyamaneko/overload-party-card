@@ -113,8 +113,8 @@ func TestPubSubPushHandler_HandleCardPackPurchased(t *testing.T) {
 		Cards:    []domain.CardPackCard{{CardID: fxPushCardID, Copies: 3}},
 	}
 
-	t.Run("card-pack-purchased の push 受け口", func(t *testing.T) {
-		t.Run("push 本文を受け取ると、カードが付与される", func(t *testing.T) {
+	t.Run("card-pack-purchasedのpush受け口", func(t *testing.T) {
+		t.Run("push本文を受け取ると、カードが付与される", func(t *testing.T) {
 			h, pcRepo := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
 				"faction_set_tuners": pack,
 			}))
@@ -136,7 +136,7 @@ func TestPubSubPushHandler_HandleCardPackPurchased(t *testing.T) {
 			assert.Equal(t, 3, cards[0].Count)
 		})
 
-		t.Run("base64 で復号できない data のとき、400 になり応答本文の error が base64 不正を示す文言と完全に一致する", func(t *testing.T) {
+		t.Run("base64で復号できないdataのとき、400になり応答本文のerrorがbase64不正を示す文言と完全に一致する", func(t *testing.T) {
 			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
 			body := `{"message":{"data":"not-valid-base64!!!"}}`
 
@@ -146,7 +146,7 @@ func TestPubSubPushHandler_HandleCardPackPurchased(t *testing.T) {
 			assert.Equal(t, "pubsub push: malformed base64 data", decodeBody(t, w)["error"])
 		})
 
-		t.Run("既知でない event_type のとき、400 とは異なる 500 になり、応答本文には出ない event_type 想定外の原因がログに出てカードも付与されない", func(t *testing.T) {
+		t.Run("既知でないevent_typeのとき、400とは異なる500になり、応答本文には出ないevent_type想定外の原因がログに出てカードも付与されない", func(t *testing.T) {
 			buf := captureSlog(t)
 			h, pcRepo := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
 				"faction_set_tuners": pack,
@@ -171,7 +171,7 @@ func TestPubSubPushHandler_HandleCardPackPurchased(t *testing.T) {
 			assert.Empty(t, cards)
 		})
 
-		t.Run("同じイベントを二度投げても、2 回目はカードが二重に付与されない", func(t *testing.T) {
+		t.Run("同じイベントを二度投げても、2回目はカードが二重に付与されない", func(t *testing.T) {
 			h, pcRepo := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
 				"faction_set_tuners": pack,
 			}))
@@ -205,8 +205,8 @@ func TestPubSubPushHandler_HandlePlayerOnboarded(t *testing.T) {
 		"faction_set_tuners": {PackID: "faction_set_tuners", IsActive: true, Cards: []domain.CardPackCard{{CardID: fxPushCardID, Copies: 3}}},
 	}
 
-	t.Run("player-onboarded の push 受け口", func(t *testing.T) {
-		t.Run("push 本文を受け取ると、basic と faction のカードが付与される", func(t *testing.T) {
+	t.Run("player-onboardedのpush受け口", func(t *testing.T) {
+		t.Run("push本文を受け取ると、basicとfactionのカードが付与される", func(t *testing.T) {
 			h, pcRepo := newPubSubPushHandlerFixture(newFakeCardPackRepo(packs))
 			payload, err := json.Marshal(apiscenario.PlayerOnboardedEvent{
 				EventType:        apiscenario.EventTypePlayerOnboarded,
@@ -227,7 +227,7 @@ func TestPubSubPushHandler_HandlePlayerOnboarded(t *testing.T) {
 			}, cards)
 		})
 
-		t.Run("JSON として復号できない body のとき、400 になり応答本文の error が envelope 不正を示す文言と完全に一致する", func(t *testing.T) {
+		t.Run("JSONとして復号できないbodyのとき、400になり応答本文のerrorがenvelope不正を示す文言と完全に一致する", func(t *testing.T) {
 			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
 
 			w := servePush(t, h.HandlePlayerOnboarded, `not-json-at-all`)
@@ -236,7 +236,7 @@ func TestPubSubPushHandler_HandlePlayerOnboarded(t *testing.T) {
 			assert.Equal(t, "pubsub push: malformed envelope", decodeBody(t, w)["error"])
 		})
 
-		t.Run("message フィールドが無いとき、400 になり応答本文の error が envelope 不正を示す文言と完全に一致する", func(t *testing.T) {
+		t.Run("messageフィールドが無いとき、400になり応答本文のerrorがenvelope不正を示す文言と完全に一致する", func(t *testing.T) {
 			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
 
 			w := servePush(t, h.HandlePlayerOnboarded, `{}`)
@@ -245,7 +245,7 @@ func TestPubSubPushHandler_HandlePlayerOnboarded(t *testing.T) {
 			assert.Equal(t, "pubsub push: malformed envelope", decodeBody(t, w)["error"])
 		})
 
-		t.Run("message.data が空文字のとき、400 になり応答本文の error が envelope 不正を示す文言と完全に一致する", func(t *testing.T) {
+		t.Run("message.dataが空文字のとき、400になり応答本文のerrorがenvelope不正を示す文言と完全に一致する", func(t *testing.T) {
 			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
 
 			w := servePush(t, h.HandlePlayerOnboarded, `{"message":{"data":""}}`)

@@ -24,7 +24,7 @@ func cardCacheWith(cards ...*domain.Card) *cache.CardCache {
 
 func TestPlayerCardInteractor_GetPlayerCards(t *testing.T) {
 	t.Run("所持カードの取得", func(t *testing.T) {
-		t.Run("所持カードがあるとき、所持枚数は player_cards・カード定義は CardCache から構成して返す", func(t *testing.T) {
+		t.Run("所持カードがあるとき、所持枚数はplayer_cards・カード定義はCardCacheから構成して返す", func(t *testing.T) {
 			effectText := "対象を 1 体破壊する"
 			def := &domain.Card{
 				CardID: "TST-0001", CardName: "Fireball", ResourceLabel: "mana",
@@ -49,7 +49,7 @@ func TestPlayerCardInteractor_GetPlayerCards(t *testing.T) {
 			assert.Equal(t, want, got)
 		})
 
-		t.Run("所持カードが無いとき、nil ではなく空スライスを返す", func(t *testing.T) {
+		t.Run("所持カードが無いとき、nilではなく空スライスを返す", func(t *testing.T) {
 			svc := NewPlayerCardInteractor(newInMemoryPlayerCardRepo(), cardCacheWith())
 
 			got, err := svc.GetPlayerCards(context.Background(), "player-1")
@@ -57,7 +57,7 @@ func TestPlayerCardInteractor_GetPlayerCards(t *testing.T) {
 			assert.Equal(t, []*apicard.PlayerCardWithDef{}, got)
 		})
 
-		t.Run("所持カードが CardCache に無いとき、黙ってスキップせず不足カード ID を含むエラーを返す", func(t *testing.T) {
+		t.Run("所持カードがCardCacheに無いとき、黙ってスキップせず不足カードIDを含むエラーを返す", func(t *testing.T) {
 			tests := []struct {
 				name        string
 				cache       []*domain.Card
@@ -65,7 +65,7 @@ func TestPlayerCardInteractor_GetPlayerCards(t *testing.T) {
 				missingCard string
 			}{
 				{
-					name:  "唯一の所持カードが cache に無いとき、そのカード ID を含むエラーになる",
+					name:  "唯一の所持カードがcacheに無いとき、そのカードIDを含むエラーになる",
 					cache: nil,
 					seed: []*domain.PlayerCard{
 						{PlayerID: "player-1", CardID: "TST-0001", ArtNo: 1, Count: 1},
@@ -73,7 +73,7 @@ func TestPlayerCardInteractor_GetPlayerCards(t *testing.T) {
 					missingCard: "TST-0001",
 				},
 				{
-					name: "複数所持のうち 1 枚が cache に無いとき、そのカード ID を含むエラーになる",
+					name: "複数所持のうち1枚がcacheに無いとき、そのカードIDを含むエラーになる",
 					cache: []*domain.Card{
 						{CardID: "TST-0001", CardName: "Fireball"},
 					},

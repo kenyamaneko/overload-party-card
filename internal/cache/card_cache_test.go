@@ -37,20 +37,20 @@ func loadTestCache(t *testing.T) *CardCache {
 
 func TestLoadFromBytes(t *testing.T) {
 	t.Run("生成カードキャッシュのロード", func(t *testing.T) {
-		t.Run("0 件 JSON のとき、マスター欠落としてエラーになる", func(t *testing.T) {
+		t.Run("0件JSONのとき、マスター欠落としてエラーになる", func(t *testing.T) {
 			cc := NewCardCache()
 			err := cc.LoadFromBytes([]byte(`[]`))
 			assert.Error(t, err)
 		})
 
-		t.Run("JSON として不正なバイト列のとき、読み込みがエラーになる", func(t *testing.T) {
+		t.Run("JSONとして不正なバイト列のとき、読み込みがエラーになる", func(t *testing.T) {
 			cc := NewCardCache()
 			err := cc.LoadFromBytes([]byte(`{`))
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "parse card data")
 		})
 
-		t.Run("全カードで resource 種別なら resource_label があり、support 種別なら無い", func(t *testing.T) {
+		t.Run("全カードでresource種別ならresource_labelがあり、support種別なら無い", func(t *testing.T) {
 			// リソース種別か否かと label 有無を 1 枚ごとに等式で突き合わせ、if 分岐なしで網羅する。
 			cc := loadTestCache(t)
 			for cardID, card := range cc.All() {
@@ -65,8 +65,8 @@ func TestLoadFromBytes(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
-	t.Run("DB からのカードキャッシュ読み込み", func(t *testing.T) {
-		t.Run("DB に定義があるとき、読み込んだ定義が検索で引けるようになる", func(t *testing.T) {
+	t.Run("DBからのカードキャッシュ読み込み", func(t *testing.T) {
+		t.Run("DBに定義があるとき、読み込んだ定義が検索で引けるようになる", func(t *testing.T) {
 			repo := &stubCardRepo{cards: []*domain.Card{
 				{CardID: "TST-0001", CardName: "Test Card"},
 			}}
@@ -80,7 +80,7 @@ func TestLoad(t *testing.T) {
 			assert.Equal(t, "Test Card", got.CardName)
 		})
 
-		t.Run("DB が 0 件のとき、マスター欠落としてエラーになる", func(t *testing.T) {
+		t.Run("DBが0件のとき、マスター欠落としてエラーになる", func(t *testing.T) {
 			repo := &stubCardRepo{cards: nil}
 			cc := NewCardCache()
 
@@ -90,7 +90,7 @@ func TestLoad(t *testing.T) {
 			assert.Contains(t, err.Error(), "0 cards loaded")
 		})
 
-		t.Run("DB 読み込みが失敗したとき、そのエラーが伝播する", func(t *testing.T) {
+		t.Run("DB読み込みが失敗したとき、そのエラーが伝播する", func(t *testing.T) {
 			dbErr := errors.New("db down")
 			repo := &stubCardRepo{err: dbErr}
 			cc := NewCardCache()

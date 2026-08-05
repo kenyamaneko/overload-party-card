@@ -38,8 +38,8 @@ func seedCardPack(t *testing.T, s cardPackSeed) {
 }
 
 func TestGetPack(t *testing.T) {
-	t.Run("card pack の取得", func(t *testing.T) {
-		t.Run("該当 pack があるとき、card_id 昇順の Cards 付きで返る", func(t *testing.T) {
+	t.Run("card packの取得", func(t *testing.T) {
+		t.Run("該当packがあるとき、card_id昇順のCards付きで返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedCardPack(t, cardPackSeed{
 				PackID:   "wanted",
@@ -68,7 +68,7 @@ func TestGetPack(t *testing.T) {
 			}, got.Cards)
 		})
 
-		t.Run("存在しない pack_id のとき、ErrNotFound になり nil を返す", func(t *testing.T) {
+		t.Run("存在しないpack_idのとき、ErrNotFoundになりnilを返す", func(t *testing.T) {
 			sharedPg.Truncate(t)
 
 			repo := repository.NewPgCardPackRepository(sharedPg.Pool)
@@ -79,7 +79,7 @@ func TestGetPack(t *testing.T) {
 			assert.Nil(t, got)
 		})
 
-		t.Run("card_pack_cards が 0 件のとき、空 Cards の CardPack を返す", func(t *testing.T) {
+		t.Run("card_pack_cardsが0件のとき、空CardsのCardPackを返す", func(t *testing.T) {
 			// 空 pack を弾くかどうかの運用判定は usecase 側の責務。
 			sharedPg.Truncate(t)
 			seedCardPack(t, cardPackSeed{
@@ -96,7 +96,7 @@ func TestGetPack(t *testing.T) {
 			assert.Empty(t, got.Cards)
 		})
 
-		t.Run("運用停止中の pack を取得すると、停止状態のまま内包カード付きで返る", func(t *testing.T) {
+		t.Run("運用停止中のpackを取得すると、停止状態のまま内包カード付きで返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedCardPack(t, cardPackSeed{
 				PackID:   "inactive-pack",

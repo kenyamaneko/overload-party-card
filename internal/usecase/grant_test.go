@@ -91,17 +91,17 @@ func TestGrantPack(t *testing.T) {
 			wantErr  error
 		}{
 			{
-				name:     "無効化されたカードパックのとき、ErrPackInactive になり何も付与されない",
+				name:     "無効化されたカードパックのとき、ErrPackInactiveになり何も付与されない",
 				packRepo: &fakeCardPackRepo{pack: &domain.CardPack{IsActive: false, Cards: []domain.CardPackCard{{CardID: "SH-0001", Copies: 3}}}},
 				wantErr:  port.ErrPackInactive,
 			},
 			{
-				name:     "存在しないカードパックのとき、ErrNotFound になり何も付与されない",
+				name:     "存在しないカードパックのとき、ErrNotFoundになり何も付与されない",
 				packRepo: &fakeCardPackRepo{err: port.ErrNotFound},
 				wantErr:  port.ErrNotFound,
 			},
 			{
-				name:     "中身が空のカードパックのとき、ErrEmptyPack になり何も付与されない",
+				name:     "中身が空のカードパックのとき、ErrEmptyPackになり何も付与されない",
 				packRepo: &fakeCardPackRepo{pack: &domain.CardPack{IsActive: true, Cards: nil}},
 				wantErr:  port.ErrEmptyPack,
 			},

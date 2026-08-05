@@ -28,7 +28,7 @@ func TestGetPlayerCards(t *testing.T) {
 			want   []ownedRow
 		}{
 			{
-				name: "複数所持のとき、card_id / art_no 昇順で返る",
+				name: "複数所持のとき、card_id / art_no昇順で返る",
 				seeds: []playerCardSeed{
 					{playerA, "SH-0002", 0, 3},
 					{playerA, "SH-0001", 1, 1},
@@ -42,7 +42,7 @@ func TestGetPlayerCards(t *testing.T) {
 				},
 			},
 			{
-				name: "他プレイヤーの行があるとき、除外される (PK スコープ)",
+				name: "他プレイヤーの行があるとき、除外される (PKスコープ)",
 				seeds: []playerCardSeed{
 					{playerA, "SH-0001", 0, 1},
 					{playerB, "SH-0002", 0, 5},
@@ -82,7 +82,7 @@ func TestGetPlayerCards(t *testing.T) {
 }
 
 func TestAddCards(t *testing.T) {
-	t.Run("所持カードの UPSERT 加算", func(t *testing.T) {
+	t.Run("所持カードのUPSERT加算", func(t *testing.T) {
 		bulkCards, bulkExpected := bulkCardPackCards(30, 3)
 
 		tests := []struct {
@@ -93,7 +93,7 @@ func TestAddCards(t *testing.T) {
 			wantFinalCount map[string]int // card_id (art_no=0) → 期待 count
 		}{
 			{
-				name:  "全て新規カードのとき、INSERT される",
+				name:  "全て新規カードのとき、INSERTされる",
 				seeds: nil,
 				cards: []domain.CardPackCard{
 					{CardID: "SH-0001", Copies: 3},
@@ -103,7 +103,7 @@ func TestAddCards(t *testing.T) {
 				wantFinalCount: map[string]int{"SH-0001": 3, "SH-0002": 3},
 			},
 			{
-				name: "既所持カードのとき、count に加算される (UPSERT)",
+				name: "既所持カードのとき、countに加算される (UPSERT)",
 				seeds: []playerCardSeed{
 					{playerA, "SH-0001", 0, 2},
 				},
@@ -124,7 +124,7 @@ func TestAddCards(t *testing.T) {
 				wantFinalCount: map[string]int{"SH-0001": 4, "SH-0002": 1},
 			},
 			{
-				name:           "30 種類 (実 grant スケール) のとき、1 文の bulk UPSERT で投入される",
+				name:           "30種類 (実grantスケール)のとき、1文のbulk UPSERTで投入される",
 				seeds:          nil,
 				cards:          bulkCards,
 				wantGranted:    90,

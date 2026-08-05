@@ -19,7 +19,7 @@ func mustMarshalCardPackPurchased(t *testing.T, ev apishop.CardPackPurchasedEven
 }
 
 func TestCardPackPurchasedSubscriber_Handle(t *testing.T) {
-	t.Run("card_pack_purchased イベントの処理", func(t *testing.T) {
+	t.Run("card_pack_purchasedイベントの処理", func(t *testing.T) {
 		validPayload := mustMarshalCardPackPurchased(t, apishop.CardPackPurchasedEvent{
 			EventID:    "evt-1",
 			PlayerID:   "player-1",
@@ -36,13 +36,13 @@ func TestCardPackPurchasedSubscriber_Handle(t *testing.T) {
 			wantPacks     []string
 		}{
 			{
-				name:      "新規イベントのとき、pack_id を GrantPack に渡して Ack する",
+				name:      "新規イベントのとき、pack_idをGrantPackに渡してAckする",
 				payload:   validPayload,
 				wantAck:   true,
 				wantPacks: []string{"faction_set_Tuners"},
 			},
 			{
-				name:         "重複イベント (processed_events 既存) のとき、配布せず Ack する",
+				name:         "重複イベント (processed_events既存)のとき、配布せずAckする",
 				payload:      validPayload,
 				seedInserted: "evt-1",
 				wantAck:      true,
@@ -52,27 +52,27 @@ func TestCardPackPurchasedSubscriber_Handle(t *testing.T) {
 				// processed_events への INSERT (dedup ガード) が失敗した場合、event を
 				// Ack で捨てると配布も dedup 記録もされずメッセージが失われる。Nack して
 				// Pub/Sub の at-least-once 再配送に乗せる。
-				name:          "processed_events INSERT 失敗のとき、再配送に乗せるため Nack する",
+				name:          "processed_events INSERT失敗のとき、再配送に乗せるためNackする",
 				payload:       validPayload,
 				repoInsertErr: errors.New("db down"),
 				wantAck:       false,
 				wantPacks:     nil,
 			},
 			{
-				name:       "GrantPack 失敗のとき、Nack して再配送に乗せる",
+				name:       "GrantPack失敗のとき、Nackして再配送に乗せる",
 				payload:    validPayload,
 				granterErr: errors.New("grant failed"),
 				wantAck:    false,
 				wantPacks:  []string{"faction_set_Tuners"},
 			},
 			{
-				name:      "malformed JSON のとき、Nack して DLQ 送りになる",
+				name:      "malformed JSONのとき、NackしてDLQ送りになる",
 				payload:   []byte("not-json"),
 				wantAck:   false,
 				wantPacks: nil,
 			},
 			{
-				name: "未知 event_type のとき、Nack して DLQ で publisher バグを検出する",
+				name: "未知event_typeのとき、NackしてDLQでpublisherバグを検出する",
 				payload: mustMarshal(t, apishop.CardPackPurchasedEvent{
 					EventType:  "unknown",
 					EventID:    "evt-2",
@@ -101,7 +101,7 @@ func TestCardPackPurchasedSubscriber_Handle(t *testing.T) {
 			})
 		}
 
-		t.Run("同じ event_id を持つイベントを二度処理しても、2 回目は配布されない", func(t *testing.T) {
+		t.Run("同じevent_idを持つイベントを二度処理しても、2回目は配布されない", func(t *testing.T) {
 			payload := mustMarshalCardPackPurchased(t, apishop.CardPackPurchasedEvent{
 				EventID:    "evt-repeat",
 				PlayerID:   "player-1",

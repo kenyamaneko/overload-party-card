@@ -13,7 +13,7 @@ import (
 )
 
 func TestInsert(t *testing.T) {
-	t.Run("processed_events への冪等挿入", func(t *testing.T) {
+	t.Run("processed_eventsへの冪等挿入", func(t *testing.T) {
 		// ON CONFLICT DO NOTHING RETURNING で pgx.ErrNoRows を潰し、新規は true・重複は false を返す。
 		tests := []struct {
 			name         string
@@ -23,21 +23,21 @@ func TestInsert(t *testing.T) {
 			wantInserted bool
 		}{
 			{
-				name:         "新規 event_id のとき、inserted=true になる",
+				name:         "新規event_idのとき、inserted=trueになる",
 				preInsert:    nil,
 				eventID:      "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
 				eventType:    "card_pack_purchased",
 				wantInserted: true,
 			},
 			{
-				name:         "既存 event_id のとき、inserted=false になる (重複適用抑止)",
+				name:         "既存event_idのとき、inserted=falseになる (重複適用抑止)",
 				preInsert:    []string{"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"},
 				eventID:      "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
 				eventType:    "card_pack_purchased",
 				wantInserted: false,
 			},
 			{
-				name:         "他の event_id が存在しても新規のとき、inserted=true になる",
+				name:         "他のevent_idが存在しても新規のとき、inserted=trueになる",
 				preInsert:    []string{"cccccccc-cccc-cccc-cccc-cccccccccccc"},
 				eventID:      "dddddddd-dddd-dddd-dddd-dddddddddddd",
 				eventType:    "player_onboarded",

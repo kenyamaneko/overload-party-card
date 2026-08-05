@@ -36,7 +36,7 @@ func mustMarshalPlayerOnboarded(t *testing.T, ev apiscenario.PlayerOnboardedEven
 }
 
 func TestPlayerOnboardedSubscriber_Handle(t *testing.T) {
-	t.Run("player_onboarded イベントの処理", func(t *testing.T) {
+	t.Run("player_onboardedイベントの処理", func(t *testing.T) {
 		validPayload := mustMarshalPlayerOnboarded(t, apiscenario.PlayerOnboardedEvent{
 			EventID:          "evt-1",
 			PlayerID:         "player-1",
@@ -54,13 +54,13 @@ func TestPlayerOnboardedSubscriber_Handle(t *testing.T) {
 			wantPacks        []string
 		}{
 			{
-				name:      "新規イベントのとき、basic と faction_set_<faction> を順次配布して Ack する",
+				name:      "新規イベントのとき、basicとfaction_set_<faction> を順次配布してAckする",
 				payload:   validPayload,
 				wantAck:   true,
 				wantPacks: []string{"basic", "faction_set_tuners"},
 			},
 			{
-				name:         "重複イベント (processed_events 既存) のとき、配布せず Ack する",
+				name:         "重複イベント (processed_events既存)のとき、配布せずAckする",
 				payload:      validPayload,
 				seedInserted: "evt-1",
 				wantAck:      true,
@@ -71,7 +71,7 @@ func TestPlayerOnboardedSubscriber_Handle(t *testing.T) {
 				// Ack で捨てると配布も dedup 記録もされずメッセージが失われる。Nack して
 				// Pub/Sub の at-least-once 再配送に乗せ、次回成功時に dedup と配布が走る
 				// ことを期待する仕様の固定。
-				name:          "processed_events INSERT 失敗のとき、再配送に乗せるため Nack する",
+				name:          "processed_events INSERT失敗のとき、再配送に乗せるためNackする",
 				payload:       validPayload,
 				repoInsertErr: errors.New("db down"),
 				wantAck:       false,
@@ -81,7 +81,7 @@ func TestPlayerOnboardedSubscriber_Handle(t *testing.T) {
 				// basic → faction_set の順次配布は fail-fast: 1 回目失敗時点で 2 回目を
 				// 呼ばずに Nack する。1 回目失敗後にそのまま続行すると DB 状態によって
 				// 挙動が予測不能になるため、early exit を仕様として固定する。
-				name:             "1 回目 (basic) GrantPack 失敗のとき、2 回目を呼ばずに Nack する (fail-fast)",
+				name:             "1回目 (basic) GrantPack失敗のとき、2回目を呼ばずにNackする (fail-fast)",
 				payload:          validPayload,
 				granterErr:       errors.New("grant failed"),
 				granterErrOnPack: "basic",
@@ -93,7 +93,7 @@ func TestPlayerOnboardedSubscriber_Handle(t *testing.T) {
 				// 配布が発生する。このとき Nack で再配送されても processed_events が
 				// 既に書かれていれば dedup で skip され、不完全配布のまま固定される。
 				// この at-most-once 相当の挙動を仕様として固定する。
-				name:             "2 回目 (faction) GrantPack 失敗のとき、1 回目だけ配布された状態で Nack する (不完全配布)",
+				name:             "2回目 (faction) GrantPack失敗のとき、1回目だけ配布された状態でNackする (不完全配布)",
 				payload:          validPayload,
 				granterErr:       errors.New("grant failed"),
 				granterErrOnPack: "faction_set_tuners",
@@ -101,13 +101,13 @@ func TestPlayerOnboardedSubscriber_Handle(t *testing.T) {
 				wantPacks:        []string{"basic", "faction_set_tuners"},
 			},
 			{
-				name:      "malformed JSON のとき、Nack して DLQ 送りになる",
+				name:      "malformed JSONのとき、NackしてDLQ送りになる",
 				payload:   []byte("not-json"),
 				wantAck:   false,
 				wantPacks: nil,
 			},
 			{
-				name: "未知 event_type のとき、Nack して DLQ で publisher バグを検出する",
+				name: "未知event_typeのとき、NackしてDLQでpublisherバグを検出する",
 				payload: mustMarshal(t, apiscenario.PlayerOnboardedEvent{
 					EventType:        "unknown",
 					EventID:          "evt-2",
@@ -136,7 +136,7 @@ func TestPlayerOnboardedSubscriber_Handle(t *testing.T) {
 			})
 		}
 
-		t.Run("同じ event_id を持つイベントを二度処理しても、2 回目は配布されない", func(t *testing.T) {
+		t.Run("同じevent_idを持つイベントを二度処理しても、2回目は配布されない", func(t *testing.T) {
 			payload := mustMarshalPlayerOnboarded(t, apiscenario.PlayerOnboardedEvent{
 				EventID:          "evt-repeat",
 				PlayerID:         "player-1",
