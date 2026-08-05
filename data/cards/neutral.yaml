@@ -718,8 +718,7 @@ cards:
         custom: cloud_shift
         meta:
           faction: Tenki
-          # custom 効果の meta は配列しか受けないため、1 要素でも配列で書く。
-          card_type: [Compute]
+          group: compute
           deploy_discount: 500
 
   - card_no: 130
@@ -747,7 +746,7 @@ cards:
         custom: cloud_shift
         meta:
           faction: Tuners
-          card_type: [Database, CacheDB]
+          group: db
           deploy_discount: 500
 
   - card_no: 135

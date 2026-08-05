@@ -211,7 +211,7 @@ cards:
           - match:
               selector: target
               faction: Tenki
-              card_type: DataResource
+              group: db
           - not_same: { a: source, b: target }
         ops:
           - apply_buff:
@@ -524,7 +524,7 @@ cards:
         ops:
           - trash_to_hand:
               faction: Tenki
-              card_type: [Compute, Container, Orchestrator, Serverless, "AI/ML", Database, CacheDB, ObjectStorage]
+              card_type: [Compute, DataResource]
 
   - card_no: 44
     card_id: "TK-0022"
@@ -590,12 +590,12 @@ cards:
           - match:
               selector: target
               faction: Tenki
-              card_type: Compute
+              group: compute
         ops:
           - deploy_from_hand:
               filter:
                 faction: Tenki
-                card_type: Compute
+                group: compute
 
   - card_no: 36
     card_id: "TK-0025"

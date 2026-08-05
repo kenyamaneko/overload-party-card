@@ -164,7 +164,7 @@ cards:
       - trigger: on_field_change
         guard:
           - count:
-              selector: { owner: myself, faction: Tuners, card_type: [Database, CacheDB] }
+              selector: { owner: myself, faction: Tuners, group: db }
               min: 1
         ops:
           - apply_buff:
@@ -354,7 +354,7 @@ cards:
         use_limit: once_per_game
         ops:
           - deploy_from_repo:
-              filter: { faction: Tuners, subtype: Database }
+              filter: { faction: Tuners, group: db }
               override_av: 200
 
   - card_no: 86
@@ -435,7 +435,7 @@ cards:
                 owner: myself
                 zone: backend
                 faction: Tuners
-                subtype: Database
+                group: db
                 pick: choice
               amount: { ref: target.max_av, multiply: 1 }
 
@@ -460,7 +460,7 @@ cards:
           - match:
               selector: target
               faction: Tuners
-              subtype: Database
+              group: db
         ops:
           - deploy_from_hand:
-              filter: { faction: Tuners, subtype: Database }
+              filter: { faction: Tuners, group: db }

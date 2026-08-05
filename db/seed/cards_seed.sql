@@ -194,14 +194,14 @@ VALUES
    false, false, '{"throughput": 400, "availability": 800, "sla_penalty": 300, "maintenance_cost": 100}'::jsonb,
    '**Cloud First:** このカードはスターティングリソースとしてのみデプロイできる。
 **Cloud Shift:** 手札から 天気使い コンピュート系リソースをデプロイコスト -500 でデプロイできる。その後、このカードをトラッシュに送る。',
-   '[{"trigger": "ignition", "use_limit": "once_per_game", "custom": "cloud_shift", "meta": {"faction": "Tenki", "card_type": ["Compute"], "deploy_discount": 500}}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_game", "custom": "cloud_shift", "meta": {"faction": "Tenki", "card_type": "Compute", "deploy_discount": 500}}]'::jsonb,
    'unlimited', true),
 
   ('NT-0033', '調律部 DB', 'On-premises', 'Neutral', 'DataResource', 'Database',
    false, false, '{"yield": 200, "availability": 700, "sla_penalty": 500, "maintenance_cost": 100}'::jsonb,
    '**Cloud First:** このカードはスターティングリソースとしてのみデプロイできる。
 **Cloud Shift:** 手札から 調律部 DB系リソースをデプロイコスト -500 でデプロイできる。その後、このカードをトラッシュに送る。',
-   '[{"trigger": "ignition", "use_limit": "once_per_game", "custom": "cloud_shift", "meta": {"faction": "Tuners", "card_type": ["Database", "CacheDB"], "deploy_discount": 500}}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_game", "custom": "cloud_shift", "meta": {"faction": "Tuners", "subtype": ["Database", "CacheDB"], "deploy_discount": 500}}]'::jsonb,
    'unlimited', true),
 
   ('NT-0034', 'スロットリング', '', 'Neutral', 'Reactive', NULL,
@@ -249,7 +249,7 @@ VALUES
   ('SH-0007', 'オオロバ', 'DistributedDB', 'SHE', 'DataResource', 'Database',
    true, false, '{"yield": 500, "availability": 1200, "sla_penalty": 500, "maintenance_cost": 200}'::jsonb,
    '**星の連鎖:** 自分のバックエンドのこのカード以外の SHEのDB系リソース1体につき、このカードの Yield を +200 する',
-   '[{"trigger": "on_field_change", "ops": [{"apply_buff": {"selector": "source", "buff": "yield", "amount": {"base": 0, "per": {"count": {"owner": "myself", "zone": "backend", "faction": "SHE", "subtype": "Database", "exclude": "source"}, "value": 200}}, "duration": "this_turn"}}]}]'::jsonb,
+   '[{"trigger": "on_field_change", "ops": [{"apply_buff": {"selector": "source", "buff": "yield", "amount": {"base": 0, "per": {"count": {"owner": "myself", "zone": "backend", "faction": "SHE", "subtype": ["Database", "CacheDB"], "exclude": "source"}, "value": 200}}, "duration": "this_turn"}}]}]'::jsonb,
    'unlimited', true),
 
   ('SH-0008', 'えりり', 'Storage', 'SHE', 'DataResource', 'ObjectStorage',
@@ -550,7 +550,7 @@ VALUES
   ('TK-0008', 'ハヤテ', 'DB', 'Tenki', 'DataResource', 'Database',
    true, false, '{"yield": 500, "availability": 1400, "sla_penalty": 500, "maintenance_cost": 200}'::jsonb,
    '**嵐の後の虹:** 自分のバックエンドの他の 天気使い DB系リソースが破壊された時、2ターンの間、このカードの Yield を +400 する。',
-   '[{"trigger": "on_destroy", "guard": [{"match": {"selector": "target", "faction": "Tenki", "card_type": "DataResource"}}, {"not_same": {"a": "source", "b": "target"}}], "ops": [{"apply_buff": {"selector": "source", "buff": "yield", "amount": 400, "duration": "until_next_own_turn_end"}}]}]'::jsonb,
+   '[{"trigger": "on_destroy", "guard": [{"match": {"selector": "target", "faction": "Tenki", "subtype": ["Database", "CacheDB"]}}, {"not_same": {"a": "source", "b": "target"}}], "ops": [{"apply_buff": {"selector": "source", "buff": "yield", "amount": 400, "duration": "until_next_own_turn_end"}}]}]'::jsonb,
    'unlimited', true),
 
   ('TK-0009', 'フブキ', 'Storage', 'Tenki', 'DataResource', 'ObjectStorage',
@@ -629,7 +629,7 @@ VALUES
   ('TK-0021', '天気使い Migration', '', 'Tenki', 'Strategy', NULL,
    false, false, '{}'::jsonb,
    'Budget 100 を払って発動できる。トラッシュから 天気使い リソース1枚を選択して手札に加える。',
-   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"trash_to_hand": {"faction": "Tenki", "card_type": ["Compute", "Container", "Orchestrator", "Serverless", "AI/ML", "Database", "CacheDB", "ObjectStorage"]}}]}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"trash_to_hand": {"faction": "Tenki", "card_type": ["Compute", "DataResource"]}}]}]'::jsonb,
    'unlimited', true),
 
   ('TK-0022', '天気使い Policy', '', 'Tenki', 'Strategy', NULL,
@@ -689,7 +689,7 @@ VALUES
   ('TN-0006', 'アピエッタ', 'Low-Code', 'Tuners', 'Compute', 'Serverless',
    false, true, '{"throughput": 300, "availability": 1400, "sla_penalty": 200, "maintenance_cost": 0}'::jsonb,
    '**Low-Code:** 自分のフィールドに 調律部 DB がある時、このカードのスループットを +400 する。',
-   '[{"trigger": "on_field_change", "guard": [{"count": {"selector": {"owner": "myself", "faction": "Tuners", "card_type": ["Database", "CacheDB"]}, "min": 1}}], "ops": [{"apply_buff": {"selector": "source", "buff": "tp", "amount": 400, "duration": "this_turn"}}]}]'::jsonb,
+   '[{"trigger": "on_field_change", "guard": [{"count": {"selector": {"owner": "myself", "faction": "Tuners", "subtype": ["Database", "CacheDB"]}, "min": 1}}], "ops": [{"apply_buff": {"selector": "source", "buff": "tp", "amount": 400, "duration": "this_turn"}}]}]'::jsonb,
    'semi_limited', true),
 
   ('TN-0007', '音の魔術師〈マジシャン・オブ・ミュージック〉', 'DB', 'Tuners', 'DataResource', 'Database',
@@ -737,7 +737,7 @@ VALUES
   ('TN-0014', '調律部 ノーツガード', '', 'Tuners', 'Attachment', NULL,
    false, false, '{}'::jsonb,
    '自分の 調律部 DB系リソースに装備できる。装備先が破壊された時に発動できる。リポジトリから 調律部 DB系リソース1枚をデプロイコストなしでデプロイする。この効果は1ゲーム中に1回のみ使用できる。',
-   '[{"trigger": "on_destroy", "use_limit": "once_per_game", "ops": [{"deploy_from_repo": {"filter": {"faction": "Tuners", "subtype": "Database"}, "override_av": 200}}]}]'::jsonb,
+   '[{"trigger": "on_destroy", "use_limit": "once_per_game", "ops": [{"deploy_from_repo": {"filter": {"faction": "Tuners", "subtype": ["Database", "CacheDB"]}, "override_av": 200}}]}]'::jsonb,
    'unlimited', true),
 
   ('TN-0015', '調律部 リアル・アンサンブル・クラスター', '', 'Tuners', 'Attachment', NULL,
@@ -755,13 +755,13 @@ VALUES
   ('TN-0017', '調律部 License', '', 'Tuners', 'Strategy', NULL,
    false, false, '{}'::jsonb,
    'Budget 100 を払って発動できる。自分の 調律部 DB系リソース1体の可用性を最大値まで回復する。',
-   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"heal_damage": {"selector": {"owner": "myself", "zone": "backend", "faction": "Tuners", "subtype": "Database", "pick": "choice"}, "amount": {"ref": "target.max_av", "multiply": 1}}}]}]'::jsonb,
+   '[{"trigger": "ignition", "use_limit": "once_per_turn", "ops": [{"heal_damage": {"selector": {"owner": "myself", "zone": "backend", "faction": "Tuners", "subtype": ["Database", "CacheDB"], "pick": "choice"}, "amount": {"ref": "target.max_av", "multiply": 1}}}]}]'::jsonb,
    'unlimited', true),
 
   ('TN-0018', '調律部 Failback', '', 'Tuners', 'Reactive', NULL,
    false, false, '{}'::jsonb,
    '自分の 調律部 DB系リソースが破壊された時に発動する。手札から 調律部 DB系リソース1枚をデプロイコストなしでデプロイする。',
-   '[{"trigger": "on_destroy", "guard": [{"match": {"selector": "target", "faction": "Tuners", "subtype": "Database"}}], "ops": [{"deploy_from_hand": {"filter": {"faction": "Tuners", "subtype": "Database"}}}]}]'::jsonb,
+   '[{"trigger": "on_destroy", "guard": [{"match": {"selector": "target", "faction": "Tuners", "subtype": ["Database", "CacheDB"]}}], "ops": [{"deploy_from_hand": {"filter": {"faction": "Tuners", "subtype": ["Database", "CacheDB"]}}}]}]'::jsonb,
    'unlimited', true)
 
 ON CONFLICT (card_id) DO UPDATE SET
