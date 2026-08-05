@@ -11,8 +11,10 @@ Usage:
 """
 
 import json
+import os
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 try:
@@ -30,6 +32,11 @@ GO_JSON_OUT = ROOT / "data" / "cache" / "cards_gen.json"
 STARTER_DECKS_YAML = ROOT / "data" / "mock" / "starter_decks.yaml"
 STARTER_DECKS_JSON_OUT = ROOT / "data" / "cache" / "starter_decks_gen.json"
 
+# CI では common を兄弟ディレクトリに置けないため、場所を環境変数で差し替えられるようにする
+COMMON_REPO_ENV = "COMMON_REPO"
+DEFAULT_COMMON_REPO = ROOT.parent / "overload-party-common"
+GAME_DESIGN_CONSTANTS_RELPATH = Path("data") / "game_design_constants.yaml"
+
 # ─── Constants ──────────────────────────────────────────
 # 3階層分類（Zone / CardType / Subtype）。Phase 2b で導入。
 # 参考: overload-party-battle/memory/project_card_taxonomy.md
@@ -45,6 +52,13 @@ SUBTYPES_BY_CARD_TYPE = {
     CARD_TYPE_COMPUTE: {"VM", "Container", "Orchestrator", "Serverless", "AI/ML"},
     CARD_TYPE_DATA:    {"Database", "ObjectStorage", "CacheDB"},
 }
+
+EFFECT_GROUP_KEY = "group"
+EFFECT_CARD_TYPE_KEY = "card_type"
+EFFECT_SUBTYPE_KEY = "subtype"
+SUBTYPES_KEY = "subtypes"
+RESOURCE_GROUPS_KEY = "resource_groups"
+CARD_TYPES_KEY = "card_types"
 
 VALID_RESTRICTION = {"unlimited", "limited", "semi_limited", "forbidden"}
 VALID_FACTIONS = {"SHE", "Tenki", "Sugar", "Tuners", "Neutral"}
@@ -102,6 +116,123 @@ def load_all_cards():
         all_cards.extend(cards)
 
     return all_cards, faction_data
+
+
+# ─── Game design constants (common SSoT) ───────────────
+class CardGenerationError(Exception):
+    """Raised when card generation cannot proceed because its inputs are malformed."""
+
+
+@dataclass(frozen=True)
+class EffectTaxonomy:
+    """Canonical card_type / subtype values and the resource groups that expand into them."""
+
+    card_types: frozenset
+    subtypes: frozenset
+    resource_groups: dict
+
+
+def resolve_common_constants_path():
+    """Locate the game design constants owned by common.
+
+    Returns:
+        Path to game_design_constants.yaml, taken from the COMMON_REPO environment
+        variable when set and from the sibling checkout of common otherwise.
+    """
+    repo_root = os.environ.get(COMMON_REPO_ENV)
+    base = Path(repo_root) if repo_root else DEFAULT_COMMON_REPO
+    return base / GAME_DESIGN_CONSTANTS_RELPATH
+
+
+def load_effect_taxonomy(constants_path):
+    """Load the canonical card_type / subtype values and the resource groups from common.
+
+    Args:
+        constants_path: Path to common's game_design_constants.yaml.
+
+    Returns:
+        EffectTaxonomy built from the file.
+
+    Raises:
+        CardGenerationError: When the file is missing or lacks a required key.
+    """
+    path = Path(constants_path)
+    if not path.exists():
+        raise CardGenerationError(
+            f"game design constants not found at {path}. "
+            f"Set {COMMON_REPO_ENV} to the overload-party-common checkout."
+        )
+
+    with open(path, "r", encoding="utf-8") as f:
+        constants = yaml.safe_load(f)
+
+    for key in (CARD_TYPES_KEY, SUBTYPES_KEY, RESOURCE_GROUPS_KEY):
+        if key not in constants:
+            raise CardGenerationError(f"game design constants at {path} is missing '{key}'")
+
+    subtypes = frozenset(s for values in constants[SUBTYPES_KEY].values() for s in values)
+    return EffectTaxonomy(
+        card_types=frozenset(constants[CARD_TYPES_KEY]),
+        subtypes=subtypes,
+        resource_groups=constants[RESOURCE_GROUPS_KEY],
+    )
+
+
+# ─── Expand resource groups ────────────────────────────
+def expand_card_resource_groups(cards, resource_groups):
+    """Replace every card's effects with a tree whose resource groups are expanded.
+
+    Args:
+        cards: Cards to rewrite in place.
+        resource_groups: Group name to its card_type / subtypes definition.
+
+    Raises:
+        CardGenerationError: When a card names an undefined group, combines a group
+            with card_type / subtype, or the group definition is malformed.
+    """
+    for card in cards:
+        if not card.get("effects"):
+            continue
+        label = f"{card.get('card_id', '???')} {card.get('card_name', '???')}"
+        card["effects"] = _expand_resource_groups(card["effects"], resource_groups, label)
+
+
+def _expand_resource_groups(node, resource_groups, label):
+    if isinstance(node, list):
+        return [_expand_resource_groups(item, resource_groups, label) for item in node]
+    if not isinstance(node, dict):
+        return node
+
+    expanded = {}
+    for key, value in node.items():
+        if key == EFFECT_GROUP_KEY:
+            expanded.update(_resolve_resource_group(value, resource_groups, node, label))
+        else:
+            expanded[key] = _expand_resource_groups(value, resource_groups, label)
+    return expanded
+
+
+def _resolve_resource_group(name, resource_groups, node, label):
+    definition = resource_groups.get(name) if isinstance(name, str) else None
+    if definition is None:
+        raise CardGenerationError(f"{label}: unknown resource group '{name}'")
+
+    combined = [key for key in (EFFECT_CARD_TYPE_KEY, EFFECT_SUBTYPE_KEY) if key in node]
+    if combined:
+        raise CardGenerationError(
+            f"{label}: resource group '{name}' cannot be combined with {', '.join(combined)}"
+        )
+
+    defined = [key for key in (EFFECT_CARD_TYPE_KEY, SUBTYPES_KEY) if key in definition]
+    if len(defined) != 1:
+        raise CardGenerationError(
+            f"{label}: resource group '{name}' must define exactly one of "
+            f"'{EFFECT_CARD_TYPE_KEY}' / '{SUBTYPES_KEY}'"
+        )
+
+    if defined[0] == EFFECT_CARD_TYPE_KEY:
+        return {EFFECT_CARD_TYPE_KEY: definition[EFFECT_CARD_TYPE_KEY]}
+    return {EFFECT_SUBTYPE_KEY: list(definition[SUBTYPES_KEY])}
 
 
 # ─── Validate ──────────────────────────────────────────
@@ -246,6 +377,45 @@ def validate(cards):
         _validate_elastic(card, label, errors)
 
     return errors
+
+
+def validate_effect_taxonomy(cards, taxonomy):
+    """Check that effect definitions only name canonical card_type / subtype values.
+
+    Args:
+        cards: Cards whose resource groups are already expanded.
+        taxonomy: Canonical values owned by common.
+
+    Returns:
+        List of error strings, each naming the card and the offending value.
+    """
+    errors = []
+    allowed = {EFFECT_CARD_TYPE_KEY: taxonomy.card_types, EFFECT_SUBTYPE_KEY: taxonomy.subtypes}
+    for card in cards:
+        if not card.get("effects"):
+            continue
+        label = f"{card.get('card_id', '???')} {card.get('card_name', '???')}"
+        _collect_effect_taxonomy_errors(card["effects"], allowed, label, errors)
+    return errors
+
+
+def _collect_effect_taxonomy_errors(node, allowed, label, errors):
+    if isinstance(node, list):
+        for item in node:
+            _collect_effect_taxonomy_errors(item, allowed, label, errors)
+        return
+    if not isinstance(node, dict):
+        return
+
+    for key, value in node.items():
+        if key in allowed:
+            # 空で書くと engine が絞り込みなしとして扱い、効果が黙って全てのカードに及ぶ
+            if isinstance(value, list) and not value:
+                errors.append(f"{label}: effect '{key}' is empty")
+            for name in value if isinstance(value, list) else [value]:
+                if name not in allowed[key]:
+                    errors.append(f"{label}: effect '{key}' has invalid value '{name}'")
+        _collect_effect_taxonomy_errors(value, allowed, label, errors)
 
 
 # ─── Generate JSON ─────────────────────────────────────
@@ -605,7 +775,14 @@ def main():
         print("ERROR: No cards loaded from YAML files", file=sys.stderr)
         sys.exit(1)
 
-    errors = validate(cards)
+    try:
+        taxonomy = load_effect_taxonomy(resolve_common_constants_path())
+        expand_card_resource_groups(cards, taxonomy.resource_groups)
+    except CardGenerationError as err:
+        print(f"ERROR: {err}", file=sys.stderr)
+        sys.exit(1)
+
+    errors = validate(cards) + validate_effect_taxonomy(cards, taxonomy)
     if errors:
         print(f"Validation failed with {len(errors)} error(s):", file=sys.stderr)
         for err in errors:

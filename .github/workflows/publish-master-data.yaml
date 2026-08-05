@@ -15,6 +15,7 @@ on:
       - ".github/scripts/deploy/upload-master-data.sh"
       - ".github/scripts/deploy/resolve-master-data-bucket.sh"
       - ".github/scripts/ci/check-codegen-drift.sh"
+      - ".github/scripts/ci/checkout-common.sh"
       - ".github/workflows/publish-master-data.yaml"
   workflow_dispatch:
     inputs:
@@ -60,6 +61,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.version || github.ref }}
+
+      # マスターデータの生成器が common のゲーム定数を読むため、private リポジトリを取得できるようにする
+      - name: Configure private repo auth
+        uses: kenyamaneko/overload-party-common/.github/actions/setup-go-private-modules@main
+        with:
+          app-id: ${{ vars.CROSS_REPO_DEPS_APP_ID }}
+          private-key: ${{ secrets.CROSS_REPO_DEPS_APP_PRIVATE_KEY }}
 
       - name: Resolve target bucket
         id: target
