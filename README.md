@@ -52,4 +52,6 @@ scripts/generate_types.sh
 python3 scripts/generate_cards.py  # data/cards/*.yaml → db/seed/cards_seed.sql
 ```
 
+生成器は効果定義のリソースの括り (`group`) を展開し、`card_type` / `subtype` が正規値かを検証するために common のゲーム定数を読む。既定では兄弟ディレクトリの `../overload-party-common` を見るので、別の場所に置いているときは `COMMON_REPO` にそのパスを渡す。
+
 詳細は [ARCHITECTURE.md#カードデータ-ssot-フロー](docs/ARCHITECTURE.md#カードデータ-ssot-フロー) を参照。

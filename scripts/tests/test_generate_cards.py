@@ -1,4 +1,4 @@
-"""generate_cards.py の validate() のユニットテスト."""
+"""generate_cards.py のカード定義の検証と、リソースの括りの展開のユニットテスト."""
 
 from __future__ import annotations
 
@@ -211,3 +211,174 @@ class Testカード定義の列挙値網羅:
     )
     def test_DataResourceのsubtypeの全値で検証を通る(self, cards):
         assert gen.validate(cards) == []
+
+
+_RESOURCE_GROUPS = {
+    "compute": {"card_type": "Compute"},
+    "db": {"subtypes": ["Database", "CacheDB"]},
+}
+
+_TAXONOMY = gen.EffectTaxonomy(
+    card_types=frozenset({"Compute", "DataResource", "Platform", "Attachment", "Strategy", "Reactive", "Incident"}),
+    subtypes=frozenset({"VM", "Container", "Orchestrator", "Serverless", "AI/ML", "Database", "ObjectStorage", "CacheDB"}),
+    resource_groups=_RESOURCE_GROUPS,
+)
+
+_EFFECT_CARD_ID = "NT-9901"
+_EFFECT_CARD_NAME = "テストカード"
+_CARD_LABEL = f"{_EFFECT_CARD_ID} {_EFFECT_CARD_NAME}"
+
+
+def _card_with_effects(effects: list) -> dict:
+    """効果定義を持つカード dict を組み立てる。
+
+    Args:
+        effects: カードに持たせる効果定義。
+
+    Returns:
+        展開・検証にそのまま渡せるカード dict。
+    """
+    return {"card_id": _EFFECT_CARD_ID, "card_name": _EFFECT_CARD_NAME, "effects": effects}
+
+
+class Testリソースの括りの展開:
+    @pytest.mark.parametrize(
+        ("effects", "want"),
+        [
+            pytest.param(
+                [{"trigger": "ignition", "ops": [{"apply_buff": {"selector": {"owner": "myself", "group": "compute"}}}]}],
+                [{"trigger": "ignition", "ops": [{"apply_buff": {"selector": {"owner": "myself", "card_type": "Compute"}}}]}],
+                id="compute の括りを書いた効果定義は、card_type が Compute になる",
+            ),
+            pytest.param(
+                [{"trigger": "ignition", "ops": [{"deploy_from_repo": {"filter": {"group": "db"}}}]}],
+                [{"trigger": "ignition", "ops": [{"deploy_from_repo": {"filter": {"subtype": ["Database", "CacheDB"]}}}]}],
+                id="db の括りを書いた効果定義は、subtype が Database と CacheDB になる",
+            ),
+            pytest.param(
+                [{"trigger": "deploy", "guard": [{"match": {"group": "db"}}]}],
+                [{"trigger": "deploy", "guard": [{"match": {"subtype": ["Database", "CacheDB"]}}]}],
+                id="guard の中に括りを書いた効果定義も、展開される",
+            ),
+            pytest.param(
+                [{"custom": "cloud_shift", "meta": {"faction": "Tuners", "group": "db", "deploy_discount": 500}}],
+                [{"custom": "cloud_shift", "meta": {"faction": "Tuners", "subtype": ["Database", "CacheDB"], "deploy_discount": 500}}],
+                id="meta の中に括りを書いた効果定義も、展開される",
+            ),
+            pytest.param(
+                [{"ops": [{"apply_buff": {"amount": {"per": {"count": {"group": "compute"}}}}}]}],
+                [{"ops": [{"apply_buff": {"amount": {"per": {"count": {"card_type": "Compute"}}}}}]}],
+                id="ops の入れ子の中に括りを書いた効果定義も、展開される",
+            ),
+            pytest.param(
+                [{"trigger": "deploy", "guard": [{"match": {"subtype": "Database"}}], "ops": [{"search_repo": {"card_type": "Strategy"}}]}],
+                [{"trigger": "deploy", "guard": [{"match": {"subtype": "Database"}}], "ops": [{"search_repo": {"card_type": "Strategy"}}]}],
+                id="括りを書かない効果定義は、そのまま変わらない",
+            ),
+        ],
+    )
+    def test_カード定義の括りを展開する(self, effects, want):
+        cards = [_card_with_effects(effects)]
+
+        gen.expand_card_resource_groups(cards, _RESOURCE_GROUPS)
+
+        assert cards[0]["effects"] == want
+
+    @pytest.mark.parametrize(
+        ("resource_groups", "effects", "want_message"),
+        [
+            pytest.param(
+                _RESOURCE_GROUPS,
+                [{"ops": [{"deploy_from_repo": {"filter": {"group": "storage"}}}]}],
+                f"{_CARD_LABEL}: unknown resource group 'storage'",
+                id="定義に無い括り名を書くとき、カード ID を添えて失敗する",
+            ),
+            pytest.param(
+                _RESOURCE_GROUPS,
+                [{"ops": [{"deploy_from_repo": {"filter": {"group": "db", "card_type": "DataResource"}}}]}],
+                f"{_CARD_LABEL}: resource group 'db' cannot be combined with card_type",
+                id="括りと card_type を併記するとき、失敗する",
+            ),
+            pytest.param(
+                _RESOURCE_GROUPS,
+                [{"ops": [{"deploy_from_repo": {"filter": {"group": "db", "subtype": "Database"}}}]}],
+                f"{_CARD_LABEL}: resource group 'db' cannot be combined with subtype",
+                id="括りと subtype を併記するとき、失敗する",
+            ),
+            pytest.param(
+                {"db": {"card_type": "DataResource", "subtypes": ["Database", "CacheDB"]}},
+                [{"ops": [{"deploy_from_repo": {"filter": {"group": "db"}}}]}],
+                f"{_CARD_LABEL}: resource group 'db' must define exactly one of 'card_type' / 'subtypes'",
+                id="括りの定義が card_type と subtypes の両方を持つとき、失敗する",
+            ),
+            pytest.param(
+                {"db": {}},
+                [{"ops": [{"deploy_from_repo": {"filter": {"group": "db"}}}]}],
+                f"{_CARD_LABEL}: resource group 'db' must define exactly one of 'card_type' / 'subtypes'",
+                id="括りの定義が card_type も subtypes も持たないとき、失敗する",
+            ),
+        ],
+    )
+    def test_展開できない効果定義を渡すと失敗する(self, resource_groups, effects, want_message):
+        cards = [_card_with_effects(effects)]
+
+        with pytest.raises(gen.CardGenerationError) as excinfo:
+            gen.expand_card_resource_groups(cards, resource_groups)
+
+        assert str(excinfo.value) == want_message
+
+
+class Test効果定義のカード種別とサブタイプ:
+    @pytest.mark.parametrize(
+        ("effects", "want_message"),
+        [
+            pytest.param(
+                [{"ops": [{"search_repo": {"card_type": ["Database", "CacheDB"]}}]}],
+                f"{_CARD_LABEL}: effect 'card_type' has invalid value 'Database'",
+                id="card_type に subtype の Database を書くとき、エラーになる",
+            ),
+            pytest.param(
+                [{"ops": [{"deploy_from_repo": {"filter": {"subtype": "DataResource"}}}]}],
+                f"{_CARD_LABEL}: effect 'subtype' has invalid value 'DataResource'",
+                id="subtype に card_type の DataResource を書くとき、エラーになる",
+            ),
+            pytest.param(
+                [{"guard": [{"count": {"selector": {"subtype": "Blob"}}}]}],
+                f"{_CARD_LABEL}: effect 'subtype' has invalid value 'Blob'",
+                id="guard の中の subtype が正規値でないとき、エラーになる",
+            ),
+            pytest.param(
+                [{"custom": "cloud_shift", "meta": {"card_type": ["Database", "CacheDB"]}}],
+                f"{_CARD_LABEL}: effect 'card_type' has invalid value 'CacheDB'",
+                id="meta の中の card_type が正規値でないとき、エラーになる",
+            ),
+        ],
+    )
+    def test_正規値でない値を書くとエラーになる(self, effects, want_message):
+        errors = gen.validate_effect_taxonomy([_card_with_effects(effects)], _TAXONOMY)
+
+        assert want_message in errors
+
+    @pytest.mark.parametrize(
+        "effects",
+        [
+            pytest.param(
+                [{"ops": [{"apply_buff": {"selector": {"card_type": "Compute"}}}]}],
+                id="card_type に Compute を書くとき、エラーにならない",
+            ),
+            pytest.param(
+                [{"custom": "cloud_shift", "meta": {"card_type": ["Compute"]}}],
+                id="card_type に Compute だけの並びを書くとき、エラーにならない",
+            ),
+            pytest.param(
+                [{"ops": [{"deploy_from_repo": {"filter": {"subtype": ["Database", "CacheDB"]}}}]}],
+                id="subtype に Database と CacheDB の並びを書くとき、エラーにならない",
+            ),
+            pytest.param(
+                [{"guard": [{"match": {"subtype": "ObjectStorage"}}]}],
+                id="guard の中の subtype に ObjectStorage を書くとき、エラーにならない",
+            ),
+        ],
+    )
+    def test_正規値を書くとエラーにならない(self, effects):
+        assert gen.validate_effect_taxonomy([_card_with_effects(effects)], _TAXONOMY) == []

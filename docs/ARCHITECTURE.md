@@ -22,6 +22,7 @@ battle / gateway がカードマスターを自 DB に持たないことは設�
 
 ```
 data/cards/*.yaml                 (game designer が直接編集する SSoT)
+common の game_design_constants.yaml (リソースの括りと card_type / subtype の正規値)
   │
   ▼
 scripts/generate_cards.py   →  db/seed/cards_seed.sql
@@ -36,6 +37,7 @@ cache.CardCache (起動時に全件ロード) → サービス内メモリ
 
 - `data/cards/*.yaml` が人間が編集する SSoT。PR レビューの対象はここ
 - `cards_seed.sql` / `cards_gen.json` は生成物。直接編集禁止
+- カードテキストが使うリソースの括り (DB系・コンピュート系) は、カード定義では `group` の名前で指定し、生成時に `card_type` / `subtype` へ展開する。括りに subtype が増えても common の定義を直して再生成すれば全カードが追従する
 - schema migration は ops リポジトリ側の `db-migrate` が担当する（card からは走らない）
 
 カードの意味定義（faction / card_type / subtype / stats JSON の構造等）は [CARDS.md](CARDS.md) を参照。
