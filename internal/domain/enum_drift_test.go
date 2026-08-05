@@ -12,7 +12,7 @@ import (
 )
 
 func TestEnumDriftAgainstOpenAPISpec(t *testing.T) {
-	t.Run("domain と openapi.yaml の enum 整合", func(t *testing.T) {
+	t.Run("domainとopenapi.yamlのenum整合", func(t *testing.T) {
 		// SSoT は domain 側。openapi.yaml は外部公開ドキュメントとして同じ値集合を持つ必要がある。
 		spec := loadOpenAPISpec(t)
 
@@ -22,7 +22,7 @@ func TestEnumDriftAgainstOpenAPISpec(t *testing.T) {
 			want       []string
 		}{
 			{
-				name:       "PassiveEffectType enum が domain と openapi.yaml で一致する",
+				name:       "PassiveEffectType enumがdomainとopenapi.yamlで一致する",
 				schemaName: "PassiveEffectType",
 				want: []string{
 					domain.PassiveTPPerBackendDB,
@@ -35,7 +35,7 @@ func TestEnumDriftAgainstOpenAPISpec(t *testing.T) {
 				},
 			},
 			{
-				name:       "PlatformEffectType enum が domain と openapi.yaml で一致する",
+				name:       "PlatformEffectType enumがdomainとopenapi.yamlで一致する",
 				schemaName: "PlatformEffectType",
 				want: []string{
 					domain.PlatformTPBonus,
@@ -44,14 +44,14 @@ func TestEnumDriftAgainstOpenAPISpec(t *testing.T) {
 				},
 			},
 			{
-				name:       "AttachmentEffectType enum が domain と openapi.yaml で一致する",
+				name:       "AttachmentEffectType enumがdomainとopenapi.yamlで一致する",
 				schemaName: "AttachmentEffectType",
 				want: []string{
 					domain.AttachmentStatBonus,
 				},
 			},
 			{
-				name:       "InitiativeKind enum が domain と openapi.yaml で一致する",
+				name:       "InitiativeKind enumがdomainとopenapi.yamlで一致する",
 				schemaName: "InitiativeKind",
 				want: []string{
 					domain.InitiativeKindRoutine,

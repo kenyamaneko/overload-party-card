@@ -19,7 +19,7 @@ import (
 func TestDeckHandler_SentinelErrorToStatusAndBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("sentinel error の HTTP ステータスと本文への写像", func(t *testing.T) {
+	t.Run("sentinel errorのHTTPステータスと本文への写像", func(t *testing.T) {
 		cases := []struct {
 			name       string
 			err        error
@@ -58,8 +58,8 @@ func TestDeckHandler_SentinelErrorToStatusAndBody(t *testing.T) {
 func TestRespondError_InternalServerErrorLogging(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("500 になるエラーのログ出力", func(t *testing.T) {
-		t.Run("写像対象外の error のとき、応答本文には出ない原因の文字列と要求パスがログに出る", func(t *testing.T) {
+	t.Run("500になるエラーのログ出力", func(t *testing.T) {
+		t.Run("写像対象外のerrorのとき、応答本文には出ない原因の文字列と要求パスがログに出る", func(t *testing.T) {
 			buf := captureSlog(t)
 			cause := errors.New("pq: connection refused")
 

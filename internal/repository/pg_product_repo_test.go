@@ -20,7 +20,7 @@ func TestProductFindAll(t *testing.T) {
 			wantOrder []string
 		}{
 			{
-				name: "複数プロダクトのとき、product_id 昇順で返る",
+				name: "複数プロダクトのとき、product_id昇順で返る",
 				products: []productSeed{
 					{"PD-TST2", "Tenki", "P2"},
 					{"PD-TST1", "SHE", "P1"},
@@ -53,7 +53,7 @@ func TestProductFindAll(t *testing.T) {
 			})
 		}
 
-		t.Run("is_active=false のプロダクトがあるとき、除外される", func(t *testing.T) {
+		t.Run("is_active=falseのプロダクトがあるとき、除外される", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedProduct(t, productSeed{"PD-TST1", "SHE", "P1"})
 			seedInactiveProduct(t, productSeed{"PD-TST9", "SHE", "Retired"})

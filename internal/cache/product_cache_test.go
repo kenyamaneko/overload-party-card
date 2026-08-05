@@ -28,18 +28,18 @@ const testProductsFixtureJSON = `[
 ]`
 
 func TestProductFindByID(t *testing.T) {
-	t.Run("プロダクトの ID 検索", func(t *testing.T) {
+	t.Run("プロダクトのID検索", func(t *testing.T) {
 		pc := NewProductCache()
 		require.NoError(t, pc.LoadFromBytes([]byte(testProductsFixtureJSON)))
 
-		t.Run("既知の ID のとき、該当するプロダクトが返る", func(t *testing.T) {
+		t.Run("既知のIDのとき、該当するプロダクトが返る", func(t *testing.T) {
 			got := pc.FindByID("PD-TST-0001")
 			require.NotNil(t, got)
 			assert.Equal(t, "PD-TST-0001", got.ProductID)
 			assert.Equal(t, "SHE", got.Faction)
 		})
 
-		t.Run("未知の ID のとき、nil を返す", func(t *testing.T) {
+		t.Run("未知のIDのとき、nilを返す", func(t *testing.T) {
 			assert.Nil(t, pc.FindByID("PD-NOPE"))
 		})
 	})
@@ -47,13 +47,13 @@ func TestProductFindByID(t *testing.T) {
 
 func TestProductLoadFromBytes(t *testing.T) {
 	t.Run("プロダクトキャッシュのロード", func(t *testing.T) {
-		t.Run("0 件 JSON のとき、マスター欠落としてエラーになる", func(t *testing.T) {
+		t.Run("0件JSONのとき、マスター欠落としてエラーになる", func(t *testing.T) {
 			pc := NewProductCache()
 			err := pc.LoadFromBytes([]byte(`[]`))
 			assert.Error(t, err)
 		})
 
-		t.Run("JSON として不正なバイト列のとき、読み込みがエラーになる", func(t *testing.T) {
+		t.Run("JSONとして不正なバイト列のとき、読み込みがエラーになる", func(t *testing.T) {
 			pc := NewProductCache()
 			err := pc.LoadFromBytes([]byte(`{`))
 			require.Error(t, err)
@@ -63,8 +63,8 @@ func TestProductLoadFromBytes(t *testing.T) {
 }
 
 func TestProductLoad(t *testing.T) {
-	t.Run("DB からのプロダクトキャッシュ読み込み", func(t *testing.T) {
-		t.Run("DB に定義があるとき、読み込んだ定義が検索で引けるようになる", func(t *testing.T) {
+	t.Run("DBからのプロダクトキャッシュ読み込み", func(t *testing.T) {
+		t.Run("DBに定義があるとき、読み込んだ定義が検索で引けるようになる", func(t *testing.T) {
 			repo := &stubProductRepo{products: []*domain.Product{
 				{ProductID: "PD-TST-0001", Faction: "SHE", ProductName: "テストプロダクト"},
 			}}
@@ -78,7 +78,7 @@ func TestProductLoad(t *testing.T) {
 			assert.Equal(t, "テストプロダクト", got.ProductName)
 		})
 
-		t.Run("DB が 0 件のとき、マスター欠落としてエラーになる", func(t *testing.T) {
+		t.Run("DBが0件のとき、マスター欠落としてエラーになる", func(t *testing.T) {
 			repo := &stubProductRepo{products: nil}
 			pc := NewProductCache()
 
@@ -88,7 +88,7 @@ func TestProductLoad(t *testing.T) {
 			assert.Contains(t, err.Error(), "0 products loaded")
 		})
 
-		t.Run("DB 読み込みが失敗したとき、そのエラーが伝播する", func(t *testing.T) {
+		t.Run("DB読み込みが失敗したとき、そのエラーが伝播する", func(t *testing.T) {
 			dbErr := errors.New("db down")
 			repo := &stubProductRepo{err: dbErr}
 			pc := NewProductCache()

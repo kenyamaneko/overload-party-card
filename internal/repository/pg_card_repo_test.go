@@ -21,7 +21,7 @@ func TestFindAll(t *testing.T) {
 			wantIDs []string
 		}{
 			{
-				name: "active と inactive が混在するとき、active のみ card_id 昇順で返る",
+				name: "activeとinactiveが混在するとき、activeのみcard_id昇順で返る",
 				seeds: []cardSeed{
 					{"SH-0002", "SHE B", "SHE", "Compute", "unlimited", true},
 					{"SH-0001", "SHE A", "SHE", "Compute", "unlimited", true},
@@ -35,7 +35,7 @@ func TestFindAll(t *testing.T) {
 				wantIDs: nil,
 			},
 			{
-				name: "全て inactive のとき、空スライスになる",
+				name: "全てinactiveのとき、空スライスになる",
 				seeds: []cardSeed{
 					{"SH-0001", "Dormant A", "SHE", "Compute", "unlimited", false},
 					{"SH-0002", "Dormant B", "SHE", "Compute", "unlimited", false},

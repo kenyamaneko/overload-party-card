@@ -28,11 +28,11 @@ const testInitiativesFixtureJSON = `[
 ]`
 
 func TestInitiativeFindByID(t *testing.T) {
-	t.Run("施策の ID 検索", func(t *testing.T) {
+	t.Run("施策のID検索", func(t *testing.T) {
 		ic := NewInitiativeCache()
 		require.NoError(t, ic.LoadFromBytes([]byte(testInitiativesFixtureJSON)))
 
-		t.Run("既知の ID のとき、該当する施策が返る", func(t *testing.T) {
+		t.Run("既知のIDのとき、該当する施策が返る", func(t *testing.T) {
 			got := ic.FindByID("IN-TST-0001")
 			require.NotNil(t, got)
 			assert.Equal(t, "IN-TST-0001", got.InitiativeID)
@@ -40,7 +40,7 @@ func TestInitiativeFindByID(t *testing.T) {
 			assert.Equal(t, "テスト施策1", got.Name)
 		})
 
-		t.Run("未知の ID のとき、nil を返す", func(t *testing.T) {
+		t.Run("未知のIDのとき、nilを返す", func(t *testing.T) {
 			assert.Nil(t, ic.FindByID("IN-NOPE"))
 		})
 	})
@@ -48,13 +48,13 @@ func TestInitiativeFindByID(t *testing.T) {
 
 func TestInitiativeLoadFromBytes(t *testing.T) {
 	t.Run("施策キャッシュのロード", func(t *testing.T) {
-		t.Run("0 件 JSON のとき、マスター欠落としてエラーになる", func(t *testing.T) {
+		t.Run("0件JSONのとき、マスター欠落としてエラーになる", func(t *testing.T) {
 			ic := NewInitiativeCache()
 			err := ic.LoadFromBytes([]byte(`[]`))
 			assert.Error(t, err)
 		})
 
-		t.Run("JSON として不正なバイト列のとき、読み込みがエラーになる", func(t *testing.T) {
+		t.Run("JSONとして不正なバイト列のとき、読み込みがエラーになる", func(t *testing.T) {
 			ic := NewInitiativeCache()
 			err := ic.LoadFromBytes([]byte(`{`))
 			require.Error(t, err)
@@ -64,8 +64,8 @@ func TestInitiativeLoadFromBytes(t *testing.T) {
 }
 
 func TestInitiativeLoad(t *testing.T) {
-	t.Run("DB からの施策キャッシュ読み込み", func(t *testing.T) {
-		t.Run("DB に定義があるとき、読み込んだ定義が検索で引けるようになる", func(t *testing.T) {
+	t.Run("DBからの施策キャッシュ読み込み", func(t *testing.T) {
+		t.Run("DBに定義があるとき、読み込んだ定義が検索で引けるようになる", func(t *testing.T) {
 			repo := &stubInitiativeRepo{initiatives: []*domain.Initiative{
 				{InitiativeID: "TST-0001", ProductID: "PD-TST", Kind: "routine", Name: "テスト施策"},
 			}}
@@ -79,7 +79,7 @@ func TestInitiativeLoad(t *testing.T) {
 			assert.Equal(t, "テスト施策", got.Name)
 		})
 
-		t.Run("DB が 0 件のとき、マスター欠落としてエラーになる", func(t *testing.T) {
+		t.Run("DBが0件のとき、マスター欠落としてエラーになる", func(t *testing.T) {
 			repo := &stubInitiativeRepo{initiatives: nil}
 			ic := NewInitiativeCache()
 
@@ -89,7 +89,7 @@ func TestInitiativeLoad(t *testing.T) {
 			assert.Contains(t, err.Error(), "0 initiatives loaded")
 		})
 
-		t.Run("DB 読み込みが失敗したとき、そのエラーが伝播する", func(t *testing.T) {
+		t.Run("DB読み込みが失敗したとき、そのエラーが伝播する", func(t *testing.T) {
 			dbErr := errors.New("db down")
 			repo := &stubInitiativeRepo{err: dbErr}
 			ic := NewInitiativeCache()

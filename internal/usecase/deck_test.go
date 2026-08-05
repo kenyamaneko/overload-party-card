@@ -246,7 +246,7 @@ func TestCreateDeck(t *testing.T) {
 				wantValid bool
 			}{
 				{
-					name:     "30枚ちょうどのとき、IsValid=true になる",
+					name:     "30枚ちょうどのとき、IsValid=trueになる",
 					deckName: "Full Deck",
 					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 						grantUnlimited(pcRepo, pid, allTenCards...)
@@ -255,7 +255,7 @@ func TestCreateDeck(t *testing.T) {
 					wantValid: true,
 				},
 				{
-					name:     "29枚のとき、IsValid=false になる",
+					name:     "29枚のとき、IsValid=falseになる",
 					deckName: "Almost Full",
 					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 						grantUnlimited(pcRepo, pid, "C-001", "C-002", "C-003", "C-004", "C-005", "C-006", "C-007", "C-008", "C-009")
@@ -268,7 +268,7 @@ func TestCreateDeck(t *testing.T) {
 					wantValid: false,
 				},
 				{
-					name:      "0枚のとき、IsValid=false になる",
+					name:      "0枚のとき、IsValid=falseになる",
 					deckName:  "Empty Deck",
 					grant:     func(pcRepo *inMemoryPlayerCardRepo, pid string) {},
 					entries:   []apicard.DeckCardEntry{},
@@ -319,7 +319,7 @@ func TestCreateDeck(t *testing.T) {
 					wantErrMsg:   `faction "" is not selectable`,
 				},
 				{
-					name:    "陣営が Neutral のとき、選択不可エラーになる",
+					name:    "陣営がNeutralのとき、選択不可エラーになる",
 					faction: "Neutral",
 					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-007", ArtNo: 0, Count: 3})
@@ -329,7 +329,7 @@ func TestCreateDeck(t *testing.T) {
 					wantErrMsg:   `faction "Neutral" is not selectable`,
 				},
 				{
-					name:    "未知の陣営 (Atlantis) のとき、選択不可エラーになる",
+					name:    "未知の陣営 (Atlantis)のとき、選択不可エラーになる",
 					faction: "Atlantis",
 					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
@@ -424,7 +424,7 @@ func TestCreateDeck(t *testing.T) {
 					wantErrMsg:   "count must be positive",
 				},
 				{
-					name:    "カード定義に存在しない ID のとき、カード未定義エラーになる",
+					name:    "カード定義に存在しないIDのとき、カード未定義エラーになる",
 					faction: "SHE",
 					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
 						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-999", ArtNo: 0, Count: 3})
@@ -507,7 +507,7 @@ func TestCreateDeck(t *testing.T) {
 		})
 
 		// 枚数不足でも陣営検証は通過する (IsValid=false になるだけでエラーにはならない)。
-		t.Run("陣営構成が選択陣営と Neutral のみのとき、通過する", func(t *testing.T) {
+		t.Run("陣営構成が選択陣営とNeutralのみのとき、通過する", func(t *testing.T) {
 			tests := []struct {
 				name    string
 				cardIDs []string
@@ -565,7 +565,7 @@ func TestCreateDeck(t *testing.T) {
 		})
 
 		t.Run("宣言陣営の所持検証", func(t *testing.T) {
-			t.Run("未所持の陣営 (SHE) を宣言すると、拒否される", func(t *testing.T) {
+			t.Run("未所持の陣営 (SHE)を宣言すると、拒否される", func(t *testing.T) {
 				svc, _, pcRepo, _, _ := setupDeckInteractorWithFactions(t, []string{"Tenki"}) // SHE は未所持
 				pid := "p1"
 				grantUnlimited(pcRepo, pid, "C-001")
@@ -580,7 +580,7 @@ func TestCreateDeck(t *testing.T) {
 				assert.Contains(t, err.Error(), "not owned")
 			})
 
-			t.Run("所持する陣営 (SHE) を宣言するとき、通過する", func(t *testing.T) {
+			t.Run("所持する陣営 (SHE)を宣言するとき、通過する", func(t *testing.T) {
 				svc, _, pcRepo, _, _ := setupDeckInteractorWithFactions(t, []string{"SHE"})
 				pid := "p1"
 				grantUnlimited(pcRepo, pid, "C-001")
@@ -617,28 +617,28 @@ func TestCreateDeck(t *testing.T) {
 					wantErrMsg: "not deck faction",
 				},
 				{
-					name:       "不明なルーチン ID のとき、ルーチンでないためエラーになる",
+					name:       "不明なルーチンIDのとき、ルーチンでないためエラーになる",
 					productID:  testProductID,
 					routineID:  "IN-NOPE",
 					specialID:  testSpecialID,
 					wantErrMsg: "is not a routine",
 				},
 				{
-					name:       "不明なスペシャル ID のとき、スペシャルでないためエラーになる",
+					name:       "不明なスペシャルIDのとき、スペシャルでないためエラーになる",
 					productID:  testProductID,
 					routineID:  testRoutineID,
 					specialID:  "IN-NOPE",
 					wantErrMsg: "is not a special",
 				},
 				{
-					name:       "スペシャルにルーチン ID を指定するとき、スペシャルでないためエラーになる",
+					name:       "スペシャルにルーチンIDを指定するとき、スペシャルでないためエラーになる",
 					productID:  testProductID,
 					routineID:  testRoutineID,
 					specialID:  testRoutineID,
 					wantErrMsg: "is not a special",
 				},
 				{
-					name:       "ルーチンにスペシャル ID を指定するとき、ルーチンでないためエラーになる",
+					name:       "ルーチンにスペシャルIDを指定するとき、ルーチンでないためエラーになる",
 					productID:  testProductID,
 					routineID:  testSpecialID,
 					specialID:  testSpecialID,
@@ -743,7 +743,7 @@ func TestGetDecks(t *testing.T) {
 
 func TestUpdateDeck(t *testing.T) {
 	t.Run("デッキ更新", func(t *testing.T) {
-		t.Run("不完全なデッキを 30枚に更新すると、有効になり一覧に反映される", func(t *testing.T) {
+		t.Run("不完全なデッキを30枚に更新すると、有効になり一覧に反映される", func(t *testing.T) {
 			svc, _, pcRepo, _ := setupDeckInteractor(t)
 			pid := "p1"
 			grantUnlimited(pcRepo, pid, allTenCards...)
@@ -851,7 +851,7 @@ func TestValidateDeckForBattle(t *testing.T) {
 			assert.Contains(t, err.Error(), "need exactly 30")
 		})
 
-		t.Run("存在しないデッキを対戦検証すると、ErrNotFound になる", func(t *testing.T) {
+		t.Run("存在しないデッキを対戦検証すると、ErrNotFoundになる", func(t *testing.T) {
 			svc, _, _, _ := setupDeckInteractor(t)
 			pid := "p1"
 

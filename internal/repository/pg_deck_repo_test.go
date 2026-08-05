@@ -24,7 +24,7 @@ func TestCreate(t *testing.T) {
 			wantCards int
 		}{
 			{
-				name: "cards ありのとき、deck と deck_cards が同時に作られる",
+				name: "cardsありのとき、deckとdeck_cardsが同時に作られる",
 				entries: []domain.DeckCardEntry{
 					{CardID: "SH-0001", ArtNo: 0, Count: 3},
 					{CardID: "SH-0002", ArtNo: 0, Count: 2},
@@ -32,7 +32,7 @@ func TestCreate(t *testing.T) {
 				wantCards: 2,
 			},
 			{
-				name:      "cards が空のとき、deck 行だけが作られる",
+				name:      "cardsが空のとき、deck行だけが作られる",
 				entries:   nil,
 				wantCards: 0,
 			},
@@ -114,7 +114,7 @@ func TestFindByPlayerID(t *testing.T) {
 			wantNames []string
 		}{
 			{
-				name: "複数デッキのとき、updated_at 降順で返る",
+				name: "複数デッキのとき、updated_at降順で返る",
 				setup: func(t *testing.T) {
 					// updated_at は now() デフォルト。手動で 3 件作って順序を制御する
 					insertDeckAt(t, playerA, "Old", time.Now().Add(-2*time.Hour))
@@ -134,7 +134,7 @@ func TestFindByPlayerID(t *testing.T) {
 				wantNames: []string{"Mine"},
 			},
 			{
-				name:      "デッキ 0 件のとき、空スライスになる",
+				name:      "デッキ0件のとき、空スライスになる",
 				setup:     func(t *testing.T) {},
 				target:    playerA,
 				wantNames: nil,
@@ -161,8 +161,8 @@ func TestFindByPlayerID(t *testing.T) {
 }
 
 func TestFindByID(t *testing.T) {
-	t.Run("deck_id 指定の取得", func(t *testing.T) {
-		t.Run("自分の deck_id のとき、デッキ全項目を返す", func(t *testing.T) {
+	t.Run("deck_id指定の取得", func(t *testing.T) {
+		t.Run("自分のdeck_idのとき、デッキ全項目を返す", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			deckID := insertDeck(t, playerA, "Target Deck")
 
@@ -184,14 +184,14 @@ func TestFindByID(t *testing.T) {
 			queryPID string
 		}{
 			{
-				name: "未登録の deck_id のとき、ErrNotFound になる",
+				name: "未登録のdeck_idのとき、ErrNotFoundになる",
 				setup: func(t *testing.T) int64 {
 					return 9999 // 未発行の ID
 				},
 				queryPID: playerA,
 			},
 			{
-				name: "他プレイヤーの deck_id のとき、ErrNotFound になる (PK スコープ)",
+				name: "他プレイヤーのdeck_idのとき、ErrNotFoundになる (PKスコープ)",
 				setup: func(t *testing.T) int64 {
 					return insertDeck(t, playerB, "Other's Deck")
 				},
@@ -230,7 +230,7 @@ func TestGetDeckCards(t *testing.T) {
 				wantCount: 2,
 			},
 			{
-				name: "deck に cards が無いとき、空になる",
+				name: "deckにcardsが無いとき、空になる",
 				setup: func(t *testing.T) (string, int64) {
 					d := insertDeck(t, playerA, "Empty")
 					return playerA, d
@@ -238,7 +238,7 @@ func TestGetDeckCards(t *testing.T) {
 				wantCount: 0,
 			},
 			{
-				name: "他プレイヤーの deck_id を query するとき、空になる (PK スコープ)",
+				name: "他プレイヤーのdeck_idをqueryするとき、空になる (PKスコープ)",
 				setup: func(t *testing.T) (string, int64) {
 					d := insertDeck(t, playerB, "Theirs")
 					seedDeckCard(t, deckCardSeed{playerB, d, "SH-0001", 0, 3})
@@ -264,7 +264,7 @@ func TestGetDeckCards(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	t.Run("デッキの更新", func(t *testing.T) {
-		t.Run("カード構成と deck_name/playmat_no を更新するとき、差し替えで反映される", func(t *testing.T) {
+		t.Run("カード構成とdeck_name/playmat_noを更新するとき、差し替えで反映される", func(t *testing.T) {
 			// カード構成は既存 deck_cards を全削除してから新規 bulk insert する差し替えセマンティクス。
 			sharedPg.Truncate(t)
 			deckID := insertDeck(t, playerA, "Original")
@@ -319,7 +319,7 @@ func TestDelete(t *testing.T) {
 			wantCardsAfter int
 		}{
 			{
-				name: "自分のデッキを削除するとき、cards も CASCADE で削除される",
+				name: "自分のデッキを削除するとき、cardsもCASCADEで削除される",
 				setup: func(t *testing.T) (int64, int64) {
 					d := insertDeck(t, playerA, "Mine")
 					seedDeckCard(t, deckCardSeed{playerA, d, "SH-0001", 0, 3})
@@ -331,7 +331,7 @@ func TestDelete(t *testing.T) {
 				wantCardsAfter: 0,
 			},
 			{
-				name: "他プレイヤーの deck_id を指定するとき、削除されない",
+				name: "他プレイヤーのdeck_idを指定するとき、削除されない",
 				setup: func(t *testing.T) (int64, int64) {
 					mine := insertDeck(t, playerA, "Mine")
 					theirs := insertDeck(t, playerB, "Theirs")

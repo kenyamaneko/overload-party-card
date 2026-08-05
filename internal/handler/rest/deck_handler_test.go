@@ -22,7 +22,7 @@ func TestDeckHandler_CreateDeck(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("デッキ作成", func(t *testing.T) {
-		t.Run("所持カードで構成した有効なリクエストのとき、201 と作成済みデッキを返す", func(t *testing.T) {
+		t.Run("所持カードで構成した有効なリクエストのとき、201と作成済みデッキを返す", func(t *testing.T) {
 			h, _, pcRepo := newDeckHandlerFixture(t)
 			pcRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: fxCardID, ArtNo: 0, Count: 3})
 
@@ -50,7 +50,7 @@ func TestDeckHandler_CreateDeck(t *testing.T) {
 			assert.NotZero(t, got.DeckID)
 		})
 
-		t.Run("未所持カードを含むとき、所持検証で弾かれ 403 になる", func(t *testing.T) {
+		t.Run("未所持カードを含むとき、所持検証で弾かれ403になる", func(t *testing.T) {
 			h, _, _ := newDeckHandlerFixture(t)
 
 			body, err := json.Marshal(apicard.DeckCreateRequest{
@@ -77,7 +77,7 @@ func TestDeckHandler_CreateDeck(t *testing.T) {
 func TestDeckHandler_NonNumericDeckID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("非整数 deckId の拒否", func(t *testing.T) {
+	t.Run("非整数deckIdの拒否", func(t *testing.T) {
 		h, _, _ := newDeckHandlerFixture(t)
 
 		cases := []struct {
@@ -110,7 +110,7 @@ func TestDeckHandler_NonNumericDeckID(t *testing.T) {
 func TestDeckHandler_MalformedJSONBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("不正な JSON 本文の拒否", func(t *testing.T) {
+	t.Run("不正なJSON本文の拒否", func(t *testing.T) {
 		h, _, _ := newDeckHandlerFixture(t)
 
 		const numericDeckID = "1"
