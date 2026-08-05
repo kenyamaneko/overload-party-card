@@ -60,6 +60,7 @@ jobs:
       # 反映の中断で古いマスターデータが残るのを避けるため、実行中の処理を中止しない
       cancel-in-progress: false
     uses: ./.github/workflows/publish-master-data.yaml
+    secrets: inherit
     with:
       environment: stg
       version: ${{ github.ref_name }}
@@ -86,6 +87,7 @@ jobs:
       # 反映の中断で古いマスターデータが残るのを避けるため、実行中の処理を中止しない
       cancel-in-progress: false
     uses: ./.github/workflows/publish-master-data.yaml
+    secrets: inherit
     with:
       environment: prod
       version: ${{ inputs.version }}

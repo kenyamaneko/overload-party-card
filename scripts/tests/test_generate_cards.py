@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+import yaml
 
 import generate_cards as gen
 
@@ -352,6 +353,16 @@ class Test効果定義のカード種別とサブタイプ:
                 f"{_CARD_LABEL}: effect 'card_type' has invalid value 'CacheDB'",
                 id="meta の中の card_type が正規値でないとき、エラーになる",
             ),
+            pytest.param(
+                [{"ops": [{"apply_buff": {"selector": {"subtype": []}}}]}],
+                f"{_CARD_LABEL}: effect 'subtype' is empty",
+                id="subtype を空の並びで書くとき、エラーになる",
+            ),
+            pytest.param(
+                [{"custom": "cloud_shift", "meta": {"card_type": []}}],
+                f"{_CARD_LABEL}: effect 'card_type' is empty",
+                id="meta の中の card_type を空の並びで書くとき、エラーになる",
+            ),
         ],
     )
     def test_正規値でない値を書くとエラーになる(self, effects, want_message):
@@ -382,3 +393,77 @@ class Test効果定義のカード種別とサブタイプ:
     )
     def test_正規値を書くとエラーにならない(self, effects):
         assert gen.validate_effect_taxonomy([_card_with_effects(effects)], _TAXONOMY) == []
+
+
+_CONSTANTS = {
+    "card_types": ["Compute", "DataResource"],
+    "subtypes": {"Compute": ["VM", "Container"], "DataResource": ["Database", "CacheDB"]},
+    "resource_groups": {"db": {"subtypes": ["Database", "CacheDB"]}},
+}
+
+
+def _write_constants(base_dir, constants: dict):
+    """ゲーム定数ファイルを common と同じ配置で書き出す。
+
+    Args:
+        base_dir: common のチェックアウトに見立てたディレクトリ。
+        constants: 書き出すゲーム定数。
+
+    Returns:
+        書き出したファイルの Path。
+    """
+    path = base_dir / "data" / "game_design_constants.yaml"
+    path.parent.mkdir(parents=True)
+    path.write_text(yaml.safe_dump(constants, allow_unicode=True), encoding="utf-8")
+    return path
+
+
+class Testゲーム定数の場所:
+    def test_環境変数が設定されているとき_その配下のファイルを指す(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("COMMON_REPO", str(tmp_path / "elsewhere"))
+
+        assert gen.resolve_common_constants_path() == tmp_path / "elsewhere" / "data" / "game_design_constants.yaml"
+
+    def test_環境変数が設定されていないとき_隣に置かれた_common_を指す(self, monkeypatch):
+        monkeypatch.delenv("COMMON_REPO", raising=False)
+
+        got = gen.resolve_common_constants_path()
+
+        assert got.parent.parent.name == "overload-party-common"
+
+
+class Testゲーム定数の読み込み:
+    def test_サブタイプはカード種別ごとの並びをまとめた一つの集合になる(self, tmp_path):
+        path = _write_constants(tmp_path, _CONSTANTS)
+
+        taxonomy = gen.load_effect_taxonomy(path)
+
+        assert taxonomy.card_types == frozenset({"Compute", "DataResource"})
+        assert taxonomy.subtypes == frozenset({"VM", "Container", "Database", "CacheDB"})
+        assert taxonomy.resource_groups == {"db": {"subtypes": ["Database", "CacheDB"]}}
+
+    def test_ファイルが無いとき_置き場所の指定方法を添えて失敗する(self, tmp_path):
+        missing = tmp_path / "data" / "game_design_constants.yaml"
+
+        with pytest.raises(gen.CardGenerationError) as excinfo:
+            gen.load_effect_taxonomy(missing)
+
+        assert "not found" in str(excinfo.value)
+        assert "COMMON_REPO" in str(excinfo.value)
+
+    @pytest.mark.parametrize(
+        "missing_key",
+        [
+            pytest.param("card_types", id="カード種別の一覧が無いとき、失敗する"),
+            pytest.param("subtypes", id="サブタイプの一覧が無いとき、失敗する"),
+            pytest.param("resource_groups", id="リソースの括りの定義が無いとき、失敗する"),
+        ],
+    )
+    def test_必要な項目が欠けているとき_欠けている項目を挙げて失敗する(self, tmp_path, missing_key):
+        constants = {k: v for k, v in _CONSTANTS.items() if k != missing_key}
+        path = _write_constants(tmp_path, constants)
+
+        with pytest.raises(gen.CardGenerationError) as excinfo:
+            gen.load_effect_taxonomy(path)
+
+        assert f"missing '{missing_key}'" in str(excinfo.value)

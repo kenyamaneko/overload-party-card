@@ -409,6 +409,9 @@ def _collect_effect_taxonomy_errors(node, allowed, label, errors):
 
     for key, value in node.items():
         if key in allowed:
+            # 空で書くと engine が絞り込みなしとして扱い、効果が黙って全てのカードに及ぶ
+            if isinstance(value, list) and not value:
+                errors.append(f"{label}: effect '{key}' is empty")
             for name in value if isinstance(value, list) else [value]:
                 if name not in allowed[key]:
                     errors.append(f"{label}: effect '{key}' has invalid value '{name}'")

@@ -337,7 +337,7 @@ cards:
       - trigger: on_deploy
         ops:
           - apply_buff:
-              selector: { owner: myself, faction: Tenki, card_type: Compute }
+              selector: { owner: myself, faction: Tenki, group: compute }
               buff: tp
               amount: 200
               duration: while_on_field
