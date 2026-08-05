@@ -353,19 +353,29 @@ class Test効果定義のカード種別とサブタイプ:
                 f"{_CARD_LABEL}: effect 'card_type' has invalid value 'CacheDB'",
                 id="meta の中の card_type が正規値でないとき、エラーになる",
             ),
+        ],
+    )
+    def test_正規値でない値を書くとエラーになる(self, effects, want_message):
+        errors = gen.validate_effect_taxonomy([_card_with_effects(effects)], _TAXONOMY)
+
+        assert want_message in errors
+
+    @pytest.mark.parametrize(
+        ("effects", "want_message"),
+        [
             pytest.param(
                 [{"ops": [{"apply_buff": {"selector": {"subtype": []}}}]}],
                 f"{_CARD_LABEL}: effect 'subtype' is empty",
-                id="subtype を空の並びで書くとき、エラーになる",
+                id="subtype が空の並びのとき、エラーになる",
             ),
             pytest.param(
                 [{"custom": "cloud_shift", "meta": {"card_type": []}}],
                 f"{_CARD_LABEL}: effect 'card_type' is empty",
-                id="meta の中の card_type を空の並びで書くとき、エラーになる",
+                id="meta の中の card_type が空の並びのとき、エラーになる",
             ),
         ],
     )
-    def test_正規値でない値を書くとエラーになる(self, effects, want_message):
+    def test_空の並びを書くとエラーになる(self, effects, want_message):
         errors = gen.validate_effect_taxonomy([_card_with_effects(effects)], _TAXONOMY)
 
         assert want_message in errors
@@ -436,10 +446,14 @@ class Testゲーム定数の読み込み:
     def test_サブタイプはカード種別ごとの並びをまとめた一つの集合になる(self, tmp_path):
         path = _write_constants(tmp_path, _CONSTANTS)
 
+        assert gen.load_effect_taxonomy(path).subtypes == frozenset({"VM", "Container", "Database", "CacheDB"})
+
+    def test_カード種別の一覧と括りの定義は書かれたまま読み取れる(self, tmp_path):
+        path = _write_constants(tmp_path, _CONSTANTS)
+
         taxonomy = gen.load_effect_taxonomy(path)
 
         assert taxonomy.card_types == frozenset({"Compute", "DataResource"})
-        assert taxonomy.subtypes == frozenset({"VM", "Container", "Database", "CacheDB"})
         assert taxonomy.resource_groups == {"db": {"subtypes": ["Database", "CacheDB"]}}
 
     def test_ファイルが無いとき_置き場所の指定方法を添えて失敗する(self, tmp_path):
