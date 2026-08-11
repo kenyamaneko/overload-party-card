@@ -36,16 +36,6 @@ make fmt   # gofmt -s -w
 
 `ENV` (`local` / `dev` / `stg` / `prod`) をはじめとする必須環境変数（一覧は [internal/config/config.go](internal/config/config.go)）は未設定なら起動時に fail する（デフォルトへの暗黙 fallback を行わない）。`make run` は `ENV=dev` をインラインで設定するので、残りの必須環境変数を export すればよい。
 
-## 公開パッケージ
-
-[packages/api-card/](packages/api-card/) に gateway が import する REST 契約型 (Go)、[packages/api-card-dotnet/](packages/api-card-dotnet/) に battle が import する client + DTO (NuGet `OverloadParty.ApiCard`)、[packages/api-card-npm/](packages/api-card-npm/) にクライアント向け TypeScript 型 (npm `@kenyamaneko/overload-party-api-card`) を公開している。[data/openapi.yaml](data/openapi.yaml) (SSoT) を編集後に以下で再生成する。
-
-```bash
-scripts/generate_types.sh
-```
-
-`openapi_gen.go` は oapi-codegen、`openapi.gen.ts` は openapi-typescript、`ApiCard_gen.cs` は NSwag の出力なので直接編集しない。
-
 ## カードマスター変更
 
 ```bash
