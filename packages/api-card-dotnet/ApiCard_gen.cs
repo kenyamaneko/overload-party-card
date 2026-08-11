@@ -30,7 +30,7 @@ namespace OverloadParty.ApiCard
     public partial interface ICardClient
     {
         /// <summary>
-        /// サービス死活監視 (ClusterIP 内部のみ)
+        /// サービス死活監視 (Cloud Run の呼び出し IAM で到達制御)
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -38,7 +38,7 @@ namespace OverloadParty.ApiCard
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
-        /// サービス死活監視 (ClusterIP 内部のみ)
+        /// サービス死活監視 (Cloud Run の呼び出し IAM で到達制御)
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -244,7 +244,7 @@ namespace OverloadParty.ApiCard
         partial void ProcessResponse(System.Net.Http.HttpClient client, System.Net.Http.HttpResponseMessage response);
 
         /// <summary>
-        /// サービス死活監視 (ClusterIP 内部のみ)
+        /// サービス死活監視 (Cloud Run の呼び出し IAM で到達制御)
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -255,7 +255,7 @@ namespace OverloadParty.ApiCard
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
-        /// サービス死活監視 (ClusterIP 内部のみ)
+        /// サービス死活監視 (Cloud Run の呼び出し IAM で到達制御)
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
