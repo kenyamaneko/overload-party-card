@@ -309,6 +309,8 @@ func (s *DeckInteractor) validateDeckCards(faction string, deckCardEntries []dom
 	return nil
 }
 
+// computeIsValid は所持カード変更や restriction 改定に古い判定結果が残らないよう、
+// 永続化された値を使わず API 応答のたびに再算出します。
 func (s *DeckInteractor) computeIsValid(deck *domain.Deck, deckCards []domain.DeckCard, ownedCards []*domain.PlayerCard) bool {
 	totalCards := 0
 	for _, dc := range deckCards {

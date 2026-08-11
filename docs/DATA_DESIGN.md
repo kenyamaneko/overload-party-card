@@ -171,6 +171,41 @@ Platform / Attachment / Strategy / Incident / Reactive には `stats` フィー�
 | `count` | INT | No | 枚数 |
 <!-- END GENERATED: deck_cards -->
 
+### card_pack
+
+配布パック (どのカードを何枚配るか) のマスター。shop からは `shop.product_card_pack_refs.card_pack_id` で論理参照される (FK なし)。
+
+- **PK:** `pack_id` (VARCHAR(50))
+- **TRIGGER:** `updated_at` 自動更新
+
+<!-- BEGIN GENERATED: card_pack -->
+| カラム名 | 型 | Nullable | 説明 |
+|---|---|---|---|
+| `pack_id` | VARCHAR(50) | No | パック識別子（例: faction_set_she） |
+| `description` | VARCHAR(200) | No | 運営用説明 |
+| `is_active` | BOOLEAN | No | 配布有効フラグ |
+| `created_at` | TIMESTAMPTZ | No | 作成日時 |
+| `updated_at` | TIMESTAMPTZ | No | 更新日時 |
+<!-- END GENERATED: card_pack -->
+
+**設計判断:**
+- 配布のたびに DB を都度参照し、`card_definitions` と同じ起動時キャッシュ戦略は採らない (設計判断は common の ADR に記録する)
+
+### card_pack_cards
+
+パックの配布対象カードと枚数を正規化した子テーブル。
+
+- **PK:** `(pack_id, card_id)`
+- **FK:** `pack_id` → `card.card_pack(pack_id)` ON DELETE CASCADE
+
+<!-- BEGIN GENERATED: card_pack_cards -->
+| カラム名 | 型 | Nullable | 説明 |
+|---|---|---|---|
+| `pack_id` | VARCHAR(50) | No | 親パック識別子 |
+| `card_id` | VARCHAR(10) | No | 配布対象カード識別子 |
+| `copies` | INT | No | 当該パック当該カードの配布枚数 |
+<!-- END GENERATED: card_pack_cards -->
+
 ### processed_events
 
 Pub/Sub subscriber の冪等性を保証するテーブル。
@@ -206,6 +241,9 @@ products (PK: product_id)
   └── 1:N ── decks        (PK: player_id, deck_id)
                 │
                 └── 1:N ── deck_cards (FK: player_id, deck_id → decks, CASCADE)
+
+card_pack (PK: pack_id)
+  └── 1:N ── card_pack_cards (FK: pack_id → card_pack, CASCADE)
 
 processed_events (独立、FK なし)
 ```

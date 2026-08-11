@@ -182,6 +182,10 @@ def load_effect_taxonomy(constants_path):
 def expand_card_resource_groups(cards, resource_groups):
     """Replace every card's effects with a tree whose resource groups are expanded.
 
+    Cards reference resource groups by name instead of card_type / subtype directly,
+    so a change to the group definitions in common propagates to every card without
+    editing each card's YAML.
+
     Args:
         cards: Cards to rewrite in place.
         resource_groups: Group name to its card_type / subtypes definition.

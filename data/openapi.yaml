@@ -7,7 +7,7 @@ info:
 
     エンドポイント分類:
     - `/internal/v1/cards`: master データ配信。battle / gateway 起動時のキャッシュロード用。認証なし
-    - `/api/v1/cards/...`: gateway 経由の player-scoped 操作。`X-Internal-Auth` (HMAC JWT) で認証し、player_id は sub クレームから解決する
+    - `/api/v1/cards/...`: gateway 経由の player-scoped 操作。`X-Internal-Auth` (RS256 JWT) で認証し、player_id は sub クレームから解決する
 
 paths:
   /health:
@@ -258,7 +258,7 @@ components:
       type: apiKey
       in: header
       name: X-Internal-Auth
-      description: gateway が発行する HS256 JWT。sub クレームに player_id を含む。
+      description: gateway が発行する RS256 JWT。sub クレームに player_id を含む。
 
   parameters:
     DeckIdPath:
