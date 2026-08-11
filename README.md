@@ -2,7 +2,7 @@
 
 カードマスターデータ（SSoT）・プロダクトマスターデータ（SSoT）・所持カード・デッキ CRUD・デッキバリデーション・カードパック配布を担う内部マイクロサービス。ポート 9003 で起動する。
 
-詳細は [サービス設計書](docs/ARCHITECTURE.md) / [API 契約 (OpenAPI)](data/openapi.yaml) / [データ設計書](docs/DATA_DESIGN.md) / [カードデータ仕様](docs/CARDS.md) / [プロダクトデータ仕様](docs/PRODUCTS.md) / [ブランチ運用](docs/BRANCHING.md) を参照。
+詳細は [API 契約 (OpenAPI)](data/openapi.yaml) / [データ設計書](docs/DATA_DESIGN.md) / [カードデータ仕様](docs/CARDS.md) / [プロダクトデータ仕様](docs/PRODUCTS.md) / [ブランチ・CI/CD](docs/BRANCHING.md) を参照。設計判断 (Why) は [common の ADR](https://github.com/kenyamaneko/overload-party-common/tree/main/docs/adr) に記録する。
 
 [テスト観点カタログ](https://kenyamaneko.github.io/overload-party-card/): テスト名から生成した、テスト済みの観点の一覧。
 
@@ -54,4 +54,4 @@ python3 scripts/generate_cards.py  # data/cards/*.yaml → db/seed/cards_seed.sq
 
 生成器は効果定義のリソースの括り (`group`) を展開し、`card_type` / `subtype` が正規値かを検証するために common のゲーム定数を読む。既定では兄弟ディレクトリの `../overload-party-common` を見るので、別の場所に置いているときは `COMMON_REPO` にそのパスを渡す。
 
-詳細は [ARCHITECTURE.md#カードデータ-ssot-フロー](docs/ARCHITECTURE.md#カードデータ-ssot-フロー) を参照。
+既存カードの `restriction` 変更 (バンリスト改定) はプレイヤーの既存デッキを即日 invalid 化しうるため、リリースノートに明記した上で stg 環境での検証を行う。

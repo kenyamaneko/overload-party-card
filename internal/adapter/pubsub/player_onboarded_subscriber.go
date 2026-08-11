@@ -68,6 +68,8 @@ func (s *PlayerOnboardedSubscriber) Handle(ctx context.Context, data []byte) err
 	// pack_id は card_packs.yaml で faction を小文字化した形 (faction_set_she 等) で定義される。
 	factionPackID := "faction_set_" + strings.ToLower(event.InitialFactionID)
 	totalGranted := 0
+	// basic pack と faction pack を順に GrantPack するため、間でクラッシュすると
+	// 「片方だけ配布済み」の状態が残りうる (稼働前のため許容)。
 	for _, packID := range []string{"basic", factionPackID} {
 		granted, err := s.grantInteractor.GrantPack(ctx, event.PlayerID, packID)
 		if err != nil {

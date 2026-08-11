@@ -6,14 +6,14 @@ info:
     Card service の REST 契約。`packages/api-card` (Go) と `packages/api-card-npm` (TypeScript) を本ファイルから生成する。
 
     エンドポイント分類:
-    - `/internal/v1/cards`: master データ配信。battle / gateway 起動時のキャッシュロード用。認証なし
-    - `/api/v1/cards/...`: gateway 経由の player-scoped 操作。`X-Internal-Auth` (HMAC JWT) で認証し、player_id は sub クレームから解決する
+    - `/internal/v1/cards`: master データ配信。battle / gateway 起動時のキャッシュロード用。アプリ層認証はなく、到達制御は呼び出し元の Cloud Run 呼び出し IAM に委ねる
+    - `/api/v1/cards/...`: gateway 経由の player-scoped 操作。`X-Internal-Auth` (RS256 JWT) で認証し、player_id は sub クレームから解決する
 
 paths:
   /health:
     get:
       operationId: getHealth
-      summary: サービス死活監視 (ClusterIP 内部のみ)
+      summary: サービス死活監視 (Cloud Run の呼び出し IAM で到達制御)
       responses:
         "200":
           description: OK
@@ -258,7 +258,7 @@ components:
       type: apiKey
       in: header
       name: X-Internal-Auth
-      description: gateway が発行する HS256 JWT。sub クレームに player_id を含む。
+      description: gateway が発行する RS256 JWT。sub クレームに player_id を含む。
 
   parameters:
     DeckIdPath:

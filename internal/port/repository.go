@@ -35,8 +35,8 @@ type PlayerCardRepo interface {
 }
 
 // CardPackRepo は配布パックマスター (card.card_pack) の永続化を抽象化するインターフェースです。
-// 実装は配布リクエストごとに DB を引く前提でキャッシュは行いません (理由は
-// docs/ARCHITECTURE.md「pack マスターはキャッシュしない」を参照)。
+// 実装は配布リクエストごとに DB を引く前提でキャッシュは行いません
+// (起動時キャッシュを使わない設計、common の ADR に記録)。
 type CardPackRepo interface {
 	// GetPack は pack_id に対応するパック定義を返します。
 	// 行が存在しない場合 ErrNotFound を返します (運用停止 = is_active=false は別エラー: ErrPackInactive)。

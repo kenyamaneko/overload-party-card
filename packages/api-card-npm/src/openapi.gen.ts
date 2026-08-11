@@ -11,7 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** サービス死活監視 (ClusterIP 内部のみ) */
+        /** サービス死活監視 (Cloud Run の呼び出し IAM で到達制御) */
         get: operations["getHealth"];
         put?: never;
         post?: never;
