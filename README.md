@@ -1,7 +1,27 @@
 # overload-party-card
 
-カードマスターデータ（SSoT）・プロダクトマスターデータ（SSoT）・所持カード・デッキ CRUD・デッキバリデーション・カードパック配布を担う内部マイクロサービス。ポート 9003 で起動する。
+カードゲーム Overload Party のカードマスターデータ（SSoT）・プロダクトマスターデータ（SSoT）・所持カード・デッキ CRUD・デッキバリデーション・カードパック配布を担うマイクロサービス。
 
-詳細は [API 契約 (OpenAPI)](data/openapi.yaml) / [データ設計書](docs/DATA_DESIGN.md) / [カードデータ仕様](docs/CARDS.md) / [プロダクトデータ仕様](docs/PRODUCTS.md) / [ブランチ・CI/CD](docs/BRANCHING.md) を参照。設計判断 (Why) は [common の ADR](https://github.com/kenyamaneko/overload-party-common/tree/main/docs/adr)、サービス構成全体の図は [common のシステム構成図](https://github.com/kenyamaneko/overload-party-common#システム構成図) を参照。ローカル開発・カードマスター変更手順は [docs/SETUP.md](docs/SETUP.md) を参照。
+## 技術スタック
 
-[テスト観点カタログ](https://kenyamaneko.github.io/overload-party-card/): テスト名から生成した、テスト済みの観点の一覧。
+| レイヤー | 技術 |
+|---|---|
+| 言語 | Go |
+| フレームワーク | Gin |
+| データベース | Cloud SQL PostgreSQL |
+| 同期通信 | REST |
+| 非同期通信 | Cloud Pub/Sub |
+
+## ドキュメント
+
+| ドキュメント | 内容 |
+|---|---|
+| [セットアップ](docs/SETUP.md) | ローカル開発環境の起動手順とカードマスター変更手順 |
+| [API仕様書](data/openapi.yaml) | REST API のエンドポイント定義 |
+| [データ設計書](docs/DATA_DESIGN.md) | テーブル定義 |
+| [カードデータ仕様](docs/CARDS.md) | 全カードの一覧 |
+| [プロダクトデータ仕様](docs/PRODUCTS.md) | 全プロダクトの一覧 |
+| [ブランチ・CI/CD](docs/BRANCHING.md) | ブランチ運用と CI/CD の構成 |
+| [ADR](https://github.com/kenyamaneko/overload-party-common/tree/main/docs/adr)（commonリポジトリ） | 設計判断の背景・理由・結果 |
+| [システム構成図](https://github.com/kenyamaneko/overload-party-common#システム構成図)（commonリポジトリ） | Overload Party 全体の構成図 |
+| [テスト観点カタログ](https://kenyamaneko.github.io/overload-party-card/) | テスト名から自動生成した、テスト済みの観点一覧 |
