@@ -143,7 +143,6 @@ func TestServer(t *testing.T) {
 		})
 
 		t.Run("ValidateDeckForBattleFnは400とerror bodyを返せる", func(t *testing.T) {
-			// cardclient 側が status code + error body message から ErrDeckInvalid を生成するための契約を固定する。
 			srv := apicardserverfake.NewServer()
 			defer srv.Close()
 

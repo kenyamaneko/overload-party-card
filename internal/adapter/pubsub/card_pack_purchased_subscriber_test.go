@@ -19,7 +19,7 @@ func mustMarshalCardPackPurchased(t *testing.T, ev apishop.CardPackPurchasedEven
 }
 
 func TestCardPackPurchasedSubscriber_Handle(t *testing.T) {
-	t.Run("card_pack_purchasedイベントの処理", func(t *testing.T) {
+	t.Run("[pubsub]card_pack_purchasedイベントの処理", func(t *testing.T) {
 		validPayload := mustMarshalCardPackPurchased(t, apishop.CardPackPurchasedEvent{
 			EventID:    "evt-1",
 			PlayerID:   "player-1",
@@ -29,7 +29,6 @@ func TestCardPackPurchasedSubscriber_Handle(t *testing.T) {
 		tests := []struct {
 			name          string
 			payload       []byte
-			seedInserted  string
 			repoInsertErr error
 			granterErr    error
 			wantAck       bool
@@ -42,16 +41,6 @@ func TestCardPackPurchasedSubscriber_Handle(t *testing.T) {
 				wantPacks: []string{"faction_set_Tuners"},
 			},
 			{
-				name:         "重複イベント (processed_events既存)のとき、配布せずAckする",
-				payload:      validPayload,
-				seedInserted: "evt-1",
-				wantAck:      true,
-				wantPacks:    nil,
-			},
-			{
-				// processed_events への INSERT (dedup ガード) が失敗した場合、event を
-				// Ack で捨てると配布も dedup 記録もされずメッセージが失われる。Nack して
-				// Pub/Sub の at-least-once 再配送に乗せる。
 				name:          "processed_events INSERT失敗のとき、再配送に乗せるためNackする",
 				payload:       validPayload,
 				repoInsertErr: errors.New("db down"),
@@ -89,9 +78,6 @@ func TestCardPackPurchasedSubscriber_Handle(t *testing.T) {
 				granter := &fakePackGranter{err: tt.granterErr}
 				repo := newFakeProcessedEventRepo()
 				repo.insertErr = tt.repoInsertErr
-				if tt.seedInserted != "" {
-					repo.inserted[tt.seedInserted] = true
-				}
 				sub := NewCardPackPurchasedSubscriber(granter, repo)
 
 				err := sub.Handle(context.Background(), tt.payload)
@@ -100,6 +86,18 @@ func TestCardPackPurchasedSubscriber_Handle(t *testing.T) {
 				assert.Equal(t, tt.wantPacks, granter.gotPacks)
 			})
 		}
+
+		t.Run("重複イベント (processed_events既存)のとき、配布せずAckする", func(t *testing.T) {
+			granter := &fakePackGranter{}
+			repo := newFakeProcessedEventRepo()
+			repo.inserted["evt-1"] = true
+			sub := NewCardPackPurchasedSubscriber(granter, repo)
+
+			err := sub.Handle(context.Background(), validPayload)
+
+			assert.NoError(t, err)
+			assert.Nil(t, granter.gotPacks)
+		})
 
 		t.Run("同じevent_idを持つイベントを二度処理しても、2回目は配布されない", func(t *testing.T) {
 			payload := mustMarshalCardPackPurchased(t, apishop.CardPackPurchasedEvent{

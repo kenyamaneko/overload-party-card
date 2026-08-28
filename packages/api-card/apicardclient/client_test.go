@@ -14,7 +14,7 @@ import (
 )
 
 func TestClient_ListCards(t *testing.T) {
-	t.Run("ListCards", func(t *testing.T) {
+	t.Run("カード一覧の取得", func(t *testing.T) {
 		t.Run("500を受けたとき、ErrInternalServerになる", func(t *testing.T) {
 			srv := apicardserverfake.NewServer()
 			defer srv.Close()
@@ -39,7 +39,7 @@ func TestClient_ListCards(t *testing.T) {
 }
 
 func TestClient_ListPlayerCards(t *testing.T) {
-	t.Run("ListPlayerCards", func(t *testing.T) {
+	t.Run("所持カード一覧の取得", func(t *testing.T) {
 		cases := []struct {
 			name       string
 			status     int
@@ -71,7 +71,7 @@ func TestClient_ListPlayerCards(t *testing.T) {
 }
 
 func TestClient_ListCardsWithOwnership(t *testing.T) {
-	t.Run("ListCardsWithOwnership", func(t *testing.T) {
+	t.Run("所持状態付きカード一覧の取得", func(t *testing.T) {
 		cases := []struct {
 			name       string
 			status     int
@@ -103,7 +103,7 @@ func TestClient_ListCardsWithOwnership(t *testing.T) {
 }
 
 func TestClient_ListDecks(t *testing.T) {
-	t.Run("ListDecks", func(t *testing.T) {
+	t.Run("デッキ一覧の取得", func(t *testing.T) {
 		cases := []struct {
 			name       string
 			status     int
@@ -140,7 +140,7 @@ func TestClient_ListDecks(t *testing.T) {
 }
 
 func TestClient_CreateDeck(t *testing.T) {
-	t.Run("CreateDeck", func(t *testing.T) {
+	t.Run("デッキの作成", func(t *testing.T) {
 		cases := []struct {
 			name       string
 			status     int
@@ -182,7 +182,7 @@ func TestClient_CreateDeck(t *testing.T) {
 }
 
 func TestClient_GetDeck(t *testing.T) {
-	t.Run("GetDeck", func(t *testing.T) {
+	t.Run("デッキの取得", func(t *testing.T) {
 		cases := []struct {
 			name       string
 			status     int
@@ -224,7 +224,7 @@ func TestClient_GetDeck(t *testing.T) {
 }
 
 func TestClient_UpdateDeck(t *testing.T) {
-	t.Run("UpdateDeck", func(t *testing.T) {
+	t.Run("デッキの更新", func(t *testing.T) {
 		cases := []struct {
 			name       string
 			status     int
@@ -271,7 +271,7 @@ func TestClient_UpdateDeck(t *testing.T) {
 }
 
 func TestClient_DeleteDeck(t *testing.T) {
-	t.Run("DeleteDeck", func(t *testing.T) {
+	t.Run("デッキの削除", func(t *testing.T) {
 		cases := []struct {
 			name       string
 			status     int
@@ -313,8 +313,7 @@ func TestClient_DeleteDeck(t *testing.T) {
 }
 
 func TestClient_ValidateDeckForBattle(t *testing.T) {
-	t.Run("ValidateDeckForBattle", func(t *testing.T) {
-		// 400 のみ ErrBadRequest ではなく ErrDeckInvalid に変換する (wire 契約上「デッキ不正」を意味するため特別扱い)。
+	t.Run("デッキのバトル可否検証", func(t *testing.T) {
 		cases := []struct {
 			name       string
 			status     int
@@ -363,7 +362,6 @@ func TestClient_ValidateDeckForBattle(t *testing.T) {
 func TestClient_RequestEditor(t *testing.T) {
 	t.Run("リクエストエディタの適用", func(t *testing.T) {
 		t.Run("設定したヘッダが送信先の全リクエストに付与される", func(t *testing.T) {
-			// X-Internal-Auth header 注入の接続点として SDK が機能することを担保する。
 			var gotHeader string
 			spy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				gotHeader = r.Header.Get("X-Internal-Auth")

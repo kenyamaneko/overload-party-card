@@ -38,21 +38,21 @@ func seedCardPack(t *testing.T, s cardPackSeed) {
 }
 
 func TestGetPack(t *testing.T) {
-	t.Run("card packの取得", func(t *testing.T) {
+	t.Run("[repository]card packの取得", func(t *testing.T) {
 		t.Run("該当packがあるとき、card_id昇順のCards付きで返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedCardPack(t, cardPackSeed{
 				PackID:   "wanted",
 				IsActive: true,
 				Cards: []domain.CardPackCard{
-					{CardID: "SH-0002", Copies: 1},
-					{CardID: "SH-0001", Copies: 3},
+					{CardID: "TST-0002", Copies: 1},
+					{CardID: "TST-0001", Copies: 3},
 				},
 			})
 			seedCardPack(t, cardPackSeed{
 				PackID:   "other",
 				IsActive: true,
-				Cards:    []domain.CardPackCard{{CardID: "TK-0001", Copies: 3}},
+				Cards:    []domain.CardPackCard{{CardID: "TST-0003", Copies: 3}},
 			})
 
 			repo := repository.NewPgCardPackRepository(sharedPg.Pool)
@@ -63,8 +63,8 @@ func TestGetPack(t *testing.T) {
 			assert.Equal(t, "wanted", got.PackID)
 			assert.True(t, got.IsActive)
 			assert.Equal(t, []domain.CardPackCard{
-				{CardID: "SH-0001", Copies: 3},
-				{CardID: "SH-0002", Copies: 1},
+				{CardID: "TST-0001", Copies: 3},
+				{CardID: "TST-0002", Copies: 1},
 			}, got.Cards)
 		})
 

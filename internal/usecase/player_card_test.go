@@ -23,7 +23,7 @@ func cardCacheWith(cards ...*domain.Card) *cache.CardCache {
 }
 
 func TestPlayerCardInteractor_GetPlayerCards(t *testing.T) {
-	t.Run("所持カードの取得", func(t *testing.T) {
+	t.Run("[usecase]所持カードの取得", func(t *testing.T) {
 		t.Run("所持カードがあるとき、所持枚数はplayer_cards・カード定義はCardCacheから構成して返す", func(t *testing.T) {
 			effectText := "対象を 1 体破壊する"
 			def := &domain.Card{

@@ -113,7 +113,7 @@ func TestPubSubPushHandler_HandleCardPackPurchased(t *testing.T) {
 		Cards:    []domain.CardPackCard{{CardID: fxPushCardID, Copies: 3}},
 	}
 
-	t.Run("card-pack-purchasedのpush受け口", func(t *testing.T) {
+	t.Run("[handler]card-pack-purchasedのpush受け口", func(t *testing.T) {
 		t.Run("push本文を受け取ると、カードが付与される", func(t *testing.T) {
 			h, pcRepo := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
 				"faction_set_tuners": pack,
@@ -205,7 +205,7 @@ func TestPubSubPushHandler_HandlePlayerOnboarded(t *testing.T) {
 		"faction_set_tuners": {PackID: "faction_set_tuners", IsActive: true, Cards: []domain.CardPackCard{{CardID: fxPushCardID, Copies: 3}}},
 	}
 
-	t.Run("player-onboardedのpush受け口", func(t *testing.T) {
+	t.Run("[handler]player-onboardedのpush受け口", func(t *testing.T) {
 		t.Run("push本文を受け取ると、basicとfactionのカードが付与される", func(t *testing.T) {
 			h, pcRepo := newPubSubPushHandlerFixture(newFakeCardPackRepo(packs))
 			payload, err := json.Marshal(apiscenario.PlayerOnboardedEvent{

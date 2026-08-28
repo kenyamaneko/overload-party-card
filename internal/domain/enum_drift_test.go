@@ -12,7 +12,7 @@ import (
 )
 
 func TestEnumDriftAgainstOpenAPISpec(t *testing.T) {
-	t.Run("domainとopenapi.yamlのenum整合", func(t *testing.T) {
+	t.Run("[domain]domainとopenapi.yamlのenum整合", func(t *testing.T) {
 		// SSoT は domain 側。openapi.yaml は外部公開ドキュメントとして同じ値集合を持つ必要がある。
 		spec := loadOpenAPISpec(t)
 

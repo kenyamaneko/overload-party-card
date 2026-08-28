@@ -36,13 +36,13 @@ func (f *fakeAddCardsErrorRepo) AddCards(_ context.Context, _ string, _ []domain
 }
 
 func TestGrantPack(t *testing.T) {
-	t.Run("パック付与", func(t *testing.T) {
+	t.Run("[usecase]パック付与", func(t *testing.T) {
 		t.Run("カードパックを配ると、含まれる各カードが枚数分プレイヤーに付与され、付与数は合計枚数になる", func(t *testing.T) {
 			packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
 				IsActive: true,
 				Cards: []domain.CardPackCard{
-					{CardID: "SH-0001", Copies: 3},
-					{CardID: "SH-0002", Copies: 1},
+					{CardID: "TST-0001", Copies: 3},
+					{CardID: "TST-0002", Copies: 1},
 				},
 			}}
 			pcRepo := newInMemoryPlayerCardRepo()
@@ -56,8 +56,8 @@ func TestGrantPack(t *testing.T) {
 			playerCards, err := pcRepo.GetPlayerCards(context.Background(), "player-1")
 			require.NoError(t, err)
 			assert.ElementsMatch(t, []*domain.PlayerCard{
-				{PlayerID: "player-1", CardID: "SH-0001", Count: 3},
-				{PlayerID: "player-1", CardID: "SH-0002", Count: 1},
+				{PlayerID: "player-1", CardID: "TST-0001", Count: 3},
+				{PlayerID: "player-1", CardID: "TST-0002", Count: 1},
 			}, playerCards)
 		})
 
@@ -65,11 +65,11 @@ func TestGrantPack(t *testing.T) {
 			packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
 				IsActive: true,
 				Cards: []domain.CardPackCard{
-					{CardID: "SH-0001", Copies: 2},
+					{CardID: "TST-0001", Copies: 2},
 				},
 			}}
 			pcRepo := newInMemoryPlayerCardRepo()
-			pcRepo.Seed("player-1", []*domain.PlayerCard{{PlayerID: "player-1", CardID: "SH-0001", Count: 5}})
+			pcRepo.Seed("player-1", []*domain.PlayerCard{{PlayerID: "player-1", CardID: "TST-0001", Count: 5}})
 
 			svc := NewGrantInteractor(packRepo, pcRepo)
 			got, err := svc.GrantPack(context.Background(), "player-1", "any")
@@ -80,7 +80,7 @@ func TestGrantPack(t *testing.T) {
 			playerCards, err := pcRepo.GetPlayerCards(context.Background(), "player-1")
 			require.NoError(t, err)
 			assert.ElementsMatch(t, []*domain.PlayerCard{
-				{PlayerID: "player-1", CardID: "SH-0001", Count: 7},
+				{PlayerID: "player-1", CardID: "TST-0001", Count: 7},
 			}, playerCards)
 		})
 
@@ -92,7 +92,7 @@ func TestGrantPack(t *testing.T) {
 		}{
 			{
 				name:     "無効化されたカードパックのとき、ErrPackInactiveになり何も付与されない",
-				packRepo: &fakeCardPackRepo{pack: &domain.CardPack{IsActive: false, Cards: []domain.CardPackCard{{CardID: "SH-0001", Copies: 3}}}},
+				packRepo: &fakeCardPackRepo{pack: &domain.CardPack{IsActive: false, Cards: []domain.CardPackCard{{CardID: "TST-0001", Copies: 3}}}},
 				wantErr:  port.ErrPackInactive,
 			},
 			{

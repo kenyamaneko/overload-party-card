@@ -36,7 +36,7 @@ func mustMarshalPlayerOnboarded(t *testing.T, ev apiscenario.PlayerOnboardedEven
 }
 
 func TestPlayerOnboardedSubscriber_Handle(t *testing.T) {
-	t.Run("player_onboardedイベントの処理", func(t *testing.T) {
+	t.Run("[pubsub]player_onboardedイベントの処理", func(t *testing.T) {
 		validPayload := mustMarshalPlayerOnboarded(t, apiscenario.PlayerOnboardedEvent{
 			EventID:          "evt-1",
 			PlayerID:         "player-1",
@@ -46,7 +46,6 @@ func TestPlayerOnboardedSubscriber_Handle(t *testing.T) {
 		tests := []struct {
 			name             string
 			payload          []byte
-			seedInserted     string
 			repoInsertErr    error
 			granterErr       error
 			granterErrOnPack string
@@ -60,17 +59,6 @@ func TestPlayerOnboardedSubscriber_Handle(t *testing.T) {
 				wantPacks: []string{"basic", "faction_set_tuners"},
 			},
 			{
-				name:         "重複イベント (processed_events既存)のとき、配布せずAckする",
-				payload:      validPayload,
-				seedInserted: "evt-1",
-				wantAck:      true,
-				wantPacks:    nil,
-			},
-			{
-				// processed_events への INSERT (dedup ガード) が失敗した場合、event を
-				// Ack で捨てると配布も dedup 記録もされずメッセージが失われる。Nack して
-				// Pub/Sub の at-least-once 再配送に乗せ、次回成功時に dedup と配布が走る
-				// ことを期待する仕様の固定。
 				name:          "processed_events INSERT失敗のとき、再配送に乗せるためNackする",
 				payload:       validPayload,
 				repoInsertErr: errors.New("db down"),
@@ -78,9 +66,6 @@ func TestPlayerOnboardedSubscriber_Handle(t *testing.T) {
 				wantPacks:     nil,
 			},
 			{
-				// basic → faction_set の順次配布は fail-fast: 1 回目失敗時点で 2 回目を
-				// 呼ばずに Nack する。1 回目失敗後にそのまま続行すると DB 状態によって
-				// 挙動が予測不能になるため、early exit を仕様として固定する。
 				name:             "1回目 (basic) GrantPack失敗のとき、2回目を呼ばずにNackする (fail-fast)",
 				payload:          validPayload,
 				granterErr:       errors.New("grant failed"),
@@ -89,10 +74,6 @@ func TestPlayerOnboardedSubscriber_Handle(t *testing.T) {
 				wantPacks:        []string{"basic"},
 			},
 			{
-				// 2 回目 (faction) で失敗した時点で 1 回目 (basic) は配布完了済み = 不完全
-				// 配布が発生する。このとき Nack で再配送されても processed_events が
-				// 既に書かれていれば dedup で skip され、不完全配布のまま固定される。
-				// この at-most-once 相当の挙動を仕様として固定する。
 				name:             "2回目 (faction) GrantPack失敗のとき、1回目だけ配布された状態でNackする (不完全配布)",
 				payload:          validPayload,
 				granterErr:       errors.New("grant failed"),
@@ -124,9 +105,6 @@ func TestPlayerOnboardedSubscriber_Handle(t *testing.T) {
 				granter := &fakePackGranter{err: tt.granterErr, errOnPack: tt.granterErrOnPack}
 				repo := newFakeProcessedEventRepo()
 				repo.insertErr = tt.repoInsertErr
-				if tt.seedInserted != "" {
-					repo.inserted[tt.seedInserted] = true
-				}
 				sub := NewPlayerOnboardedSubscriber(granter, repo)
 
 				err := sub.Handle(context.Background(), tt.payload)
@@ -135,6 +113,18 @@ func TestPlayerOnboardedSubscriber_Handle(t *testing.T) {
 				assert.Equal(t, tt.wantPacks, granter.gotPacks)
 			})
 		}
+
+		t.Run("重複イベント (processed_events既存)のとき、配布せずAckする", func(t *testing.T) {
+			granter := &fakePackGranter{}
+			repo := newFakeProcessedEventRepo()
+			repo.inserted["evt-1"] = true
+			sub := NewPlayerOnboardedSubscriber(granter, repo)
+
+			err := sub.Handle(context.Background(), validPayload)
+
+			assert.NoError(t, err)
+			assert.Nil(t, granter.gotPacks)
+		})
 
 		t.Run("同じevent_idを持つイベントを二度処理しても、2回目は配布されない", func(t *testing.T) {
 			payload := mustMarshalPlayerOnboarded(t, apiscenario.PlayerOnboardedEvent{

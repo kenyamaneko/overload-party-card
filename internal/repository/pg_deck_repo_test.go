@@ -16,7 +16,7 @@ import (
 )
 
 func TestCreate(t *testing.T) {
-	t.Run("デッキと構成カードの作成", func(t *testing.T) {
+	t.Run("[repository]デッキと構成カードの作成", func(t *testing.T) {
 		// deck_id は GENERATED ALWAYS AS IDENTITY で自動採番され、cards の deck_id に伝播する。
 		tests := []struct {
 			name      string
@@ -26,8 +26,8 @@ func TestCreate(t *testing.T) {
 			{
 				name: "cardsありのとき、deckとdeck_cardsが同時に作られる",
 				entries: []domain.DeckCardEntry{
-					{CardID: "SH-0001", ArtNo: 0, Count: 3},
-					{CardID: "SH-0002", ArtNo: 0, Count: 2},
+					{CardID: "TST-0001", ArtNo: 0, Count: 3},
+					{CardID: "TST-0002", ArtNo: 0, Count: 2},
 				},
 				wantCards: 2,
 			},
@@ -106,7 +106,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestFindByPlayerID(t *testing.T) {
-	t.Run("プレイヤーのデッキ一覧取得", func(t *testing.T) {
+	t.Run("[repository]プレイヤーのデッキ一覧取得", func(t *testing.T) {
 		tests := []struct {
 			name      string
 			setup     func(t *testing.T)
@@ -116,7 +116,6 @@ func TestFindByPlayerID(t *testing.T) {
 			{
 				name: "複数デッキのとき、updated_at降順で返る",
 				setup: func(t *testing.T) {
-					// updated_at は now() デフォルト。手動で 3 件作って順序を制御する
 					insertDeckAt(t, playerA, "Old", time.Now().Add(-2*time.Hour))
 					insertDeckAt(t, playerA, "Middle", time.Now().Add(-1*time.Hour))
 					insertDeckAt(t, playerA, "New", time.Now())
@@ -161,7 +160,7 @@ func TestFindByPlayerID(t *testing.T) {
 }
 
 func TestFindByID(t *testing.T) {
-	t.Run("deck_id指定の取得", func(t *testing.T) {
+	t.Run("[repository]deck_id指定の取得", func(t *testing.T) {
 		t.Run("自分のdeck_idのとき、デッキ全項目を返す", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			deckID := insertDeck(t, playerA, "Target Deck")
@@ -177,7 +176,6 @@ func TestFindByID(t *testing.T) {
 			assert.Equal(t, "IN-TST-S", got.SpecialID)
 		})
 
-		// PK スコープを超えた認可漏れがないことを示す。
 		notFoundCases := []struct {
 			name     string
 			setup    func(t *testing.T) int64
@@ -213,7 +211,7 @@ func TestFindByID(t *testing.T) {
 }
 
 func TestGetDeckCards(t *testing.T) {
-	t.Run("デッキ構成カードの取得", func(t *testing.T) {
+	t.Run("[repository]デッキ構成カードの取得", func(t *testing.T) {
 		tests := []struct {
 			name      string
 			setup     func(t *testing.T) (string, int64) // target player_id, deck_id
@@ -223,8 +221,8 @@ func TestGetDeckCards(t *testing.T) {
 				name: "対象デッキにカードがあるとき、全件返る",
 				setup: func(t *testing.T) (string, int64) {
 					d := insertDeck(t, playerA, "Full")
-					seedDeckCard(t, deckCardSeed{playerA, d, "SH-0001", 0, 3})
-					seedDeckCard(t, deckCardSeed{playerA, d, "SH-0002", 0, 2})
+					seedDeckCard(t, deckCardSeed{playerA, d, "TST-0001", 0, 3})
+					seedDeckCard(t, deckCardSeed{playerA, d, "TST-0002", 0, 2})
 					return playerA, d
 				},
 				wantCount: 2,
@@ -241,7 +239,7 @@ func TestGetDeckCards(t *testing.T) {
 				name: "他プレイヤーのdeck_idをqueryするとき、空になる (PKスコープ)",
 				setup: func(t *testing.T) (string, int64) {
 					d := insertDeck(t, playerB, "Theirs")
-					seedDeckCard(t, deckCardSeed{playerB, d, "SH-0001", 0, 3})
+					seedDeckCard(t, deckCardSeed{playerB, d, "TST-0001", 0, 3})
 					return playerA, d
 				},
 				wantCount: 0,
@@ -263,13 +261,12 @@ func TestGetDeckCards(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	t.Run("デッキの更新", func(t *testing.T) {
+	t.Run("[repository]デッキの更新", func(t *testing.T) {
 		t.Run("カード構成とdeck_name/playmat_noを更新するとき、差し替えで反映される", func(t *testing.T) {
-			// カード構成は既存 deck_cards を全削除してから新規 bulk insert する差し替えセマンティクス。
 			sharedPg.Truncate(t)
 			deckID := insertDeck(t, playerA, "Original")
-			seedDeckCard(t, deckCardSeed{playerA, deckID, "SH-0001", 0, 3})
-			seedDeckCard(t, deckCardSeed{playerA, deckID, "SH-0002", 0, 3})
+			seedDeckCard(t, deckCardSeed{playerA, deckID, "TST-0001", 0, 3})
+			seedDeckCard(t, deckCardSeed{playerA, deckID, "TST-0002", 0, 3})
 
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			ctx := context.Background()
@@ -286,7 +283,7 @@ func TestUpdate(t *testing.T) {
 				PlaymatNo: &newPlaymat,
 				UpdatedAt: time.Now(),
 			}, []domain.DeckCardEntry{
-				{CardID: "SH-0003", ArtNo: 0, Count: 3},
+				{CardID: "TST-0003", ArtNo: 0, Count: 3},
 			})
 			require.NoError(t, err)
 
@@ -303,13 +300,13 @@ func TestUpdate(t *testing.T) {
 			cards, err := repo.GetDeckCards(ctx, playerA, deckID)
 			require.NoError(t, err)
 			require.Len(t, cards, 1, "old deck_cards should be replaced")
-			assert.Equal(t, "SH-0003", cards[0].CardID)
+			assert.Equal(t, "TST-0003", cards[0].CardID)
 		})
 	})
 }
 
 func TestDelete(t *testing.T) {
-	t.Run("デッキの削除", func(t *testing.T) {
+	t.Run("[repository]デッキの削除", func(t *testing.T) {
 		tests := []struct {
 			name           string
 			setup          func(t *testing.T) (int64, int64) // target deck_id, other deck_id
@@ -322,7 +319,7 @@ func TestDelete(t *testing.T) {
 				name: "自分のデッキを削除するとき、cardsもCASCADEで削除される",
 				setup: func(t *testing.T) (int64, int64) {
 					d := insertDeck(t, playerA, "Mine")
-					seedDeckCard(t, deckCardSeed{playerA, d, "SH-0001", 0, 3})
+					seedDeckCard(t, deckCardSeed{playerA, d, "TST-0001", 0, 3})
 					return d, 0
 				},
 				deletePID:      playerA,
@@ -335,7 +332,7 @@ func TestDelete(t *testing.T) {
 				setup: func(t *testing.T) (int64, int64) {
 					mine := insertDeck(t, playerA, "Mine")
 					theirs := insertDeck(t, playerB, "Theirs")
-					seedDeckCard(t, deckCardSeed{playerB, theirs, "SH-0001", 0, 3})
+					seedDeckCard(t, deckCardSeed{playerB, theirs, "TST-0001", 0, 3})
 					return mine, theirs
 				},
 				deletePID:      playerA,

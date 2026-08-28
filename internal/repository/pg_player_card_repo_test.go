@@ -20,7 +20,7 @@ type ownedRow struct {
 }
 
 func TestGetPlayerCards(t *testing.T) {
-	t.Run("所持カード一覧の取得", func(t *testing.T) {
+	t.Run("[repository]所持カード一覧の取得", func(t *testing.T) {
 		tests := []struct {
 			name   string
 			seeds  []playerCardSeed
@@ -30,31 +30,31 @@ func TestGetPlayerCards(t *testing.T) {
 			{
 				name: "複数所持のとき、card_id / art_no昇順で返る",
 				seeds: []playerCardSeed{
-					{playerA, "SH-0002", 0, 3},
-					{playerA, "SH-0001", 1, 1},
-					{playerA, "SH-0001", 0, 2},
+					{playerA, "TST-0002", 0, 3},
+					{playerA, "TST-0001", 1, 1},
+					{playerA, "TST-0001", 0, 2},
 				},
 				target: playerA,
 				want: []ownedRow{
-					{"SH-0001", 0, 2},
-					{"SH-0001", 1, 1},
-					{"SH-0002", 0, 3},
+					{"TST-0001", 0, 2},
+					{"TST-0001", 1, 1},
+					{"TST-0002", 0, 3},
 				},
 			},
 			{
 				name: "他プレイヤーの行があるとき、除外される (PKスコープ)",
 				seeds: []playerCardSeed{
-					{playerA, "SH-0001", 0, 1},
-					{playerB, "SH-0002", 0, 5},
+					{playerA, "TST-0001", 0, 1},
+					{playerB, "TST-0002", 0, 5},
 				},
 				target: playerA,
 				want: []ownedRow{
-					{"SH-0001", 0, 1},
+					{"TST-0001", 0, 1},
 				},
 			},
 			{
 				name:   "未所持プレイヤーのとき、空スライスになる",
-				seeds:  []playerCardSeed{{playerB, "SH-0001", 0, 1}},
+				seeds:  []playerCardSeed{{playerB, "TST-0001", 0, 1}},
 				target: playerA,
 				want:   nil,
 			},
@@ -82,7 +82,7 @@ func TestGetPlayerCards(t *testing.T) {
 }
 
 func TestAddCards(t *testing.T) {
-	t.Run("所持カードのUPSERT加算", func(t *testing.T) {
+	t.Run("[repository]所持カードのUPSERT加算", func(t *testing.T) {
 		bulkCards, bulkExpected := bulkCardPackCards(30, 3)
 
 		tests := []struct {
@@ -96,32 +96,32 @@ func TestAddCards(t *testing.T) {
 				name:  "全て新規カードのとき、INSERTされる",
 				seeds: nil,
 				cards: []domain.CardPackCard{
-					{CardID: "SH-0001", Copies: 3},
-					{CardID: "SH-0002", Copies: 3},
+					{CardID: "TST-0001", Copies: 3},
+					{CardID: "TST-0002", Copies: 3},
 				},
 				wantGranted:    6,
-				wantFinalCount: map[string]int{"SH-0001": 3, "SH-0002": 3},
+				wantFinalCount: map[string]int{"TST-0001": 3, "TST-0002": 3},
 			},
 			{
 				name: "既所持カードのとき、countに加算される (UPSERT)",
 				seeds: []playerCardSeed{
-					{playerA, "SH-0001", 0, 2},
+					{playerA, "TST-0001", 0, 2},
 				},
-				cards:          []domain.CardPackCard{{CardID: "SH-0001", Copies: 3}},
+				cards:          []domain.CardPackCard{{CardID: "TST-0001", Copies: 3}},
 				wantGranted:    3,
-				wantFinalCount: map[string]int{"SH-0001": 5},
+				wantFinalCount: map[string]int{"TST-0001": 5},
 			},
 			{
 				name: "カードごとに枚数が異なるとき、それぞれ一括加算される",
 				seeds: []playerCardSeed{
-					{playerA, "SH-0001", 0, 1},
+					{playerA, "TST-0001", 0, 1},
 				},
 				cards: []domain.CardPackCard{
-					{CardID: "SH-0001", Copies: 3},
-					{CardID: "SH-0002", Copies: 1},
+					{CardID: "TST-0001", Copies: 3},
+					{CardID: "TST-0002", Copies: 1},
 				},
 				wantGranted:    4,
-				wantFinalCount: map[string]int{"SH-0001": 4, "SH-0002": 1},
+				wantFinalCount: map[string]int{"TST-0001": 4, "TST-0002": 1},
 			},
 			{
 				name:           "30種類 (実grantスケール)のとき、1文のbulk UPSERTで投入される",

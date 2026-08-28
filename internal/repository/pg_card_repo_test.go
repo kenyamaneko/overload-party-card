@@ -14,7 +14,7 @@ import (
 )
 
 func TestFindAll(t *testing.T) {
-	t.Run("カード一覧の取得", func(t *testing.T) {
+	t.Run("[repository]カード一覧の取得", func(t *testing.T) {
 		tests := []struct {
 			name    string
 			seeds   []cardSeed
@@ -23,11 +23,11 @@ func TestFindAll(t *testing.T) {
 			{
 				name: "activeとinactiveが混在するとき、activeのみcard_id昇順で返る",
 				seeds: []cardSeed{
-					{"SH-0002", "SHE B", "SHE", "Compute", "unlimited", true},
-					{"SH-0001", "SHE A", "SHE", "Compute", "unlimited", true},
+					{"TST-0002", "SHE B", "SHE", "Compute", "unlimited", true},
+					{"TST-0001", "SHE A", "SHE", "Compute", "unlimited", true},
 					{"SH-0099", "SHE Inactive", "SHE", "Compute", "unlimited", false},
 				},
-				wantIDs: []string{"SH-0001", "SH-0002"},
+				wantIDs: []string{"TST-0001", "TST-0002"},
 			},
 			{
 				name:    "空テーブルのとき、空スライスになる",
@@ -37,8 +37,8 @@ func TestFindAll(t *testing.T) {
 			{
 				name: "全てinactiveのとき、空スライスになる",
 				seeds: []cardSeed{
-					{"SH-0001", "Dormant A", "SHE", "Compute", "unlimited", false},
-					{"SH-0002", "Dormant B", "SHE", "Compute", "unlimited", false},
+					{"TST-0001", "Dormant A", "SHE", "Compute", "unlimited", false},
+					{"TST-0002", "Dormant B", "SHE", "Compute", "unlimited", false},
 				},
 				wantIDs: nil,
 			},

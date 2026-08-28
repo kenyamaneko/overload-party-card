@@ -21,7 +21,7 @@ import (
 func TestDeckHandler_CreateDeck(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("デッキ作成", func(t *testing.T) {
+	t.Run("[handler]デッキ作成", func(t *testing.T) {
 		t.Run("所持カードで構成した有効なリクエストのとき、201と作成済みデッキを返す", func(t *testing.T) {
 			h, _, pcRepo := newDeckHandlerFixture(t)
 			pcRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: fxCardID, ArtNo: 0, Count: 3})
@@ -77,7 +77,7 @@ func TestDeckHandler_CreateDeck(t *testing.T) {
 func TestDeckHandler_NonNumericDeckID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("非整数deckIdの拒否", func(t *testing.T) {
+	t.Run("[handler]非整数deckIdの拒否", func(t *testing.T) {
 		h, _, _ := newDeckHandlerFixture(t)
 
 		cases := []struct {
@@ -110,7 +110,7 @@ func TestDeckHandler_NonNumericDeckID(t *testing.T) {
 func TestDeckHandler_MalformedJSONBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("不正なJSON本文の拒否", func(t *testing.T) {
+	t.Run("[handler]不正なJSON本文の拒否", func(t *testing.T) {
 		h, _, _ := newDeckHandlerFixture(t)
 
 		const numericDeckID = "1"
@@ -145,7 +145,7 @@ func TestDeckHandler_MalformedJSONBody(t *testing.T) {
 func TestDeckHandler_InvalidFactionBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("選択不可能な陣営を指定したリクエストの拒否", func(t *testing.T) {
+	t.Run("[handler]選択不可能な陣営を指定したリクエストの拒否", func(t *testing.T) {
 		h, _, _ := newDeckHandlerFixture(t)
 
 		const numericDeckID = "1"

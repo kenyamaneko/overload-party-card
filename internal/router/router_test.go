@@ -130,7 +130,7 @@ func newPubSubPushRequest(path string) *http.Request {
 }
 
 func TestNew(t *testing.T) {
-	t.Run("ルーターの認証配線", func(t *testing.T) {
+	t.Run("[router]ルーターの認証配線", func(t *testing.T) {
 		t.Run("/healthはauth middlewareを通らず200を返す", func(t *testing.T) {
 			// VerifyFn 未設定: /health が verifier に到達しないことの検出を兼ねる
 			r := newTestRouter(t, &internalauth.MockVerifier{})

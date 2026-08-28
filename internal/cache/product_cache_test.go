@@ -28,7 +28,7 @@ const testProductsFixtureJSON = `[
 ]`
 
 func TestProductFindByID(t *testing.T) {
-	t.Run("プロダクトのID検索", func(t *testing.T) {
+	t.Run("[cache]プロダクトのID検索", func(t *testing.T) {
 		pc := NewProductCache()
 		require.NoError(t, pc.LoadFromBytes([]byte(testProductsFixtureJSON)))
 
@@ -46,7 +46,7 @@ func TestProductFindByID(t *testing.T) {
 }
 
 func TestProductLoadFromBytes(t *testing.T) {
-	t.Run("プロダクトキャッシュのロード", func(t *testing.T) {
+	t.Run("[cache]プロダクトキャッシュのロード", func(t *testing.T) {
 		t.Run("0件JSONのとき、マスター欠落としてエラーになる", func(t *testing.T) {
 			pc := NewProductCache()
 			err := pc.LoadFromBytes([]byte(`[]`))
@@ -63,7 +63,7 @@ func TestProductLoadFromBytes(t *testing.T) {
 }
 
 func TestProductLoad(t *testing.T) {
-	t.Run("DBからのプロダクトキャッシュ読み込み", func(t *testing.T) {
+	t.Run("[cache]DBからのプロダクトキャッシュ読み込み", func(t *testing.T) {
 		t.Run("DBに定義があるとき、読み込んだ定義が検索で引けるようになる", func(t *testing.T) {
 			repo := &stubProductRepo{products: []*domain.Product{
 				{ProductID: "PD-TST-0001", Faction: "SHE", ProductName: "テストプロダクト"},

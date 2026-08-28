@@ -7,6 +7,7 @@ import (
 
 	gencache "github.com/kenyamaneko/overload-party-card/data/cache"
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
+	gamedesign "github.com/kenyamaneko/overload-party-common/packages/game-design-constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,10 +22,8 @@ func (r *stubCardRepo) FindAll(_ context.Context) ([]*domain.Card, error) {
 	return r.cards, r.err
 }
 
-var resourceCardTypes = map[string]bool{"Compute": true, "DataResource": true}
-
 func isResourceType(cardType string) bool {
-	return resourceCardTypes[cardType]
+	return cardType == gamedesign.CardTypeCompute || cardType == gamedesign.CardTypeDataResource
 }
 
 func loadTestCache(t *testing.T) *CardCache {
@@ -36,7 +35,7 @@ func loadTestCache(t *testing.T) *CardCache {
 }
 
 func TestLoadFromBytes(t *testing.T) {
-	t.Run("生成カードキャッシュのロード", func(t *testing.T) {
+	t.Run("[cache]生成カードキャッシュのロード", func(t *testing.T) {
 		t.Run("0件JSONのとき、マスター欠落としてエラーになる", func(t *testing.T) {
 			cc := NewCardCache()
 			err := cc.LoadFromBytes([]byte(`[]`))
@@ -65,7 +64,7 @@ func TestLoadFromBytes(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
-	t.Run("DBからのカードキャッシュ読み込み", func(t *testing.T) {
+	t.Run("[cache]DBからのカードキャッシュ読み込み", func(t *testing.T) {
 		t.Run("DBに定義があるとき、読み込んだ定義が検索で引けるようになる", func(t *testing.T) {
 			repo := &stubCardRepo{cards: []*domain.Card{
 				{CardID: "TST-0001", CardName: "Test Card"},
