@@ -817,7 +817,7 @@ func TestDeleteDeck(t *testing.T) {
 }
 
 func TestValidateDeckForBattle(t *testing.T) {
-	t.Run("[usecase]対戦用デッキ検証", func(t *testing.T) {
+	t.Run("[usecase]デッキのバトル可否検証", func(t *testing.T) {
 		t.Run("30枚デッキのとき、エラーにならない", func(t *testing.T) {
 			svc, _, pcRepo, _ := setupDeckInteractor(t)
 			pid := "p1"
