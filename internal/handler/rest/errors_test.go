@@ -55,27 +55,28 @@ func TestDeckHandler_SentinelErrorToStatusAndBody(t *testing.T) {
 	})
 }
 
-func TestRespondError_InternalServerErrorLogging(t *testing.T) {
+func TestDeckHandler_InternalServerErrorLogging(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("[デッキAPI]500になるエラーのログ出力", func(t *testing.T) {
 		t.Run("写像対象外のerrorのとき、応答本文には出ない原因の文字列と要求パスがログに出る", func(t *testing.T) {
 			buf := captureSlog(t)
+			h, deckRepo, _ := newDeckHandlerFixture(t)
 			cause := errors.New("pq: connection refused")
+			deckRepo.findByIDErr = cause
 
+			r := gin.New()
+			r.GET("/api/v1/cards/decks/:deckId", h.GetDeck)
 			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/cards/decks", nil)
-
-			respondError(c, cause)
+			r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/cards/decks/1", nil))
 
 			assert.Equal(t, http.StatusInternalServerError, w.Code)
 			assert.Equal(t, internalErrorMessage, decodeBody(t, w)["error"])
 
 			records := decodeLogRecords(t, buf)
 			require.Len(t, records, 1)
-			assert.Equal(t, "/api/v1/cards/decks", records[0]["path"])
-			assert.Equal(t, cause.Error(), records[0]["error"])
+			assert.Equal(t, "/api/v1/cards/decks/1", records[0]["path"])
+			assert.Equal(t, "find deck: "+cause.Error(), records[0]["error"])
 		})
 	})
 }
