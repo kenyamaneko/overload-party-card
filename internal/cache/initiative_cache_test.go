@@ -28,7 +28,7 @@ const testInitiativesFixtureJSON = `[
 ]`
 
 func TestInitiativeFindByID(t *testing.T) {
-	t.Run("[cache]施策のID検索", func(t *testing.T) {
+	t.Run("[施策キャッシュ]施策のID検索", func(t *testing.T) {
 		ic := NewInitiativeCache()
 		require.NoError(t, ic.LoadFromBytes([]byte(testInitiativesFixtureJSON)))
 
@@ -47,7 +47,7 @@ func TestInitiativeFindByID(t *testing.T) {
 }
 
 func TestInitiativeLoadFromBytes(t *testing.T) {
-	t.Run("[cache]施策キャッシュのロード", func(t *testing.T) {
+	t.Run("[施策キャッシュ]施策キャッシュのロード", func(t *testing.T) {
 		t.Run("0件JSONのとき、マスター欠落としてエラーになる", func(t *testing.T) {
 			ic := NewInitiativeCache()
 			err := ic.LoadFromBytes([]byte(`[]`))
@@ -64,7 +64,7 @@ func TestInitiativeLoadFromBytes(t *testing.T) {
 }
 
 func TestInitiativeLoad(t *testing.T) {
-	t.Run("[cache]DBからの施策キャッシュ読み込み", func(t *testing.T) {
+	t.Run("[施策キャッシュ]DBからの施策キャッシュ読み込み", func(t *testing.T) {
 		t.Run("DBに定義があるとき、読み込んだ定義が検索で引けるようになる", func(t *testing.T) {
 			repo := &stubInitiativeRepo{initiatives: []*domain.Initiative{
 				{InitiativeID: "TST-0001", ProductID: "PD-TST", Kind: "routine", Name: "テスト施策"},

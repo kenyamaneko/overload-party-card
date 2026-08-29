@@ -13,7 +13,7 @@ import (
 )
 
 func TestInsert(t *testing.T) {
-	t.Run("[repository]processed_eventsへの冪等挿入", func(t *testing.T) {
+	t.Run("[処理済みイベントリポジトリ]processed_eventsへの冪等挿入", func(t *testing.T) {
 		// ON CONFLICT DO NOTHING RETURNING で pgx.ErrNoRows を潰し、新規は true・重複は false を返す。
 		tests := []struct {
 			name         string

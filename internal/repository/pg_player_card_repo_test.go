@@ -20,7 +20,7 @@ type ownedRow struct {
 }
 
 func TestGetPlayerCards(t *testing.T) {
-	t.Run("[repository]所持カード一覧の取得", func(t *testing.T) {
+	t.Run("[所持カードリポジトリ]所持カード一覧の取得", func(t *testing.T) {
 		tests := []struct {
 			name   string
 			seeds  []playerCardSeed
@@ -82,7 +82,7 @@ func TestGetPlayerCards(t *testing.T) {
 }
 
 func TestAddCards(t *testing.T) {
-	t.Run("[repository]所持カードのUPSERT加算", func(t *testing.T) {
+	t.Run("[所持カードリポジトリ]所持カードのUPSERT加算", func(t *testing.T) {
 		bulkCards, bulkExpected := bulkCardPackCards(30, 3)
 
 		tests := []struct {

@@ -36,7 +36,7 @@ func mustMarshalPlayerOnboarded(t *testing.T, ev apiscenario.PlayerOnboardedEven
 }
 
 func TestPlayerOnboardedSubscriber_Handle(t *testing.T) {
-	t.Run("[pubsub]player_onboardedイベントの処理", func(t *testing.T) {
+	t.Run("[オンボーディング完了購読]player_onboardedイベントの処理", func(t *testing.T) {
 		validPayload := mustMarshalPlayerOnboarded(t, apiscenario.PlayerOnboardedEvent{
 			EventID:          "evt-1",
 			PlayerID:         "player-1",

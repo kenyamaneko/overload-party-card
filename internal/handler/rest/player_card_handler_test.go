@@ -15,7 +15,7 @@ import (
 func TestPlayerCardHandler_GetPlayerCards(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("[handler]所持カード取得", func(t *testing.T) {
+	t.Run("[所持カードAPI]所持カード取得", func(t *testing.T) {
 		t.Run("所持カードの取得に失敗したとき、500になり応答本文のerrorがinternal server errorと完全に一致する", func(t *testing.T) {
 			h, pcRepo := newPlayerCardHandlerFixture()
 			pcRepo.getErr = errors.New("pq: connection refused")

@@ -13,7 +13,7 @@ import (
 )
 
 func TestProductFindAll(t *testing.T) {
-	t.Run("[repository]プロダクト一覧の取得", func(t *testing.T) {
+	t.Run("[プロダクトリポジトリ]プロダクト一覧の取得", func(t *testing.T) {
 		orderingCases := []struct {
 			name      string
 			products  []productSeed

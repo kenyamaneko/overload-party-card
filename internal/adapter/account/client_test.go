@@ -11,7 +11,7 @@ import (
 )
 
 func TestListPlayerFactions(t *testing.T) {
-	t.Run("[account]プレイヤー所持ファクションの取得", func(t *testing.T) {
+	t.Run("[陣営]プレイヤー所持ファクションの取得", func(t *testing.T) {
 		t.Run("200応答のとき、内部エンドポイントへGETしfactionsを返す", func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, "/internal/v1/players/p-1/factions", r.URL.Path)

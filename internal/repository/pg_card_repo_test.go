@@ -14,7 +14,7 @@ import (
 )
 
 func TestFindAll(t *testing.T) {
-	t.Run("[repository]カード一覧の取得", func(t *testing.T) {
+	t.Run("[カードリポジトリ]カード一覧の取得", func(t *testing.T) {
 		tests := []struct {
 			name    string
 			seeds   []cardSeed

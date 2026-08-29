@@ -17,7 +17,7 @@ type ownershipExpectation struct {
 }
 
 func TestListCardsWithOwnership(t *testing.T) {
-	t.Run("[usecase]所持状態付きカード一覧", func(t *testing.T) {
+	t.Run("[カード]所持状態付きカード一覧", func(t *testing.T) {
 		tests := []struct {
 			name  string
 			cards map[string]*domain.Card
@@ -80,7 +80,7 @@ func TestListCardsWithOwnership(t *testing.T) {
 }
 
 func TestListCards(t *testing.T) {
-	t.Run("[usecase]カード一覧", func(t *testing.T) {
+	t.Run("[カード]カード一覧", func(t *testing.T) {
 		t.Run("マスターにカードがあるとき、全件がID昇順で名前とともに返る", func(t *testing.T) {
 			cards := map[string]*domain.Card{
 				"C-002": {CardID: "C-002", CardName: "Shield"},

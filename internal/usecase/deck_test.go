@@ -236,7 +236,7 @@ func full30Entries() []apicard.DeckCardEntry {
 }
 
 func TestCreateDeck(t *testing.T) {
-	t.Run("[usecase]デッキ作成", func(t *testing.T) {
+	t.Run("[デッキ]デッキ作成", func(t *testing.T) {
 		t.Run("デッキ枚数の妥当性", func(t *testing.T) {
 			tests := []struct {
 				name      string
@@ -708,7 +708,7 @@ func TestCreateDeck(t *testing.T) {
 }
 
 func TestGetDecks(t *testing.T) {
-	t.Run("[usecase]デッキ一覧の取得", func(t *testing.T) {
+	t.Run("[デッキ]デッキ一覧の取得", func(t *testing.T) {
 		t.Run("30枚のデッキと6枚のデッキを持つとき、一覧では前者だけが有効と判定される", func(t *testing.T) {
 			svc, _, pcRepo, _ := setupDeckInteractor(t)
 			pid := "p1"
@@ -741,7 +741,7 @@ func TestGetDecks(t *testing.T) {
 }
 
 func TestUpdateDeck(t *testing.T) {
-	t.Run("[usecase]デッキ更新", func(t *testing.T) {
+	t.Run("[デッキ]デッキ更新", func(t *testing.T) {
 		t.Run("不完全なデッキを30枚に更新すると、有効になり一覧に反映される", func(t *testing.T) {
 			svc, _, pcRepo, _ := setupDeckInteractor(t)
 			pid := "p1"
@@ -797,7 +797,7 @@ func TestUpdateDeck(t *testing.T) {
 }
 
 func TestDeleteDeck(t *testing.T) {
-	t.Run("[usecase]デッキ削除", func(t *testing.T) {
+	t.Run("[デッキ]デッキ削除", func(t *testing.T) {
 		t.Run("作成したデッキを削除するとき、一覧から消える", func(t *testing.T) {
 			svc, _, pcRepo, _ := setupDeckInteractor(t)
 			pid := "p1"
@@ -817,7 +817,7 @@ func TestDeleteDeck(t *testing.T) {
 }
 
 func TestValidateDeckForBattle(t *testing.T) {
-	t.Run("[usecase]デッキのバトル可否検証", func(t *testing.T) {
+	t.Run("[デッキ]デッキのバトル可否検証", func(t *testing.T) {
 		t.Run("30枚デッキのとき、エラーにならない", func(t *testing.T) {
 			svc, _, pcRepo, _ := setupDeckInteractor(t)
 			pid := "p1"

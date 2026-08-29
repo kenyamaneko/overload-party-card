@@ -13,7 +13,7 @@ import (
 )
 
 func TestInitiativeFindAll(t *testing.T) {
-	t.Run("[repository]施策一覧の取得", func(t *testing.T) {
+	t.Run("[施策リポジトリ]施策一覧の取得", func(t *testing.T) {
 		t.Run("複数施策のとき、initiative_id昇順で親product_id付きで返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedProduct(t, productSeed{"PD-TST1", "SHE", "P1"})

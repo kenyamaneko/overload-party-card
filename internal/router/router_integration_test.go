@@ -90,7 +90,7 @@ func seedFillerProductAndInitiative(t *testing.T) {
 }
 
 func TestNewMasterAndOwnershipRoutesReachRealHandler(t *testing.T) {
-	t.Run("[router]プロダクト一覧配信", func(t *testing.T) {
+	t.Run("[ルーティング]プロダクト一覧配信", func(t *testing.T) {
 		t.Run("プロダクト2件のうち片方だけに施策2件が紐付くとき、施策を持つプロダクトには自身の施策だけが合成されて返り、施策の無いプロダクトは施策が空で返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedCard(t, cardSeed{CardID: "TST-0000", CardName: "Filler", Faction: "SHE", CardType: "Resource", Restriction: "unlimited", IsActive: true})
@@ -122,7 +122,7 @@ func TestNewMasterAndOwnershipRoutesReachRealHandler(t *testing.T) {
 		})
 	})
 
-	t.Run("[router]施策一覧の内部配信", func(t *testing.T) {
+	t.Run("[ルーティング]施策一覧の内部配信", func(t *testing.T) {
 		t.Run("施策を投入した状態で取得すると、認証なしで200と全施策が返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedCard(t, cardSeed{CardID: "TST-0000", CardName: "Filler", Faction: "SHE", CardType: "Resource", Restriction: "unlimited", IsActive: true})
@@ -146,7 +146,7 @@ func TestNewMasterAndOwnershipRoutesReachRealHandler(t *testing.T) {
 		})
 	})
 
-	t.Run("[router]所持状態付きカード一覧", func(t *testing.T) {
+	t.Run("[ルーティング]所持状態付きカード一覧", func(t *testing.T) {
 		t.Run("3種のカードのうち1種を所持するプレイヤーが取得すると、全カードが返り所持カードだけ所持済み印になる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedFillerProductAndInitiative(t)

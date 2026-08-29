@@ -16,7 +16,7 @@ import (
 )
 
 func TestCreate(t *testing.T) {
-	t.Run("[repository]デッキと構成カードの作成", func(t *testing.T) {
+	t.Run("[デッキリポジトリ]デッキと構成カードの作成", func(t *testing.T) {
 		// deck_id は GENERATED ALWAYS AS IDENTITY で自動採番され、cards の deck_id に伝播する。
 		tests := []struct {
 			name      string
@@ -106,7 +106,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestFindByPlayerID(t *testing.T) {
-	t.Run("[repository]プレイヤーのデッキ一覧取得", func(t *testing.T) {
+	t.Run("[デッキリポジトリ]プレイヤーのデッキ一覧取得", func(t *testing.T) {
 		tests := []struct {
 			name      string
 			setup     func(t *testing.T)
@@ -160,7 +160,7 @@ func TestFindByPlayerID(t *testing.T) {
 }
 
 func TestFindByID(t *testing.T) {
-	t.Run("[repository]deck_id指定の取得", func(t *testing.T) {
+	t.Run("[デッキリポジトリ]deck_id指定の取得", func(t *testing.T) {
 		t.Run("自分のdeck_idのとき、デッキ全項目を返す", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			deckID := insertDeck(t, playerA, "Target Deck")
@@ -211,7 +211,7 @@ func TestFindByID(t *testing.T) {
 }
 
 func TestGetDeckCards(t *testing.T) {
-	t.Run("[repository]デッキ構成カードの取得", func(t *testing.T) {
+	t.Run("[デッキリポジトリ]デッキ構成カードの取得", func(t *testing.T) {
 		tests := []struct {
 			name      string
 			setup     func(t *testing.T) (string, int64) // target player_id, deck_id
@@ -261,7 +261,7 @@ func TestGetDeckCards(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	t.Run("[repository]デッキの更新", func(t *testing.T) {
+	t.Run("[デッキリポジトリ]デッキの更新", func(t *testing.T) {
 		t.Run("カード構成とdeck_name/playmat_noを更新するとき、差し替えで反映される", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			deckID := insertDeck(t, playerA, "Original")
@@ -306,7 +306,7 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	t.Run("[repository]デッキの削除", func(t *testing.T) {
+	t.Run("[デッキリポジトリ]デッキの削除", func(t *testing.T) {
 		tests := []struct {
 			name           string
 			setup          func(t *testing.T) (int64, int64) // target deck_id, other deck_id

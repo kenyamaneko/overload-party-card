@@ -36,7 +36,7 @@ func (f *fakeAddCardsErrorRepo) AddCards(_ context.Context, _ string, _ []domain
 }
 
 func TestGrantPack(t *testing.T) {
-	t.Run("[usecase]パック付与", func(t *testing.T) {
+	t.Run("[カードパック]パック付与", func(t *testing.T) {
 		t.Run("カードパックを配ると、含まれる各カードが枚数分プレイヤーに付与され、付与数は合計枚数になる", func(t *testing.T) {
 			packRepo := &fakeCardPackRepo{pack: &domain.CardPack{
 				IsActive: true,

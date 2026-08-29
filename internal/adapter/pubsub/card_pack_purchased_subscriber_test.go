@@ -19,7 +19,7 @@ func mustMarshalCardPackPurchased(t *testing.T, ev apishop.CardPackPurchasedEven
 }
 
 func TestCardPackPurchasedSubscriber_Handle(t *testing.T) {
-	t.Run("[pubsub]card_pack_purchasedイベントの処理", func(t *testing.T) {
+	t.Run("[カードパック購入購読]card_pack_purchasedイベントの処理", func(t *testing.T) {
 		validPayload := mustMarshalCardPackPurchased(t, apishop.CardPackPurchasedEvent{
 			EventID:    "evt-1",
 			PlayerID:   "player-1",

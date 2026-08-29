@@ -49,7 +49,7 @@ var validEnv = map[string]string{
 }
 
 func TestFromEnv(t *testing.T) {
-	t.Run("[config]環境変数からのConfig構築", func(t *testing.T) {
+	t.Run("[起動設定]環境変数からのConfig構築", func(t *testing.T) {
 		t.Run("必須envが揃うとき、全フィールドがConfigに伝搬する", func(t *testing.T) {
 			setEnv(t, validEnv)
 

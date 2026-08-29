@@ -35,7 +35,7 @@ func loadTestCache(t *testing.T) *CardCache {
 }
 
 func TestLoadFromBytes(t *testing.T) {
-	t.Run("[cache]生成カードキャッシュのロード", func(t *testing.T) {
+	t.Run("[カードキャッシュ]生成カードキャッシュのロード", func(t *testing.T) {
 		t.Run("0件JSONのとき、マスター欠落としてエラーになる", func(t *testing.T) {
 			cc := NewCardCache()
 			err := cc.LoadFromBytes([]byte(`[]`))
@@ -64,7 +64,7 @@ func TestLoadFromBytes(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
-	t.Run("[cache]DBからのカードキャッシュ読み込み", func(t *testing.T) {
+	t.Run("[カードキャッシュ]DBからのカードキャッシュ読み込み", func(t *testing.T) {
 		t.Run("DBに定義があるとき、読み込んだ定義が検索で引けるようになる", func(t *testing.T) {
 			repo := &stubCardRepo{cards: []*domain.Card{
 				{CardID: "TST-0001", CardName: "Test Card"},

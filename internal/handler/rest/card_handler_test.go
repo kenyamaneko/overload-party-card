@@ -15,7 +15,7 @@ import (
 func TestCardHandler_RepositoryFailure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("[handler]カードマスター取得", func(t *testing.T) {
+	t.Run("[カードAPI]カードマスター取得", func(t *testing.T) {
 		h, cardRepo, _ := newCardHandlerFixture()
 		cardRepo.findAllErr = errors.New("pq: connection refused")
 

@@ -38,7 +38,7 @@ func seedCardPack(t *testing.T, s cardPackSeed) {
 }
 
 func TestGetPack(t *testing.T) {
-	t.Run("[repository]card packの取得", func(t *testing.T) {
+	t.Run("[カードパックリポジトリ]card packの取得", func(t *testing.T) {
 		t.Run("該当packがあるとき、card_id昇順のCards付きで返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedCardPack(t, cardPackSeed{
