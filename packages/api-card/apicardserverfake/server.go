@@ -7,9 +7,6 @@
 // Fn が nil の endpoint は既定値を返す (happy-path を仮定した最低限の応答)。
 //
 // JSON request / response shape は cardclient が送受する形式に合わせる。
-// cardclient が private に保持している deckWithCards wrapper は本パッケージで
-// 独立に定義しなおし (DeckWithCardsResponse)、テスト側が typed で組み立てられる
-// ようにする。
 package apicardserverfake
 
 import (
@@ -21,18 +18,14 @@ import (
 	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 )
 
-// DeckWithCardsResponse は GetDeck endpoint の JSON envelope。
-// cardclient 側の private 型と shape 一致している必要があるため、本パッケージで
-// export しテストが typed に組み立てられるようにする。
-type DeckWithCardsResponse struct {
-	Deck  *apicard.Deck      `json:"deck"`
-	Cards []apicard.DeckCard `json:"cards"`
-}
-
 // Server は card HTTP 契約を実装する httptest.Server wrapper。
 type Server struct {
-	mu  sync.Mutex
-	srv *httptest.Server
+	mu                sync.Mutex
+	srv               *httptest.Server
+	lastRequestHeader http.Header
+
+	// GetHealthFn は GET /health の応答を決定する。
+	GetHealthFn func() (int, any)
 
 	// ListAllCardsFn は GET /internal/v1/cards (master 配信) の応答を決定する。
 	ListAllCardsFn func() (int, any)
@@ -66,6 +59,7 @@ type Server struct {
 func NewServer() *Server {
 	s := &Server{}
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", s.handleGetHealth)
 	mux.HandleFunc("GET /internal/v1/cards", s.handleListAllCards)
 	mux.HandleFunc("GET /api/v1/cards/cards/with-ownership", s.handleListCardsWithOwnership)
 	mux.HandleFunc("GET /api/v1/cards/cards", s.handleListPlayerCards)
@@ -75,7 +69,7 @@ func NewServer() *Server {
 	mux.HandleFunc("PUT /api/v1/cards/decks/{deckID}", s.handleUpdateDeck)
 	mux.HandleFunc("DELETE /api/v1/cards/decks/{deckID}", s.handleDeleteDeck)
 	mux.HandleFunc("POST /api/v1/cards/decks/{deckID}/validate-for-battle", s.handleValidateDeckForBattle)
-	s.srv = httptest.NewServer(mux)
+	s.srv = httptest.NewServer(s.recordRequestHeader(mux))
 	return s
 }
 
@@ -84,6 +78,35 @@ func (s *Server) URL() string { return s.srv.URL }
 
 // Close は内部 httptest.Server を閉じる。
 func (s *Server) Close() { s.srv.Close() }
+
+// LastRequestHeader は直近に受信したリクエストのヘッダを返す。
+// RequestEditorFn が実際に送信されたリクエストへ反映されたかを確認するために使う。
+func (s *Server) LastRequestHeader() http.Header {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lastRequestHeader
+}
+
+func (s *Server) recordRequestHeader(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		s.lastRequestHeader = r.Header.Clone()
+		s.mu.Unlock()
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) handleGetHealth(w http.ResponseWriter, _ *http.Request) {
+	s.mu.Lock()
+	fn := s.GetHealthFn
+	s.mu.Unlock()
+	if fn == nil {
+		writeJSON(w, http.StatusOK, apicard.HealthResponse{Status: "ok"})
+		return
+	}
+	status, body := fn()
+	writeJSON(w, status, body)
+}
 
 func (s *Server) handleListAllCards(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
@@ -139,7 +162,7 @@ func (s *Server) handleGetDeck(w http.ResponseWriter, r *http.Request) {
 	s.mu.Unlock()
 	deckID := r.PathValue("deckID")
 	if fn == nil {
-		writeJSON(w, http.StatusOK, DeckWithCardsResponse{Cards: []apicard.DeckCard{}})
+		writeJSON(w, http.StatusOK, apicard.Deck{})
 		return
 	}
 	status, body := fn(deckID)
