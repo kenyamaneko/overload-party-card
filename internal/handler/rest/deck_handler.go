@@ -43,12 +43,12 @@ func (h *DeckHandler) GetDeck(c *gin.Context) {
 		return
 	}
 
-	deck, cards, err := h.deckInteractor.GetDeck(c.Request.Context(), playerID, deckID)
+	deck, err := h.deckInteractor.GetDeck(c.Request.Context(), playerID, deckID)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"deck": deck, "cards": cards})
+	c.JSON(http.StatusOK, deck)
 }
 
 // CreateDeck は新しいデッキを作成します。
