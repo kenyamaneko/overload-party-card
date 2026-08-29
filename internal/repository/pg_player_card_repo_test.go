@@ -6,168 +6,189 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
 	"github.com/kenyamaneko/overload-party-card/internal/repository"
 )
 
-type ownedRow struct {
-	cardID string
-	artNo  int64
-	count  int
-}
+func TestPlayerCardRepoGetPlayerCards(t *testing.T) {
+	t.Run("[所持カードリポジトリ] 所持カード取得", func(t *testing.T) {
+		t.Run("指定プレイヤーの所持カードが0件のとき、空の一覧を返す", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
 
-func TestGetPlayerCards(t *testing.T) {
-	t.Run("所持カード一覧の取得", func(t *testing.T) {
-		tests := []struct {
-			name   string
-			seeds  []playerCardSeed
-			target string
-			want   []ownedRow
-		}{
-			{
-				name: "複数所持のとき、card_id / art_no昇順で返る",
-				seeds: []playerCardSeed{
-					{playerA, "SH-0002", 0, 3},
-					{playerA, "SH-0001", 1, 1},
-					{playerA, "SH-0001", 0, 2},
-				},
-				target: playerA,
-				want: []ownedRow{
-					{"SH-0001", 0, 2},
-					{"SH-0001", 1, 1},
-					{"SH-0002", 0, 3},
-				},
-			},
-			{
-				name: "他プレイヤーの行があるとき、除外される (PKスコープ)",
-				seeds: []playerCardSeed{
-					{playerA, "SH-0001", 0, 1},
-					{playerB, "SH-0002", 0, 5},
-				},
-				target: playerA,
-				want: []ownedRow{
-					{"SH-0001", 0, 1},
-				},
-			},
-			{
-				name:   "未所持プレイヤーのとき、空スライスになる",
-				seeds:  []playerCardSeed{{playerB, "SH-0001", 0, 1}},
-				target: playerA,
-				want:   nil,
-			},
-		}
+			got, err := repo.GetPlayerCards(context.Background(), playerA)
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				sharedPg.Truncate(t)
-				for _, s := range tt.seeds {
-					seedPlayerCard(t, s)
-				}
+			require.NoError(t, err)
+			require.Empty(t, got)
+		})
 
-				repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
-				got, err := repo.GetPlayerCards(context.Background(), tt.target)
-				require.NoError(t, err)
+		t.Run("指定プレイヤーの所持カードがあるとき、それらを返す", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedPlayerCard(t, playerCardSeed{PlayerID: playerA, CardID: "TST-0001", ArtNo: 0, Count: 3})
+			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
 
-				var gotRows []ownedRow
-				for _, pc := range got {
-					gotRows = append(gotRows, ownedRow{pc.CardID, pc.ArtNo, pc.Count})
-				}
-				assert.Equal(t, tt.want, gotRows)
-			})
-		}
+			got, err := repo.GetPlayerCards(context.Background(), playerA)
+
+			require.NoError(t, err)
+			require.Len(t, got, 1)
+			require.Equal(t, "TST-0001", got[0].CardID)
+		})
+
+		t.Run("別プレイヤーの所持カードは、返る一覧に含まれない", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedPlayerCard(t, playerCardSeed{PlayerID: playerB, CardID: "TST-0001", ArtNo: 0, Count: 3})
+			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
+
+			got, err := repo.GetPlayerCards(context.Background(), playerA)
+
+			require.NoError(t, err)
+			require.Empty(t, got)
+		})
+
+		t.Run("card_idが異なる所持カードが複数件あるとき、card_idの昇順で返る", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedPlayerCard(t, playerCardSeed{PlayerID: playerA, CardID: "TST-0003", ArtNo: 0, Count: 1})
+			seedPlayerCard(t, playerCardSeed{PlayerID: playerA, CardID: "TST-0001", ArtNo: 0, Count: 1})
+			seedPlayerCard(t, playerCardSeed{PlayerID: playerA, CardID: "TST-0002", ArtNo: 0, Count: 1})
+			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
+
+			got, err := repo.GetPlayerCards(context.Background(), playerA)
+
+			require.NoError(t, err)
+			require.Len(t, got, 3)
+			require.Equal(t, []string{"TST-0001", "TST-0002", "TST-0003"},
+				[]string{got[0].CardID, got[1].CardID, got[2].CardID})
+		})
+
+		t.Run("同じcard_idでart_noが異なる所持カードが複数件あるとき、art_noの昇順で返る", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedPlayerCard(t, playerCardSeed{PlayerID: playerA, CardID: "TST-0001", ArtNo: 2, Count: 1})
+			seedPlayerCard(t, playerCardSeed{PlayerID: playerA, CardID: "TST-0001", ArtNo: 0, Count: 1})
+			seedPlayerCard(t, playerCardSeed{PlayerID: playerA, CardID: "TST-0001", ArtNo: 1, Count: 1})
+			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
+
+			got, err := repo.GetPlayerCards(context.Background(), playerA)
+
+			require.NoError(t, err)
+			require.Len(t, got, 3)
+			require.Equal(t, []int64{0, 1, 2}, []int64{got[0].ArtNo, got[1].ArtNo, got[2].ArtNo})
+		})
+
+		t.Run("保存したPlayerID/CardID/ArtNo/Countの値が、そのまま返る", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedPlayerCard(t, playerCardSeed{PlayerID: playerA, CardID: "TST-0001", ArtNo: 3, Count: 9})
+			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
+
+			got, err := repo.GetPlayerCards(context.Background(), playerA)
+
+			require.NoError(t, err)
+			require.Len(t, got, 1)
+			require.Equal(t, &domain.PlayerCard{PlayerID: playerA, CardID: "TST-0001", ArtNo: 3, Count: 9}, got[0])
+		})
 	})
 }
 
-func TestAddCards(t *testing.T) {
-	t.Run("所持カードのUPSERT加算", func(t *testing.T) {
-		bulkCards, bulkExpected := bulkCardPackCards(30, 3)
-
-		tests := []struct {
-			name           string
-			seeds          []playerCardSeed
-			cards          []domain.CardPackCard
-			wantGranted    int
-			wantFinalCount map[string]int // card_id (art_no=0) → 期待 count
-		}{
-			{
-				name:  "全て新規カードのとき、INSERTされる",
-				seeds: nil,
-				cards: []domain.CardPackCard{
-					{CardID: "SH-0001", Copies: 3},
-					{CardID: "SH-0002", Copies: 3},
-				},
-				wantGranted:    6,
-				wantFinalCount: map[string]int{"SH-0001": 3, "SH-0002": 3},
-			},
-			{
-				name: "既所持カードのとき、countに加算される (UPSERT)",
-				seeds: []playerCardSeed{
-					{playerA, "SH-0001", 0, 2},
-				},
-				cards:          []domain.CardPackCard{{CardID: "SH-0001", Copies: 3}},
-				wantGranted:    3,
-				wantFinalCount: map[string]int{"SH-0001": 5},
-			},
-			{
-				name: "カードごとに枚数が異なるとき、それぞれ一括加算される",
-				seeds: []playerCardSeed{
-					{playerA, "SH-0001", 0, 1},
-				},
-				cards: []domain.CardPackCard{
-					{CardID: "SH-0001", Copies: 3},
-					{CardID: "SH-0002", Copies: 1},
-				},
-				wantGranted:    4,
-				wantFinalCount: map[string]int{"SH-0001": 4, "SH-0002": 1},
-			},
-			{
-				name:           "30種類 (実grantスケール)のとき、1文のbulk UPSERTで投入される",
-				seeds:          nil,
-				cards:          bulkCards,
-				wantGranted:    90,
-				wantFinalCount: bulkExpected,
-			},
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				sharedPg.Truncate(t)
-				for _, s := range tt.seeds {
-					seedPlayerCard(t, s)
-				}
-
-				repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
-				got, err := repo.AddCards(context.Background(), playerA, tt.cards)
-				require.NoError(t, err)
-				assert.Equal(t, tt.wantGranted, got)
-
-				for cid, wantCount := range tt.wantFinalCount {
-					gotCount, ok := fetchPlayerCardCount(t, playerA, cid, 0)
-					assert.Truef(t, ok, "expected row for card_id=%s", cid)
-					assert.Equalf(t, wantCount, gotCount, "final count for card_id=%s", cid)
-				}
-			})
-		}
-
-		t.Run("別アート(art_no=1)のみ所持するカードを配布すると、加算ではなく通常アート(art_no=0)の行が新規作成される", func(t *testing.T) {
+func TestPlayerCardRepoAddCards(t *testing.T) {
+	t.Run("[所持カードリポジトリ] 所持カード加算", func(t *testing.T) {
+		t.Run("空のカード一覧を渡したとき、所持カードの枚数は変化せず、加算したコピー総数として0を返す", func(t *testing.T) {
 			sharedPg.Truncate(t)
-			seedPlayerCard(t, playerCardSeed{playerA, "TST-0001", 1, 2})
-
+			seedPlayerCard(t, playerCardSeed{PlayerID: playerA, CardID: "TST-0001", ArtNo: 0, Count: 5})
 			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
-			got, err := repo.AddCards(context.Background(), playerA, []domain.CardPackCard{{CardID: "TST-0001", Copies: 3}})
+
+			total, err := repo.AddCards(context.Background(), playerA, []domain.CardPackCard{})
+
 			require.NoError(t, err)
-			assert.Equal(t, 3, got)
+			require.Equal(t, 0, total)
+			count, ok := fetchPlayerCardCount(t, playerA, "TST-0001", 0)
+			require.True(t, ok)
+			require.Equal(t, 5, count)
+		})
 
-			count0, ok0 := fetchPlayerCardCount(t, playerA, "TST-0001", 0)
-			assert.True(t, ok0)
-			assert.Equal(t, 3, count0)
+		t.Run("指定したカードをart_no0で所持していないプレイヤーに対してAddCardsを実行すると、指定した枚数でart_no0の所持カード行が新規に作られる", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
 
-			count1, ok1 := fetchPlayerCardCount(t, playerA, "TST-0001", 1)
-			assert.True(t, ok1)
-			assert.Equal(t, 2, count1)
+			_, err := repo.AddCards(context.Background(), playerA, []domain.CardPackCard{{CardID: "TST-0001", Copies: 4}})
+
+			require.NoError(t, err)
+			count, ok := fetchPlayerCardCount(t, playerA, "TST-0001", 0)
+			require.True(t, ok)
+			require.Equal(t, 4, count)
+		})
+
+		t.Run("指定したカードを既にart_no0で所持しているプレイヤーに対してAddCardsを実行すると、既存の所持枚数に指定した枚数が加算される", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedPlayerCard(t, playerCardSeed{PlayerID: playerA, CardID: "TST-0001", ArtNo: 0, Count: 5})
+			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
+
+			_, err := repo.AddCards(context.Background(), playerA, []domain.CardPackCard{{CardID: "TST-0001", Copies: 3}})
+
+			require.NoError(t, err)
+			count, ok := fetchPlayerCardCount(t, playerA, "TST-0001", 0)
+			require.True(t, ok)
+			require.Equal(t, 8, count)
+		})
+
+		t.Run("指定したカードをart_no0以外のアート番号で所持しているプレイヤーに対してAddCardsを実行すると、そのアート番号の所持枚数は変化せず、別途art_no0の所持カード行が新規に作られる", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedPlayerCard(t, playerCardSeed{PlayerID: playerA, CardID: "TST-0001", ArtNo: 5, Count: 2})
+			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
+
+			_, err := repo.AddCards(context.Background(), playerA, []domain.CardPackCard{{CardID: "TST-0001", Copies: 3}})
+
+			require.NoError(t, err)
+			artNo5Count, ok := fetchPlayerCardCount(t, playerA, "TST-0001", 5)
+			require.True(t, ok)
+			require.Equal(t, 2, artNo5Count)
+			artNo0Count, ok := fetchPlayerCardCount(t, playerA, "TST-0001", 0)
+			require.True(t, ok)
+			require.Equal(t, 3, artNo0Count)
+		})
+
+		t.Run("複数カードを一括で加算したとき、それぞれのカードの枚数が個別に加算される", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
+
+			_, err := repo.AddCards(context.Background(), playerA, []domain.CardPackCard{
+				{CardID: "TST-0001", Copies: 2},
+				{CardID: "TST-0002", Copies: 5},
+			})
+
+			require.NoError(t, err)
+			count1, ok := fetchPlayerCardCount(t, playerA, "TST-0001", 0)
+			require.True(t, ok)
+			require.Equal(t, 2, count1)
+			count2, ok := fetchPlayerCardCount(t, playerA, "TST-0002", 0)
+			require.True(t, ok)
+			require.Equal(t, 5, count2)
+		})
+
+		t.Run("戻り値は、渡した各カードの加算枚数の合計値になる", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
+
+			total, err := repo.AddCards(context.Background(), playerA, []domain.CardPackCard{
+				{CardID: "TST-0001", Copies: 2},
+				{CardID: "TST-0002", Copies: 5},
+			})
+
+			require.NoError(t, err)
+			require.Equal(t, 7, total)
+		})
+
+		t.Run("別プレイヤーの所持カードは、AddCardsの対象にならない", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedPlayerCard(t, playerCardSeed{PlayerID: playerB, CardID: "TST-0001", ArtNo: 0, Count: 5})
+			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
+
+			_, err := repo.AddCards(context.Background(), playerA, []domain.CardPackCard{{CardID: "TST-0001", Copies: 3}})
+
+			require.NoError(t, err)
+			count, ok := fetchPlayerCardCount(t, playerB, "TST-0001", 0)
+			require.True(t, ok)
+			require.Equal(t, 5, count)
 		})
 	})
 }

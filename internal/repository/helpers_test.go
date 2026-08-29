@@ -6,14 +6,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
-
-	"github.com/kenyamaneko/overload-party-card/internal/domain"
 )
 
 // cardSeed は card.card_definitions への最小シード入力。
@@ -216,16 +213,60 @@ const (
 	playerB = "22222222-2222-2222-2222-222222222222"
 )
 
-// bulkCardPackCards は AddCards の bulk UPSERT を実 grant スケール (数十枚) で
-// 検証するためのフィクスチャを生成する。n 件の (card_id, copies) ペアと
-// 「全件 copies コピーずつ」の期待値マップをペアで返す。
-func bulkCardPackCards(n, copies int) ([]domain.CardPackCard, map[string]int) {
-	cards := make([]domain.CardPackCard, n)
-	expected := make(map[string]int, n)
-	for i := range cards {
-		id := fmt.Sprintf("BK-%04d", i+1)
-		cards[i] = domain.CardPackCard{CardID: id, Copies: copies}
-		expected[id] = copies
-	}
-	return cards, expected
+// cardPackSeed は card.card_pack への最小シード入力。
+type cardPackSeed struct {
+	PackID   string
+	IsActive bool
+}
+
+func seedCardPack(t *testing.T, s cardPackSeed) {
+	t.Helper()
+	_, err := sharedPg.Pool.Exec(context.Background(),
+		`INSERT INTO card.card_pack (pack_id, is_active) VALUES ($1, $2)`,
+		s.PackID, s.IsActive)
+	require.NoError(t, err)
+}
+
+// fullCardPackSeed は card.card_pack への全列シード入力。GetPack の全フィールド
+// 写像を検証するテスト用に、省略可能なカラムも含め明示的に指定する。
+type fullCardPackSeed struct {
+	PackID      string
+	Description string
+	IsActive    bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+func seedFullCardPack(t *testing.T, s fullCardPackSeed) {
+	t.Helper()
+	_, err := sharedPg.Pool.Exec(context.Background(),
+		`INSERT INTO card.card_pack (pack_id, description, is_active, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5)`,
+		s.PackID, s.Description, s.IsActive, s.CreatedAt, s.UpdatedAt)
+	require.NoError(t, err)
+}
+
+func seedCardPackCard(t *testing.T, packID, cardID string, copies int) {
+	t.Helper()
+	_, err := sharedPg.Pool.Exec(context.Background(),
+		`INSERT INTO card.card_pack_cards (pack_id, card_id, copies) VALUES ($1, $2, $3)`,
+		packID, cardID, copies)
+	require.NoError(t, err)
+}
+
+// fetchProcessedEventType は card.processed_events の指定行の event_type を返す。
+// Insert の冪等性 (先勝ち) を DB 直読みで確認するために使う。
+func fetchProcessedEventType(t *testing.T, eventID string) string {
+	t.Helper()
+	var eventType string
+	err := sharedPg.Pool.QueryRow(context.Background(),
+		`SELECT event_type FROM card.processed_events WHERE event_id = $1`, eventID).Scan(&eventType)
+	require.NoError(t, err)
+	return eventType
+}
+
+// int64Ptr はテストで PlaymatNo / SleeveNo のような *int64 フィールドを
+// リテラルから組み立てるためのヘルパー。
+func int64Ptr(v int64) *int64 {
+	return &v
 }
