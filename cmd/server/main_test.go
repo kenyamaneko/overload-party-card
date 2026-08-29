@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -272,7 +273,7 @@ func TestMainProcessExit(t *testing.T) {
 
 			cmd := exec.Command(execPath)
 			cmd.Env = []string{mainSubprocessEnvKey + "=1"}
-			var stderr strings.Builder
+			var stderr bytes.Buffer
 			cmd.Stderr = &stderr
 
 			runErr := cmd.Run()
