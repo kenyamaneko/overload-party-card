@@ -139,16 +139,16 @@ func (c *Client) ListDecks(ctx context.Context) ([]apicard.Deck, error) {
 	return nil, newStatusError("ListDecks", resp.StatusCode())
 }
 
-// GetDeck はデッキ詳細 (deck メタとカード構成) を返す。
-func (c *Client) GetDeck(ctx context.Context, deckID int64) (*apicard.Deck, []apicard.DeckCard, error) {
+// GetDeck はデッキ詳細を返す。カード構成は応答の deck_cards フィールドに含まれる。
+func (c *Client) GetDeck(ctx context.Context, deckID int64) (*apicard.Deck, error) {
 	resp, err := c.api.GetDeckWithResponse(ctx, deckID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("apicardclient: GetDeck: %w", err)
+		return nil, fmt.Errorf("apicardclient: GetDeck: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return &resp.JSON200.Deck, resp.JSON200.Cards, nil
+		return resp.JSON200, nil
 	}
-	return nil, nil, newStatusError("GetDeck", resp.StatusCode())
+	return nil, newStatusError("GetDeck", resp.StatusCode())
 }
 
 // CreateDeck は新しいデッキを作成する。

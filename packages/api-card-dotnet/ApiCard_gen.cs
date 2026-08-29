@@ -75,6 +75,36 @@ namespace OverloadParty.ApiCard
         System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Initiative>> ListInitiativesAsync(System.Threading.CancellationToken cancellationToken);
 
         /// <summary>
+        /// player-onboarded-card-sub の Cloud Pub/Sub push 配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM)
+        /// </summary>
+        /// <returns>処理完了</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task PubsubPlayerOnboardedAsync(PubSubPushEnvelope body);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// player-onboarded-card-sub の Cloud Pub/Sub push 配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM)
+        /// </summary>
+        /// <returns>処理完了</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task PubsubPlayerOnboardedAsync(PubSubPushEnvelope body, System.Threading.CancellationToken cancellationToken);
+
+        /// <summary>
+        /// card-pack-purchased-card-sub の Cloud Pub/Sub push 配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM)
+        /// </summary>
+        /// <returns>処理完了</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task PubsubCardPackPurchasedAsync(PubSubPushEnvelope body);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// card-pack-purchased-card-sub の Cloud Pub/Sub push 配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM)
+        /// </summary>
+        /// <returns>処理完了</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task PubsubCardPackPurchasedAsync(PubSubPushEnvelope body, System.Threading.CancellationToken cancellationToken);
+
+        /// <summary>
         /// 全プロダクト定義を返す (client のデッキ構築・プロダクト表示用)
         /// </summary>
         /// <returns>プロダクト定義一覧</returns>
@@ -152,17 +182,17 @@ namespace OverloadParty.ApiCard
         /// <summary>
         /// 指定デッキの詳細 (カード構成を含む) を返す
         /// </summary>
-        /// <returns>デッキ詳細</returns>
+        /// <returns>デッキ詳細 (カード構成は deck.deck_cards に含まれる)</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DeckDetailResponse> GetDeckAsync(long deckId);
+        System.Threading.Tasks.Task<Deck> GetDeckAsync(long deckId);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// 指定デッキの詳細 (カード構成を含む) を返す
         /// </summary>
-        /// <returns>デッキ詳細</returns>
+        /// <returns>デッキ詳細 (カード構成は deck.deck_cards に含まれる)</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DeckDetailResponse> GetDeckAsync(long deckId, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<Deck> GetDeckAsync(long deckId, System.Threading.CancellationToken cancellationToken);
 
         /// <summary>
         /// 既存デッキを更新する
@@ -480,6 +510,200 @@ namespace OverloadParty.ApiCard
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             return objectResponse_.Object;
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// player-onboarded-card-sub の Cloud Pub/Sub push 配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM)
+        /// </summary>
+        /// <returns>処理完了</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task PubsubPlayerOnboardedAsync(PubSubPushEnvelope body)
+        {
+            return PubsubPlayerOnboardedAsync(body, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// player-onboarded-card-sub の Cloud Pub/Sub push 配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM)
+        /// </summary>
+        /// <returns>処理完了</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task PubsubPlayerOnboardedAsync(PubSubPushEnvelope body, System.Threading.CancellationToken cancellationToken)
+        {
+            if (body == null)
+                throw new System.ArgumentNullException("body");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    var json_ = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.ByteArrayContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("POST");
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "internal/v1/pubsub/player-onboarded"
+                    urlBuilder_.Append("internal/v1/pubsub/player-onboarded");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            return;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("envelope \u307e\u305f\u306f base64 \u30c7\u30fc\u30bf\u304c\u4e0d\u6b63", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("\u30a4\u30d9\u30f3\u30c8\u51e6\u7406\u306b\u5931\u6557", status_, responseText_, headers_, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// card-pack-purchased-card-sub の Cloud Pub/Sub push 配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM)
+        /// </summary>
+        /// <returns>処理完了</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task PubsubCardPackPurchasedAsync(PubSubPushEnvelope body)
+        {
+            return PubsubCardPackPurchasedAsync(body, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// card-pack-purchased-card-sub の Cloud Pub/Sub push 配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM)
+        /// </summary>
+        /// <returns>処理完了</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task PubsubCardPackPurchasedAsync(PubSubPushEnvelope body, System.Threading.CancellationToken cancellationToken)
+        {
+            if (body == null)
+                throw new System.ArgumentNullException("body");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    var json_ = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.ByteArrayContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("POST");
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "internal/v1/pubsub/card-pack-purchased"
+                    urlBuilder_.Append("internal/v1/pubsub/card-pack-purchased");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            return;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("envelope \u307e\u305f\u306f base64 \u30c7\u30fc\u30bf\u304c\u4e0d\u6b63", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("\u30a4\u30d9\u30f3\u30c8\u51e6\u7406\u306b\u5931\u6557", status_, responseText_, headers_, null);
                         }
                         else
                         {
@@ -1003,9 +1227,9 @@ namespace OverloadParty.ApiCard
         /// <summary>
         /// 指定デッキの詳細 (カード構成を含む) を返す
         /// </summary>
-        /// <returns>デッキ詳細</returns>
+        /// <returns>デッキ詳細 (カード構成は deck.deck_cards に含まれる)</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<DeckDetailResponse> GetDeckAsync(long deckId)
+        public virtual System.Threading.Tasks.Task<Deck> GetDeckAsync(long deckId)
         {
             return GetDeckAsync(deckId, System.Threading.CancellationToken.None);
         }
@@ -1014,9 +1238,9 @@ namespace OverloadParty.ApiCard
         /// <summary>
         /// 指定デッキの詳細 (カード構成を含む) を返す
         /// </summary>
-        /// <returns>デッキ詳細</returns>
+        /// <returns>デッキ詳細 (カード構成は deck.deck_cards に含まれる)</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<DeckDetailResponse> GetDeckAsync(long deckId, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Deck> GetDeckAsync(long deckId, System.Threading.CancellationToken cancellationToken)
         {
             if (deckId == null)
                 throw new System.ArgumentNullException("deckId");
@@ -1061,7 +1285,7 @@ namespace OverloadParty.ApiCard
                         var status_ = (int)response_.StatusCode;
                         if (status_ == 200)
                         {
-                            var objectResponse_ = await ReadObjectResponseAsync<DeckDetailResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            var objectResponse_ = await ReadObjectResponseAsync<Deck>(response_, headers_, cancellationToken).ConfigureAwait(false);
                             if (objectResponse_.Object == null)
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
@@ -1592,6 +1816,27 @@ namespace OverloadParty.ApiCard
 
         [System.Text.Json.Serialization.JsonPropertyName("status")]
         public string Status { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    /// <summary>
+    /// Cloud Pub/Sub push subscription が送るリクエスト本文の envelope。
+    /// </summary>
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class PubSubPushEnvelope
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("message")]
+        public Message Message { get; set; } = new Message();
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -2347,30 +2592,6 @@ namespace OverloadParty.ApiCard
     }
 
     /// <summary>
-    /// GET /players/{playerId}/decks/{deckId} のレスポンス封筒。
-    /// </summary>
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial class DeckDetailResponse
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("deck")]
-        public Deck Deck { get; set; } = new Deck();
-
-        [System.Text.Json.Serialization.JsonPropertyName("cards")]
-        public System.Collections.Generic.List<DeckCard> Cards { get; set; } = new System.Collections.Generic.List<DeckCard>();
-
-        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
-
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
-
-    }
-
-    /// <summary>
     /// パッシブエフェクトの種別。
     /// </summary>
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -2427,6 +2648,27 @@ namespace OverloadParty.ApiCard
 
         [System.Runtime.Serialization.EnumMember(Value = @"stat_bonus")]
         Stat_bonus = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class Message
+    {
+
+        /// <summary>
+        /// base64 エンコードされたイベント payload。
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("data")]
+        public byte[] Data { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
 
     }
 
