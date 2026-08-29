@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,92 +12,82 @@ import (
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
 	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
+	gamedesign "github.com/kenyamaneko/overload-party-common/packages/game-design-constants"
 )
 
-// cardCacheWith は渡したカード定義だけを保持する CardCache を組み立てる。
-func cardCacheWith(cards ...*domain.Card) *cache.CardCache {
+// newPlayerCardFixture は fakePlayerCardRepo / cache.CardCache を差し替え可能な
+// PlayerCardInteractor を返す。
+func newPlayerCardFixture() (*PlayerCardInteractor, *fakePlayerCardRepo, *cache.CardCache) {
+	playerCardRepo := newFakePlayerCardRepo()
 	cc := cache.NewCardCache()
-	for _, c := range cards {
-		cc.InjectForTest(c.CardID, c)
-	}
-	return cc
+	return NewPlayerCardInteractor(playerCardRepo, cc), playerCardRepo, cc
 }
 
-func TestPlayerCardInteractor_GetPlayerCards(t *testing.T) {
-	t.Run("所持カードの取得", func(t *testing.T) {
-		t.Run("所持カードがあるとき、所持枚数はplayer_cards・カード定義はCardCacheから構成して返す", func(t *testing.T) {
-			effectText := "対象を 1 体破壊する"
-			def := &domain.Card{
-				CardID: "TST-0001", CardName: "Fireball", ResourceLabel: "mana",
-				Faction: "SHE", CardType: "spell", Resizable: true, Elastic: false,
-				Stats: json.RawMessage(`{"atk":3}`), EffectText: &effectText, Restriction: "limited",
-			}
-			owned := &domain.PlayerCard{PlayerID: "player-1", CardID: def.CardID, ArtNo: 7, Count: 3}
+func TestGetPlayerCards(t *testing.T) {
+	t.Run("[所持カード]所持カード一覧取得", func(t *testing.T) {
+		t.Run("プレイヤー所持カードの取得元がエラーを返すとき、そのエラーをそのまま返す", func(t *testing.T) {
+			interactor, playerCardRepo, _ := newPlayerCardFixture()
+			injected := errors.New("player card repo unavailable")
+			playerCardRepo.getErr = injected
 
-			repo := newInMemoryPlayerCardRepo()
-			repo.Seed(owned.PlayerID, []*domain.PlayerCard{owned})
-			svc := NewPlayerCardInteractor(repo, cardCacheWith(def))
+			_, err := interactor.GetPlayerCards(context.Background(), fxPlayerID)
 
-			got, err := svc.GetPlayerCards(context.Background(), owned.PlayerID)
-			require.NoError(t, err)
-
-			want := []*apicard.PlayerCardWithDef{{
-				CardID: owned.CardID, ArtNo: owned.ArtNo, Count: owned.Count,
-				CardName: def.CardName, ResourceLabel: def.ResourceLabel, Faction: def.Faction,
-				CardType: def.CardType, Resizable: def.Resizable, Elastic: def.Elastic,
-				Stats: def.Stats, EffectText: def.EffectText, Restriction: def.Restriction,
-			}}
-			assert.Equal(t, want, got)
+			require.Error(t, err)
+			assert.ErrorIs(t, err, injected)
 		})
 
-		t.Run("所持カードが無いとき、nilではなく空スライスを返す", func(t *testing.T) {
-			svc := NewPlayerCardInteractor(newInMemoryPlayerCardRepo(), cardCacheWith())
+		t.Run("プレイヤーが所持カードを1件も持たないとき、空の一覧を返す", func(t *testing.T) {
+			interactor, _, _ := newPlayerCardFixture()
 
-			got, err := svc.GetPlayerCards(context.Background(), "player-1")
+			result, err := interactor.GetPlayerCards(context.Background(), fxPlayerID)
+
 			require.NoError(t, err)
-			assert.Equal(t, []*apicard.PlayerCardWithDef{}, got)
+			assert.Empty(t, result)
 		})
 
-		t.Run("所持カードがCardCacheに無いとき、黙ってスキップせず不足カードIDを含むエラーを返す", func(t *testing.T) {
-			tests := []struct {
-				name        string
-				cache       []*domain.Card
-				seed        []*domain.PlayerCard
-				missingCard string
-			}{
-				{
-					name:  "唯一の所持カードがcacheに無いとき、そのカードIDを含むエラーになる",
-					cache: nil,
-					seed: []*domain.PlayerCard{
-						{PlayerID: "player-1", CardID: "TST-0001", ArtNo: 1, Count: 1},
-					},
-					missingCard: "TST-0001",
-				},
-				{
-					name: "複数所持のうち1枚がcacheに無いとき、そのカードIDを含むエラーになる",
-					cache: []*domain.Card{
-						{CardID: "TST-0001", CardName: "Fireball"},
-					},
-					seed: []*domain.PlayerCard{
-						{PlayerID: "player-1", CardID: "TST-0001", ArtNo: 1, Count: 1},
-						{PlayerID: "player-1", CardID: "TST-9999", ArtNo: 1, Count: 1},
-					},
-					missingCard: "TST-9999",
-				},
-			}
+		t.Run("プレイヤーが所持するカードのカードIDがカード定義キャッシュに存在しないとき、エラーを返す", func(t *testing.T) {
+			interactor, playerCardRepo, _ := newPlayerCardFixture()
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-UNDEFINED", ArtNo: 1, Count: 1})
 
-			for _, tt := range tests {
-				t.Run(tt.name, func(t *testing.T) {
-					pcRepo := newInMemoryPlayerCardRepo()
-					pcRepo.Seed("player-1", tt.seed)
-					svc := NewPlayerCardInteractor(pcRepo, cardCacheWith(tt.cache...))
+			_, err := interactor.GetPlayerCards(context.Background(), fxPlayerID)
 
-					got, err := svc.GetPlayerCards(context.Background(), "player-1")
-					require.Error(t, err)
-					assert.ErrorContains(t, err, tt.missingCard)
-					assert.Nil(t, got)
-				})
+			require.Error(t, err)
+			assert.ErrorContains(t, err, "cache")
+		})
+
+		t.Run("プレイヤーが所持するカードがすべてカード定義キャッシュに存在するとき、返る一覧の各要素には所持カードのcard_id/art_no/countと、カード定義キャッシュ上の対応するカード定義の内容(card_name/faction/card_type/restriction等)が組み合わさって反映される", func(t *testing.T) {
+			interactor, playerCardRepo, cc := newPlayerCardFixture()
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 3, Count: 2})
+			cc.InjectForTest("TST-0001", &domain.Card{
+				CardID:        "TST-0001",
+				CardName:      "Test Compute",
+				ResourceLabel: "vCPU",
+				Faction:       fxFaction,
+				CardType:      gamedesign.CardTypeCompute,
+				Resizable:     true,
+				Elastic:       true,
+				Stats:         json.RawMessage(`{"tp":1}`),
+				Restriction:   gamedesign.RestrictionUnlimited,
+			})
+
+			result, err := interactor.GetPlayerCards(context.Background(), fxPlayerID)
+
+			require.NoError(t, err)
+			require.Len(t, result, 1)
+			want := &apicard.PlayerCardWithDef{
+				CardID:        "TST-0001",
+				ArtNo:         3,
+				Count:         2,
+				CardName:      "Test Compute",
+				ResourceLabel: "vCPU",
+				Faction:       fxFaction,
+				CardType:      gamedesign.CardTypeCompute,
+				Resizable:     true,
+				Elastic:       true,
+				Stats:         json.RawMessage(`{"tp":1}`),
+				Restriction:   gamedesign.RestrictionUnlimited,
 			}
+			assert.Equal(t, want, result[0])
 		})
 	})
 }
