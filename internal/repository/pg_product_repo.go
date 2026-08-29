@@ -33,7 +33,7 @@ func (r *PgProductRepository) FindAll(ctx context.Context) ([]*domain.Product, e
 	}
 	defer rows.Close()
 
-	var products []*domain.Product
+	products := make([]*domain.Product, 0)
 	for rows.Next() {
 		var p domain.Product
 		if err := rows.Scan(&p.ProductID, &p.Faction, &p.ProductName, &p.IsActive); err != nil {

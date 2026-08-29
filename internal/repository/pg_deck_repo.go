@@ -150,7 +150,7 @@ func (r *PgDeckRepository) Update(ctx context.Context, deck domain.Deck, deckCar
 		return fmt.Errorf("delete old deck cards: %w", err)
 	}
 
-	_, err = tx.Exec(ctx,
+	tag, err := tx.Exec(ctx,
 		`UPDATE card.decks SET deck_name = $1, faction = $2, product_id = $3, routine_id = $4, special_id = $5, playmat_no = $6, sleeve_no = $7, updated_at = $8
 		 WHERE player_id = $9 AND deck_id = $10`,
 		deck.DeckName,
@@ -167,6 +167,9 @@ func (r *PgDeckRepository) Update(ctx context.Context, deck domain.Deck, deckCar
 	if err != nil {
 		return fmt.Errorf("update deck: %w", err)
 	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("%w: deck %d", port.ErrNotFound, deck.DeckID)
+	}
 
 	cards := buildDeckCards(deck.PlayerID, deck.DeckID, deckCardEntries)
 	if err := bulkInsertDeckCards(ctx, tx, cards); err != nil {
@@ -177,12 +180,15 @@ func (r *PgDeckRepository) Update(ctx context.Context, deck domain.Deck, deckCar
 
 // Delete は指定デッキを削除します。
 func (r *PgDeckRepository) Delete(ctx context.Context, playerID string, deckID int64) error {
-	_, err := r.pool.Exec(ctx,
+	tag, err := r.pool.Exec(ctx,
 		`DELETE FROM card.decks WHERE player_id = $1 AND deck_id = $2`,
 		playerID, deckID,
 	)
 	if err != nil {
 		return fmt.Errorf("delete deck: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("%w: deck %d", port.ErrNotFound, deckID)
 	}
 	return nil
 }

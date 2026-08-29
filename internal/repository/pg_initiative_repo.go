@@ -34,7 +34,7 @@ func (r *PgInitiativeRepository) FindAll(ctx context.Context) ([]*domain.Initiat
 	}
 	defer rows.Close()
 
-	var initiatives []*domain.Initiative
+	initiatives := make([]*domain.Initiative, 0)
 	for rows.Next() {
 		var (
 			i      domain.Initiative

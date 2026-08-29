@@ -39,7 +39,8 @@ type PlayerCardRepo interface {
 // (起動時キャッシュを使わない設計、common の ADR に記録)。
 type CardPackRepo interface {
 	// GetPack は pack_id に対応するパック定義を返します。
-	// 行が存在しない場合 ErrNotFound を返します (運用停止 = is_active=false は別エラー: ErrPackInactive)。
+	// 行が存在しない場合 ErrNotFound を返します。運用停止や内包カード 0 件の判定は
+	// 呼び出し元が行います。
 	GetPack(ctx context.Context, packID string) (*domain.CardPack, error)
 }
 
