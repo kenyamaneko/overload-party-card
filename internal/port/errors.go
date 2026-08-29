@@ -11,8 +11,6 @@ var (
 	ErrInvalidDeck = errors.New("invalid deck")
 	// ErrRestrictionExceeded はカードの制限カテゴリによるコピー上限超過時に返します。
 	ErrRestrictionExceeded = errors.New("restriction exceeded")
-	// ErrInvalidArgument はリクエストパラメータのバリデーション失敗時に返します。
-	ErrInvalidArgument = errors.New("invalid argument")
 	// ErrEmptyPack は配布パックに対象カードが 1 件も登録されていない場合に返します。
 	// pack マスターのデータ不整合 (例: card_pack 行はあるが card_pack_cards 行が 0 件)
 	// を示す運用エラーです。
