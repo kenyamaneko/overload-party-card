@@ -1,180 +1,194 @@
-package config
+package config_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/kenyamaneko/overload-party-card/internal/config"
 )
 
-// testPublicKeyPEM は config が値をそのまま保持することの確認にだけ使うダミー。
-// 鍵としての妥当性は検証しないため、PEM の体裁だけ揃えている。
-const testPublicKeyPEM = "-----BEGIN PUBLIC KEY-----\ndummy-not-a-real-key\n-----END PUBLIC KEY-----\n"
-
-var allEnvKeys = []string{
-	"PORT",
-	"ENV",
-	"DATABASE_CONN",
-	"DATABASE_IAM_AUTH_ENABLED",
-	"CLOUDSQL_CONNECTION_NAME",
-	"INTERNAL_AUTH_PUBLIC_KEY",
-	"ACCOUNT_SERVICE_URL",
-}
-
-// setEnv は os.Getenv が "" と unset を区別しない性質を使い、未指定キーに "" を渡して未設定を再現する。
-func setEnv(t *testing.T, envs map[string]string) {
+func setValidEnv(t *testing.T) {
 	t.Helper()
-	for _, k := range allEnvKeys {
-		t.Setenv(k, envs[k])
-	}
+	t.Setenv("PORT", "8080")
+	t.Setenv("ENV", "local")
+	t.Setenv("DATABASE_CONN", "postgres://test")
+	t.Setenv("DATABASE_IAM_AUTH_ENABLED", "false")
+	t.Setenv("INTERNAL_AUTH_PUBLIC_KEY", "dummy-public-key")
+	t.Setenv("ACCOUNT_SERVICE_URL", "http://account.internal.test")
 }
 
-func mergeEnv(maps ...map[string]string) map[string]string {
-	out := map[string]string{}
-	for _, m := range maps {
-		for k, v := range m {
-			out[k] = v
+func TestConfigFromEnv(t *testing.T) {
+	t.Run("[config] 起動設定の読み込み", func(t *testing.T) {
+		t.Run("環境変数PORTが未設定のとき、起動設定の読み込みはエラーになる", func(t *testing.T) {
+			setValidEnv(t)
+			require.NoError(t, os.Unsetenv("PORT"))
+
+			_, err := config.FromEnv()
+
+			assert.ErrorContains(t, err, "PORT is required")
+		})
+
+		t.Run("環境変数PORTが整数として解釈できない値のとき、起動設定の読み込みはエラーになる", func(t *testing.T) {
+			setValidEnv(t)
+			t.Setenv("PORT", "not-a-number")
+
+			_, err := config.FromEnv()
+
+			assert.ErrorContains(t, err, `PORT "not-a-number"`)
+		})
+
+		t.Run("環境変数PORTが整数として解釈できる値のとき、起動設定のポート番号としてその値が読み取られる", func(t *testing.T) {
+			setValidEnv(t)
+			t.Setenv("PORT", "9090")
+
+			cfg, err := config.FromEnv()
+
+			require.NoError(t, err)
+			assert.Equal(t, 9090, cfg.Port)
+		})
+
+		t.Run("環境変数ENVが未設定のとき、起動設定の読み込みはエラーになる", func(t *testing.T) {
+			setValidEnv(t)
+			require.NoError(t, os.Unsetenv("ENV"))
+
+			_, err := config.FromEnv()
+
+			assert.ErrorContains(t, err, "ENV is required")
+		})
+
+		t.Run("環境変数ENVがlocal/dev/stg/prodのいずれでもない値のとき、起動設定の読み込みはエラーになる", func(t *testing.T) {
+			setValidEnv(t)
+			t.Setenv("ENV", "invalid-env")
+
+			_, err := config.FromEnv()
+
+			assert.ErrorContains(t, err, "ENV must be one of")
+		})
+
+		envCases := []string{"local", "dev", "stg", "prod"}
+		for _, envValue := range envCases {
+			t.Run("環境変数ENVが"+envValue+"のとき、起動設定の動作環境としてその値が読み取られる", func(t *testing.T) {
+				setValidEnv(t)
+				t.Setenv("ENV", envValue)
+
+				cfg, err := config.FromEnv()
+
+				require.NoError(t, err)
+				assert.Equal(t, config.Env(envValue), cfg.Env)
+			})
 		}
-	}
-	return out
-}
 
-var validEnv = map[string]string{
-	"PORT":                      "9003",
-	"ENV":                       "dev",
-	"DATABASE_CONN":             "host=localhost port=5432 dbname=card user=card password=card sslmode=disable",
-	"DATABASE_IAM_AUTH_ENABLED": "false",
-	"INTERNAL_AUTH_PUBLIC_KEY":  testPublicKeyPEM,
-	"ACCOUNT_SERVICE_URL":       "http://localhost:9005",
-}
+		t.Run("環境変数DATABASE_CONNが未設定(空文字含む)のとき、起動設定の読み込みはエラーになる", func(t *testing.T) {
+			setValidEnv(t)
+			require.NoError(t, os.Unsetenv("DATABASE_CONN"))
 
-func TestFromEnv(t *testing.T) {
-	t.Run("環境変数からのConfig構築", func(t *testing.T) {
-		t.Run("必須envが揃うとき、全フィールドがConfigに伝搬する", func(t *testing.T) {
-			setEnv(t, validEnv)
+			_, err := config.FromEnv()
 
-			cfg, err := FromEnv()
-
-			require.NoError(t, err)
-			assert.Equal(t, 9003, cfg.Port)
-			assert.Equal(t, Env("dev"), cfg.Env)
-			assert.Equal(t, "host=localhost port=5432 dbname=card user=card password=card sslmode=disable", cfg.DatabaseConn)
-			assert.Equal(t, testPublicKeyPEM, cfg.InternalAuthPublicKey)
-			assert.Equal(t, "http://localhost:9005", cfg.AccountServiceURL)
+			assert.ErrorContains(t, err, "DATABASE_CONN")
 		})
 
-		t.Run("DATABASE_IAM_AUTH_ENABLEDがfalseのとき、CLOUDSQL_CONNECTION_NAMEが未設定でも成功する", func(t *testing.T) {
-			setEnv(t, validEnv)
+		t.Run("環境変数DATABASE_CONNが設定されているとき、起動設定のデータベース接続文字列としてその値が読み取られる", func(t *testing.T) {
+			setValidEnv(t)
+			t.Setenv("DATABASE_CONN", "postgres://custom")
 
-			cfg, err := FromEnv()
+			cfg, err := config.FromEnv()
 
 			require.NoError(t, err)
-			assert.False(t, cfg.DatabaseIAMAuthEnabled)
-			assert.Empty(t, cfg.CloudSQLConnectionName)
+			assert.Equal(t, "postgres://custom", cfg.DatabaseConn)
 		})
 
-		t.Run("DATABASE_IAM_AUTH_ENABLEDがtrueかつCLOUDSQL_CONNECTION_NAMEが指定されるとき、両方の値がConfigに反映される", func(t *testing.T) {
-			setEnv(t, mergeEnv(validEnv, map[string]string{
-				"DATABASE_IAM_AUTH_ENABLED": "true",
-				"CLOUDSQL_CONNECTION_NAME":  "overload-party-dev:asia-northeast1:overload-party-db",
-			}))
+		t.Run("環境変数DATABASE_IAM_AUTH_ENABLEDがtrueでもfalseでもない値(未設定含む)のとき、起動設定の読み込みはエラーになる", func(t *testing.T) {
+			setValidEnv(t)
+			require.NoError(t, os.Unsetenv("DATABASE_IAM_AUTH_ENABLED"))
 
-			cfg, err := FromEnv()
+			_, err := config.FromEnv()
+
+			assert.ErrorContains(t, err, "DATABASE_IAM_AUTH_ENABLED must be")
+		})
+
+		t.Run("環境変数DATABASE_IAM_AUTH_ENABLEDがtrueで、環境変数CLOUDSQL_CONNECTION_NAMEが未設定(空文字含む)のとき、起動設定の読み込みはエラーになる", func(t *testing.T) {
+			setValidEnv(t)
+			t.Setenv("DATABASE_IAM_AUTH_ENABLED", "true")
+			t.Setenv("CLOUDSQL_CONNECTION_NAME", "placeholder")
+			require.NoError(t, os.Unsetenv("CLOUDSQL_CONNECTION_NAME"))
+
+			_, err := config.FromEnv()
+
+			assert.ErrorContains(t, err, "CLOUDSQL_CONNECTION_NAME")
+		})
+
+		t.Run("環境変数DATABASE_IAM_AUTH_ENABLEDがtrueで、環境変数CLOUDSQL_CONNECTION_NAMEが設定されているとき、起動設定はCloud SQL IAM認証が有効な状態として読み込まれる", func(t *testing.T) {
+			setValidEnv(t)
+			t.Setenv("DATABASE_IAM_AUTH_ENABLED", "true")
+			t.Setenv("CLOUDSQL_CONNECTION_NAME", "proj:region:instance")
+
+			cfg, err := config.FromEnv()
 
 			require.NoError(t, err)
 			assert.True(t, cfg.DatabaseIAMAuthEnabled)
-			assert.Equal(t, "overload-party-dev:asia-northeast1:overload-party-db", cfg.CloudSQLConnectionName)
 		})
 
-		acceptedEnvCases := []struct {
-			name string
-			env  string
-			want Env
-		}{
-			{name: `ENVが "local" のとき、Configの環境がlocalになる`, env: "local", want: Env("local")},
-			{name: `ENVが "dev" のとき、Configの環境がdevになる`, env: "dev", want: Env("dev")},
-			{name: `ENVが "stg" のとき、Configの環境がstgになる`, env: "stg", want: Env("stg")},
-			{name: `ENVが "prod" のとき、Configの環境がprodになる`, env: "prod", want: Env("prod")},
-		}
-		for _, tc := range acceptedEnvCases {
-			t.Run(tc.name, func(t *testing.T) {
-				setEnv(t, mergeEnv(validEnv, map[string]string{"ENV": tc.env}))
+		t.Run("環境変数DATABASE_IAM_AUTH_ENABLEDがtrueで、環境変数CLOUDSQL_CONNECTION_NAMEが設定されているとき、起動設定のCloud SQL接続名としてその値が読み取られる", func(t *testing.T) {
+			setValidEnv(t)
+			t.Setenv("DATABASE_IAM_AUTH_ENABLED", "true")
+			t.Setenv("CLOUDSQL_CONNECTION_NAME", "proj:region:instance")
 
-				cfg, err := FromEnv()
+			cfg, err := config.FromEnv()
 
-				require.NoError(t, err)
-				assert.Equal(t, tc.want, cfg.Env)
-			})
-		}
+			require.NoError(t, err)
+			assert.Equal(t, "proj:region:instance", cfg.CloudSQLConnectionName)
+		})
 
-		invalidCases := []struct {
-			name    string
-			envs    map[string]string
-			wantErr string
-		}{
-			{
-				name:    "PORTが未設定のとき、エラーになる",
-				envs:    mergeEnv(validEnv, map[string]string{"PORT": ""}),
-				wantErr: "PORT is required",
-			},
-			{
-				name:    "PORTが数値でないとき、エラーになる",
-				envs:    mergeEnv(validEnv, map[string]string{"PORT": "not-a-number"}),
-				wantErr: "PORT",
-			},
-			{
-				name:    "ENVが未設定のとき、エラーになる",
-				envs:    mergeEnv(validEnv, map[string]string{"ENV": ""}),
-				wantErr: "ENV is required",
-			},
-			{
-				name:    "ENVが未定義値のとき、エラーになる",
-				envs:    mergeEnv(validEnv, map[string]string{"ENV": "staging"}),
-				wantErr: "ENV must be",
-			},
-			{
-				name:    "DATABASE_CONNが未設定のとき、エラーになる",
-				envs:    mergeEnv(validEnv, map[string]string{"DATABASE_CONN": ""}),
-				wantErr: "DATABASE_CONN is required",
-			},
-			{
-				name:    "DATABASE_IAM_AUTH_ENABLEDが未設定のとき、変数名を含むエラーになる",
-				envs:    mergeEnv(validEnv, map[string]string{"DATABASE_IAM_AUTH_ENABLED": ""}),
-				wantErr: "DATABASE_IAM_AUTH_ENABLED must be",
-			},
-			{
-				name:    `DATABASE_IAM_AUTH_ENABLEDが "true"/"false" 以外の "yes" のとき、変数名を含むエラーになる`,
-				envs:    mergeEnv(validEnv, map[string]string{"DATABASE_IAM_AUTH_ENABLED": "yes"}),
-				wantErr: "DATABASE_IAM_AUTH_ENABLED must be",
-			},
-			{
-				name: "DATABASE_IAM_AUTH_ENABLEDがtrueかつCLOUDSQL_CONNECTION_NAMEが未設定のとき、CLOUDSQL_CONNECTION_NAMEを含むエラーになる",
-				envs: mergeEnv(validEnv, map[string]string{
-					"DATABASE_IAM_AUTH_ENABLED": "true",
-					"CLOUDSQL_CONNECTION_NAME":  "",
-				}),
-				wantErr: "CLOUDSQL_CONNECTION_NAME is required",
-			},
-			{
-				name:    "INTERNAL_AUTH_PUBLIC_KEYが未設定のとき、エラーになる",
-				envs:    mergeEnv(validEnv, map[string]string{"INTERNAL_AUTH_PUBLIC_KEY": ""}),
-				wantErr: "INTERNAL_AUTH_PUBLIC_KEY is required",
-			},
-			{
-				name:    "ACCOUNT_SERVICE_URLが未設定のとき、エラーになる",
-				envs:    mergeEnv(validEnv, map[string]string{"ACCOUNT_SERVICE_URL": ""}),
-				wantErr: "ACCOUNT_SERVICE_URL is required",
-			},
-		}
-		for _, tc := range invalidCases {
-			t.Run(tc.name, func(t *testing.T) {
-				setEnv(t, tc.envs)
+		t.Run("環境変数DATABASE_IAM_AUTH_ENABLEDがfalseのとき、環境変数CLOUDSQL_CONNECTION_NAMEが設定されていても、起動設定のCloud SQL接続名は空文字のままになる", func(t *testing.T) {
+			setValidEnv(t)
+			t.Setenv("DATABASE_IAM_AUTH_ENABLED", "false")
+			t.Setenv("CLOUDSQL_CONNECTION_NAME", "proj:region:instance")
 
-				_, err := FromEnv()
+			cfg, err := config.FromEnv()
 
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tc.wantErr)
-			})
-		}
+			require.NoError(t, err)
+			assert.Empty(t, cfg.CloudSQLConnectionName)
+		})
+
+		t.Run("環境変数INTERNAL_AUTH_PUBLIC_KEYが未設定(空文字含む)のとき、起動設定の読み込みはエラーになる", func(t *testing.T) {
+			setValidEnv(t)
+			require.NoError(t, os.Unsetenv("INTERNAL_AUTH_PUBLIC_KEY"))
+
+			_, err := config.FromEnv()
+
+			assert.ErrorContains(t, err, "INTERNAL_AUTH_PUBLIC_KEY")
+		})
+
+		t.Run("環境変数INTERNAL_AUTH_PUBLIC_KEYが設定されているとき、起動設定の内部認証公開鍵としてその値が読み取られる", func(t *testing.T) {
+			setValidEnv(t)
+			t.Setenv("INTERNAL_AUTH_PUBLIC_KEY", "custom-public-key")
+
+			cfg, err := config.FromEnv()
+
+			require.NoError(t, err)
+			assert.Equal(t, "custom-public-key", cfg.InternalAuthPublicKey)
+		})
+
+		t.Run("環境変数ACCOUNT_SERVICE_URLが未設定(空文字含む)のとき、起動設定の読み込みはエラーになる", func(t *testing.T) {
+			setValidEnv(t)
+			require.NoError(t, os.Unsetenv("ACCOUNT_SERVICE_URL"))
+
+			_, err := config.FromEnv()
+
+			assert.ErrorContains(t, err, "ACCOUNT_SERVICE_URL")
+		})
+
+		t.Run("環境変数ACCOUNT_SERVICE_URLが設定されているとき、起動設定のaccountサービスURLとしてその値が読み取られる", func(t *testing.T) {
+			setValidEnv(t)
+			t.Setenv("ACCOUNT_SERVICE_URL", "http://custom.account.test")
+
+			cfg, err := config.FromEnv()
+
+			require.NoError(t, err)
+			assert.Equal(t, "http://custom.account.test", cfg.AccountServiceURL)
+		})
 	})
 }

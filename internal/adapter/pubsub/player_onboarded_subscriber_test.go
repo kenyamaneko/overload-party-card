@@ -1,157 +1,94 @@
-package pubsub
+package pubsub_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	apiscenario "github.com/kenyamaneko/overload-party-scenario/packages/api-scenario"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/kenyamaneko/overload-party-card/internal/adapter/pubsub"
 )
 
-// fakePackGranter は packGranter のテスト用スタブです。
-// errOnPack に一致する pack_id だけエラーを返す形にすると、N 回呼びの中で
-// 何回目に失敗したかを直接表現できます。
-type fakePackGranter struct {
-	errOnPack string
-	err       error
-	gotPacks  []string
-}
-
-func (f *fakePackGranter) GrantPack(_ context.Context, _, packID string) (int, error) {
-	f.gotPacks = append(f.gotPacks, packID)
-	if f.err != nil && (f.errOnPack == "" || f.errOnPack == packID) {
-		return 0, f.err
-	}
-	return 6, nil
-}
-
-// mustMarshalPlayerOnboarded は apiscenario.PlayerOnboardedEvent の型を経由して
-// payload を組み立てる (scenario が schema を変えたら本テストが compile / 実行で
-// 破綻し、乖離を CI で検知する)。EventType は契約固定値で上書きする。
-func mustMarshalPlayerOnboarded(t *testing.T, ev apiscenario.PlayerOnboardedEvent) []byte {
+func newPlayerOnboardedPayload(t *testing.T, eventID, playerID, initialFactionID string) []byte {
 	t.Helper()
-	ev.EventType = apiscenario.EventTypePlayerOnboarded
-	return mustMarshal(t, ev)
+	data, err := json.Marshal(apiscenario.PlayerOnboardedEvent{
+		EventType:        apiscenario.EventTypePlayerOnboarded,
+		EventID:          eventID,
+		Timestamp:        time.Now(),
+		PlayerID:         playerID,
+		InitialFactionID: initialFactionID,
+	})
+	require.NoError(t, err)
+	return data
 }
 
-func TestPlayerOnboardedSubscriber_Handle(t *testing.T) {
-	t.Run("player_onboardedイベントの処理", func(t *testing.T) {
-		validPayload := mustMarshalPlayerOnboarded(t, apiscenario.PlayerOnboardedEvent{
-			EventID:          "evt-1",
-			PlayerID:         "player-1",
-			InitialFactionID: "Tuners",
+func TestPlayerOnboardedSubscriberHandle(t *testing.T) {
+	t.Run("[pubsub] player-onboarded-card-subのイベント処理", func(t *testing.T) {
+		t.Run("payloadがJSONとして解釈できないとき、エラーになる", func(t *testing.T) {
+			sub := pubsub.NewPlayerOnboardedSubscriber(&fakePackGranter{}, &fakeProcessedEventRepo{})
+
+			err := sub.Handle(context.Background(), []byte("not json"))
+
+			assert.ErrorContains(t, err, "bad payload")
 		})
 
-		tests := []struct {
-			name             string
-			payload          []byte
-			seedInserted     string
-			repoInsertErr    error
-			granterErr       error
-			granterErrOnPack string
-			wantAck          bool
-			wantPacks        []string
-		}{
-			{
-				name:      "新規イベントのとき、basicとfaction_set_<faction> を順次配布してAckする",
-				payload:   validPayload,
-				wantAck:   true,
-				wantPacks: []string{"basic", "faction_set_tuners"},
-			},
-			{
-				name:         "重複イベント (processed_events既存)のとき、配布せずAckする",
-				payload:      validPayload,
-				seedInserted: "evt-1",
-				wantAck:      true,
-				wantPacks:    nil,
-			},
-			{
-				// processed_events への INSERT (dedup ガード) が失敗した場合、event を
-				// Ack で捨てると配布も dedup 記録もされずメッセージが失われる。Nack して
-				// Pub/Sub の at-least-once 再配送に乗せ、次回成功時に dedup と配布が走る
-				// ことを期待する仕様の固定。
-				name:          "processed_events INSERT失敗のとき、再配送に乗せるためNackする",
-				payload:       validPayload,
-				repoInsertErr: errors.New("db down"),
-				wantAck:       false,
-				wantPacks:     nil,
-			},
-			{
-				// basic → faction_set の順次配布は fail-fast: 1 回目失敗時点で 2 回目を
-				// 呼ばずに Nack する。1 回目失敗後にそのまま続行すると DB 状態によって
-				// 挙動が予測不能になるため、early exit を仕様として固定する。
-				name:             "1回目 (basic) GrantPack失敗のとき、2回目を呼ばずにNackする (fail-fast)",
-				payload:          validPayload,
-				granterErr:       errors.New("grant failed"),
-				granterErrOnPack: "basic",
-				wantAck:          false,
-				wantPacks:        []string{"basic"},
-			},
-			{
-				// 2 回目 (faction) で失敗した時点で 1 回目 (basic) は配布完了済み = 不完全
-				// 配布が発生する。このとき Nack で再配送されても processed_events が
-				// 既に書かれていれば dedup で skip され、不完全配布のまま固定される。
-				// この at-most-once 相当の挙動を仕様として固定する。
-				name:             "2回目 (faction) GrantPack失敗のとき、1回目だけ配布された状態でNackする (不完全配布)",
-				payload:          validPayload,
-				granterErr:       errors.New("grant failed"),
-				granterErrOnPack: "faction_set_tuners",
-				wantAck:          false,
-				wantPacks:        []string{"basic", "faction_set_tuners"},
-			},
-			{
-				name:      "malformed JSONのとき、NackしてDLQ送りになる",
-				payload:   []byte("not-json"),
-				wantAck:   false,
-				wantPacks: nil,
-			},
-			{
-				name: "未知event_typeのとき、NackしてDLQでpublisherバグを検出する",
-				payload: mustMarshal(t, apiscenario.PlayerOnboardedEvent{
-					EventType:        "unknown",
-					EventID:          "evt-2",
-					PlayerID:         "player-1",
-					InitialFactionID: "SHE",
-				}),
-				wantAck:   false,
-				wantPacks: nil,
-			},
-		}
+		t.Run("デコードしたevent_typeが処理対象のイベント種別と一致しないとき、エラーになる", func(t *testing.T) {
+			sub := pubsub.NewPlayerOnboardedSubscriber(&fakePackGranter{}, &fakeProcessedEventRepo{})
+			payload := []byte(`{"event_type":"unrelated_event","event_id":"evt-1","player_id":"TST-0001","initial_faction_id":"SHE"}`)
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				granter := &fakePackGranter{err: tt.granterErr, errOnPack: tt.granterErrOnPack}
-				repo := newFakeProcessedEventRepo()
-				repo.insertErr = tt.repoInsertErr
-				if tt.seedInserted != "" {
-					repo.inserted[tt.seedInserted] = true
-				}
-				sub := NewPlayerOnboardedSubscriber(granter, repo)
+			err := sub.Handle(context.Background(), payload)
 
-				err := sub.Handle(context.Background(), tt.payload)
+			assert.ErrorContains(t, err, "unexpected event_type")
+		})
 
-				assert.Equal(t, tt.wantAck, err == nil, "ack 判定 (nil=ack, err=%v)", err)
-				assert.Equal(t, tt.wantPacks, granter.gotPacks)
-			})
-		}
+		t.Run("処理済みイベントの記録への保存が失敗したとき、エラーになる", func(t *testing.T) {
+			sub := pubsub.NewPlayerOnboardedSubscriber(&fakePackGranter{}, &fakeProcessedEventRepo{err: errors.New("insert failed")})
+			payload := newPlayerOnboardedPayload(t, "evt-1", "TST-0001", "SHE")
 
-		t.Run("同じevent_idを持つイベントを二度処理しても、2回目は配布されない", func(t *testing.T) {
-			payload := mustMarshalPlayerOnboarded(t, apiscenario.PlayerOnboardedEvent{
-				EventID:          "evt-repeat",
-				PlayerID:         "player-1",
-				InitialFactionID: "Tuners",
-			})
+			err := sub.Handle(context.Background(), payload)
+
+			assert.ErrorContains(t, err, "insert processed_events")
+		})
+
+		t.Run("当該event_idが既に処理済みとして記録されているとき、パックの配布は要求されず、正常終了になる", func(t *testing.T) {
 			granter := &fakePackGranter{}
-			repo := newFakeProcessedEventRepo()
-			sub := NewPlayerOnboardedSubscriber(granter, repo)
+			sub := pubsub.NewPlayerOnboardedSubscriber(granter, &fakeProcessedEventRepo{inserted: false})
+			payload := newPlayerOnboardedPayload(t, "evt-1", "TST-0001", "SHE")
 
-			firstErr := sub.Handle(context.Background(), payload)
-			secondErr := sub.Handle(context.Background(), payload)
+			err := sub.Handle(context.Background(), payload)
 
-			assert.NoError(t, firstErr)
-			assert.NoError(t, secondErr)
-			assert.Equal(t, []string{"basic", "faction_set_tuners"}, granter.gotPacks, "GrantPack は 1 巡だけ呼ばれる")
+			assert.NoError(t, err)
+			assert.Empty(t, granter.calls)
+		})
+
+		t.Run("basicパックの配布に失敗したとき、faction_set_*パックの配布は要求されず、エラーになる", func(t *testing.T) {
+			granter := &fakePackGranter{errFor: map[string]error{"basic": errors.New("grant failed")}}
+			sub := pubsub.NewPlayerOnboardedSubscriber(granter, &fakeProcessedEventRepo{inserted: true})
+			payload := newPlayerOnboardedPayload(t, "evt-1", "TST-0001", "SHE")
+
+			err := sub.Handle(context.Background(), payload)
+
+			assert.ErrorContains(t, err, `grant "basic"`)
+			assert.Equal(t, []grantCall{{playerID: "TST-0001", packID: "basic"}}, granter.calls)
+		})
+
+		t.Run("payloadが未処理のevent_id・player_id・initial_faction_id SHEを含む正常な内容のとき、basicパックとfaction_set_sheパックの配布が要求され、正常終了になる", func(t *testing.T) {
+			granter := &fakePackGranter{copiesFor: map[string]int{"basic": 3, "faction_set_she": 5}}
+			sub := pubsub.NewPlayerOnboardedSubscriber(granter, &fakeProcessedEventRepo{inserted: true})
+			payload := newPlayerOnboardedPayload(t, "evt-1", "TST-0001", "SHE")
+
+			err := sub.Handle(context.Background(), payload)
+
+			assert.NoError(t, err)
+			assert.Equal(t, []grantCall{
+				{playerID: "TST-0001", packID: "basic"},
+				{playerID: "TST-0001", packID: "faction_set_she"},
+			}, granter.calls)
 		})
 	})
 }

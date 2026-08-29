@@ -5,26 +5,47 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/kenyamaneko/overload-party-card/internal/domain"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
-
-	"github.com/kenyamaneko/overload-party-card/internal/domain"
 )
 
-func TestEnumDriftAgainstOpenAPISpec(t *testing.T) {
-	t.Run("domainとopenapi.yamlのenum整合", func(t *testing.T) {
-		// SSoT は domain 側。openapi.yaml は外部公開ドキュメントとして同じ値集合を持つ必要がある。
-		spec := loadOpenAPISpec(t)
+type openAPIEnumSchema struct {
+	Enum []string `yaml:"enum"`
+}
 
+type openAPIDocument struct {
+	Components struct {
+		Schemas map[string]openAPIEnumSchema `yaml:"schemas"`
+	} `yaml:"components"`
+}
+
+func readOpenAPIEnumValues(t *testing.T, schemaName string) []string {
+	t.Helper()
+
+	raw, err := os.ReadFile(filepath.Join("..", "..", "data", "openapi.yaml"))
+	require.NoError(t, err)
+
+	var doc openAPIDocument
+	require.NoError(t, yaml.Unmarshal(raw, &doc))
+
+	require.Contains(t, doc.Components.Schemas, schemaName)
+
+	return doc.Components.Schemas[schemaName].Enum
+}
+
+func TestEnumDrift(t *testing.T) {
+	t.Run("[契約整合性] domain の列挙型定数と openapi.yaml の列挙型スキーマ", func(t *testing.T) {
 		cases := []struct {
-			name       string
-			schemaName string
-			want       []string
+			caseName     string
+			schemaName   string
+			domainValues []string
 		}{
 			{
-				name:       "PassiveEffectType enumがdomainとopenapi.yamlで一致する",
+				caseName:   "PassiveEffectType 系定数のとき、openapi.yaml の PassiveEffectType の列挙値と過不足なく一致する",
 				schemaName: "PassiveEffectType",
-				want: []string{
+				domainValues: []string{
 					domain.PassiveTPPerBackendDB,
 					domain.PassiveTPPerBackendData,
 					domain.PassiveTPIfCardTypeOnField,
@@ -35,25 +56,25 @@ func TestEnumDriftAgainstOpenAPISpec(t *testing.T) {
 				},
 			},
 			{
-				name:       "PlatformEffectType enumがdomainとopenapi.yamlで一致する",
+				caseName:   "PlatformEffectType 系定数のとき、openapi.yaml の PlatformEffectType の列挙値と過不足なく一致する",
 				schemaName: "PlatformEffectType",
-				want: []string{
+				domainValues: []string{
 					domain.PlatformTPBonus,
 					domain.PlatformYieldBonus,
 					domain.PlatformAVBonus,
 				},
 			},
 			{
-				name:       "AttachmentEffectType enumがdomainとopenapi.yamlで一致する",
+				caseName:   "AttachmentEffectType 系定数のとき、openapi.yaml の AttachmentEffectType の列挙値と過不足なく一致する",
 				schemaName: "AttachmentEffectType",
-				want: []string{
+				domainValues: []string{
 					domain.AttachmentStatBonus,
 				},
 			},
 			{
-				name:       "InitiativeKind enumがdomainとopenapi.yamlで一致する",
+				caseName:   "InitiativeKind 系定数のとき、openapi.yaml の InitiativeKind の列挙値と過不足なく一致する",
 				schemaName: "InitiativeKind",
-				want: []string{
+				domainValues: []string{
 					domain.InitiativeKindRoutine,
 					domain.InitiativeKindSpecial,
 				},
@@ -61,49 +82,11 @@ func TestEnumDriftAgainstOpenAPISpec(t *testing.T) {
 		}
 
 		for _, tc := range cases {
-			t.Run(tc.name, func(t *testing.T) {
-				got := specEnumValues(t, spec, tc.schemaName)
-				require.ElementsMatch(t, tc.want, got, "domain と openapi.yaml の %s enum が drift している", tc.schemaName)
+			t.Run(tc.caseName, func(t *testing.T) {
+				openAPIValues := readOpenAPIEnumValues(t, tc.schemaName)
+
+				assert.ElementsMatch(t, tc.domainValues, openAPIValues)
 			})
 		}
 	})
-}
-
-// loadOpenAPISpec は data/openapi.yaml をパースして返す。
-func loadOpenAPISpec(t *testing.T) map[string]interface{} {
-	t.Helper()
-	specPath := filepath.Join(repoRoot(t), "data", "openapi.yaml")
-	raw, err := os.ReadFile(specPath)
-	require.NoError(t, err)
-	var doc map[string]interface{}
-	require.NoError(t, yaml.Unmarshal(raw, &doc))
-	return doc
-}
-
-// specEnumValues は components/schemas/<name>/enum 配下の値一覧を取り出す。
-func specEnumValues(t *testing.T, spec map[string]interface{}, schemaName string) []string {
-	t.Helper()
-	components, ok := spec["components"].(map[string]interface{})
-	require.True(t, ok, "components が見つからない")
-	schemas, ok := components["schemas"].(map[string]interface{})
-	require.True(t, ok, "components/schemas が見つからない")
-	schema, ok := schemas[schemaName].(map[string]interface{})
-	require.True(t, ok, "components/schemas/%s が見つからない", schemaName)
-	rawEnum, ok := schema["enum"].([]interface{})
-	require.True(t, ok, "components/schemas/%s/enum が無い、または配列でない", schemaName)
-	out := make([]string, 0, len(rawEnum))
-	for _, v := range rawEnum {
-		s, ok := v.(string)
-		require.True(t, ok, "%s の enum 値が文字列でない", schemaName)
-		out = append(out, s)
-	}
-	return out
-}
-
-// repoRoot は本ファイルから見たリポジトリルートを返す (internal/domain/ から 2 階層上)。
-func repoRoot(t *testing.T) string {
-	t.Helper()
-	wd, err := os.Getwd()
-	require.NoError(t, err)
-	return filepath.Join(wd, "..", "..")
 }
