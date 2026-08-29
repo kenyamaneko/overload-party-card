@@ -1,257 +1,130 @@
-package rest
+package rest_test
 
 import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	apiscenario "github.com/kenyamaneko/overload-party-scenario/packages/api-scenario"
-	apishop "github.com/kenyamaneko/overload-party-shop/packages/api-shop"
-
-	pubsubadapter "github.com/kenyamaneko/overload-party-card/internal/adapter/pubsub"
-	"github.com/kenyamaneko/overload-party-card/internal/domain"
-	"github.com/kenyamaneko/overload-party-card/internal/port"
-	"github.com/kenyamaneko/overload-party-card/internal/usecase"
 )
 
-const (
-	fxPushPlayerID = "TST-PLAYER-1"
-	fxPushCardID   = "TST-0001"
-)
+func TestPubSubPushHandler(t *testing.T) {
+	t.Run("[handler] Pub/Sub push受信", func(t *testing.T) {
+		malformedEnvelopeCases := []struct {
+			name string
+			body string
+		}{
+			{name: "messageフィールドが欠落しているとき", body: `{}`},
+			{name: "message.dataフィールドが欠落しているとき", body: `{"message":{}}`},
+			{name: "message.dataが空文字のとき", body: `{"message":{"data":""}}`},
+		}
+		for _, tc := range malformedEnvelopeCases {
+			t.Run(tc.name+"、400になりボディのerrorフィールドはpubsub push: malformed envelopeになる", func(t *testing.T) {
+				engine := newTestRouter(t, withPlayerOnboardedHandler(failIfCalled(t)))
 
-// fakeCardPackRepo は port.CardPackRepo のテスト用スタブ。pack_id をキーに
-// 固定のパック定義を返す。
-type fakeCardPackRepo struct {
-	packs map[string]*domain.CardPack
+				rr := doRequest(t, engine, http.MethodPost, "/internal/v1/pubsub/player-onboarded", tc.body)
+
+				require.Equal(t, http.StatusBadRequest, rr.Code)
+				assert.Equal(t, "pubsub push: malformed envelope", decodeErrorMessage(t, rr))
+			})
+		}
+
+		t.Run("message.dataがbase64として解釈できない文字列のとき、400になりボディのerrorフィールドはpubsub push: malformed base64 dataになる", func(t *testing.T) {
+			engine := newTestRouter(t, withPlayerOnboardedHandler(failIfCalled(t)))
+
+			rr := doRequest(t, engine, http.MethodPost, "/internal/v1/pubsub/player-onboarded", `{"message":{"data":"not valid base64!!"}}`)
+
+			require.Equal(t, http.StatusBadRequest, rr.Code)
+			assert.Equal(t, "pubsub push: malformed base64 data", decodeErrorMessage(t, rr))
+		})
+
+		t.Run("message.dataがbase64として解釈でき、注入したport.MessageHandlerがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+			engine := newTestRouter(t, withPlayerOnboardedHandler(func(ctx context.Context, data []byte) error {
+				return errors.New("handler failed")
+			}))
+
+			rr := doRequest(t, engine, http.MethodPost, "/internal/v1/pubsub/player-onboarded", pubsubEnvelopeBody(t, "payload"))
+
+			require.Equal(t, http.StatusInternalServerError, rr.Code)
+			assert.Equal(t, "internal server error", decodeErrorMessage(t, rr))
+		})
+
+		t.Run("message.dataがbase64として解釈でき、注入したport.MessageHandlerがエラーを返さないとき、200になりレスポンスボディは空になる", func(t *testing.T) {
+			engine := newTestRouter(t, withPlayerOnboardedHandler(func(ctx context.Context, data []byte) error {
+				return nil
+			}))
+
+			rr := doRequest(t, engine, http.MethodPost, "/internal/v1/pubsub/player-onboarded", pubsubEnvelopeBody(t, "payload"))
+
+			require.Equal(t, http.StatusOK, rr.Code)
+			assert.Empty(t, rr.Body.String())
+		})
+
+		t.Run("port.MessageHandlerが呼び出されるとき、渡される引数はデコード後のmessage.dataの内容と一致する", func(t *testing.T) {
+			var received []byte
+			engine := newTestRouter(t, withPlayerOnboardedHandler(func(ctx context.Context, data []byte) error {
+				received = data
+				return nil
+			}))
+
+			rr := doRequest(t, engine, http.MethodPost, "/internal/v1/pubsub/player-onboarded", pubsubEnvelopeBody(t, "decoded-payload"))
+
+			require.Equal(t, http.StatusOK, rr.Code)
+			assert.Equal(t, "decoded-payload", string(received))
+		})
+
+		t.Run("player-onboarded用とcard-pack-purchased用に別々のport.MessageHandlerを登録したとき、それぞれのエンドポイントは対応するハンドラだけを呼び出す", func(t *testing.T) {
+			var onboardedCalled, purchasedCalled bool
+			engine := newTestRouter(t,
+				withPlayerOnboardedHandler(func(ctx context.Context, data []byte) error {
+					onboardedCalled = true
+					return nil
+				}),
+				withCardPackPurchasedHandler(func(ctx context.Context, data []byte) error {
+					purchasedCalled = true
+					return nil
+				}),
+			)
+
+			rrOnboarded := doRequest(t, engine, http.MethodPost, "/internal/v1/pubsub/player-onboarded", pubsubEnvelopeBody(t, "onboarded"))
+			require.Equal(t, http.StatusOK, rrOnboarded.Code)
+			assert.True(t, onboardedCalled, "player-onboarded用ハンドラが呼ばれる")
+			assert.False(t, purchasedCalled, "card-pack-purchased用ハンドラは呼ばれない")
+
+			onboardedCalled, purchasedCalled = false, false
+			rrPurchased := doRequest(t, engine, http.MethodPost, "/internal/v1/pubsub/card-pack-purchased", pubsubEnvelopeBody(t, "purchased"))
+			require.Equal(t, http.StatusOK, rrPurchased.Code)
+			assert.False(t, onboardedCalled, "player-onboarded用ハンドラは呼ばれない")
+			assert.True(t, purchasedCalled, "card-pack-purchased用ハンドラが呼ばれる")
+		})
+	})
 }
 
-func newFakeCardPackRepo(packs map[string]*domain.CardPack) *fakeCardPackRepo {
-	return &fakeCardPackRepo{packs: packs}
-}
-
-func (r *fakeCardPackRepo) GetPack(_ context.Context, packID string) (*domain.CardPack, error) {
-	pack, ok := r.packs[packID]
-	if !ok {
-		return nil, port.ErrNotFound
-	}
-	return pack, nil
-}
-
-// fakeProcessedEventRepo は port.ProcessedEventRepo のテスト用スタブ。
-// event_id ごとの挿入済み状態を追跡し、実 DB の UNIQUE 制約相当の dedup を再現する。
-type fakeProcessedEventRepo struct {
-	inserted map[string]bool
-}
-
-func newFakeProcessedEventRepo() *fakeProcessedEventRepo {
-	return &fakeProcessedEventRepo{inserted: make(map[string]bool)}
-}
-
-func (r *fakeProcessedEventRepo) Insert(_ context.Context, eventID, _ string) (bool, error) {
-	if r.inserted[eventID] {
-		return false, nil
-	}
-	r.inserted[eventID] = true
-	return true, nil
-}
-
-// newPubSubPushHandlerFixture は実 subscriber (pubsubadapter) と実 GrantInteractor を
-// fake repo に載せた PubSubPushHandler を組み立てる。既存の subscriber ロジックを
-// 通した「受け口 (push handler) を叩くと実際に付与される」結合検証に使う。
-func newPubSubPushHandlerFixture(packRepo *fakeCardPackRepo) (*PubSubPushHandler, *fakePlayerCardRepo) {
-	pcRepo := newFakePlayerCardRepo()
-	grantInteractor := usecase.NewGrantInteractor(packRepo, pcRepo)
-	eventRepo := newFakeProcessedEventRepo()
-
-	onboardedSub := pubsubadapter.NewPlayerOnboardedSubscriber(grantInteractor, eventRepo)
-	cardPackPurchasedSub := pubsubadapter.NewCardPackPurchasedSubscriber(grantInteractor, eventRepo)
-
-	return NewPubSubPushHandler(onboardedSub.Handle, cardPackPurchasedSub.Handle), pcRepo
-}
-
-// servePush は Cloud Pub/Sub push subscription が送るリクエストを模した body を
-// gin handler へ実際の HTTP ディスパッチ経路 (Engine.ServeHTTP) で通す。
-// gin.Context を直接呼ぶだけでは応答ヘッダのフラッシュ (200 応答時など) が
-// Engine の終端処理に依存するため確定しない。
-func servePush(t *testing.T, handlerFunc gin.HandlerFunc, body string) *httptest.ResponseRecorder {
+// failIfCalled returns a port.MessageHandler that fails the test if invoked, for cases that
+// must be rejected before the handler is reached.
+func failIfCalled(t *testing.T) func(ctx context.Context, data []byte) error {
 	t.Helper()
-	r := gin.New()
-	r.POST("/", handlerFunc)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body)))
-	return w
+	return func(ctx context.Context, data []byte) error {
+		t.Fatal("message handler must not be called")
+		return nil
+	}
 }
 
-// pushEnvelopeBody は payload を base64 埋め込みした push envelope の JSON 文字列を返す。
-func pushEnvelopeBody(t *testing.T, payload []byte) string {
+// pubsubEnvelopeBody builds a valid Cloud Pub/Sub push envelope JSON body carrying payload,
+// base64-encoded as the wire format requires.
+func pubsubEnvelopeBody(t *testing.T, payload string) string {
 	t.Helper()
-	env := struct {
+	envelope := struct {
 		Message struct {
 			Data string `json:"data"`
 		} `json:"message"`
 	}{}
-	env.Message.Data = base64.StdEncoding.EncodeToString(payload)
-	b, err := json.Marshal(env)
+	envelope.Message.Data = base64.StdEncoding.EncodeToString([]byte(payload))
+	encoded, err := json.Marshal(envelope)
 	require.NoError(t, err)
-	return string(b)
-}
-
-func TestPubSubPushHandler_HandleCardPackPurchased(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	pack := &domain.CardPack{
-		PackID:   "faction_set_tuners",
-		IsActive: true,
-		Cards:    []domain.CardPackCard{{CardID: fxPushCardID, Copies: 3}},
-	}
-
-	t.Run("card-pack-purchasedのpush受け口", func(t *testing.T) {
-		t.Run("push本文を受け取ると、カードが付与される", func(t *testing.T) {
-			h, pcRepo := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
-				"faction_set_tuners": pack,
-			}))
-			payload, err := json.Marshal(apishop.CardPackPurchasedEvent{
-				EventType:  apishop.EventTypeCardPackPurchased,
-				EventID:    "evt-1",
-				PlayerID:   fxPushPlayerID,
-				CardPackID: "faction_set_tuners",
-			})
-			require.NoError(t, err)
-
-			w := servePush(t, h.HandleCardPackPurchased, pushEnvelopeBody(t, payload))
-
-			assert.Equal(t, http.StatusOK, w.Code)
-			cards, getErr := pcRepo.GetPlayerCards(context.Background(), fxPushPlayerID)
-			require.NoError(t, getErr)
-			require.Len(t, cards, 1)
-			assert.Equal(t, fxPushCardID, cards[0].CardID)
-			assert.Equal(t, 3, cards[0].Count)
-		})
-
-		t.Run("base64で復号できないdataのとき、400になり応答本文のerrorがbase64不正を示す文言と完全に一致する", func(t *testing.T) {
-			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
-			body := `{"message":{"data":"not-valid-base64!!!"}}`
-
-			w := servePush(t, h.HandleCardPackPurchased, body)
-
-			assert.Equal(t, http.StatusBadRequest, w.Code)
-			assert.Equal(t, "pubsub push: malformed base64 data", decodeBody(t, w)["error"])
-		})
-
-		t.Run("既知でないevent_typeのとき、400とは異なる500になり、応答本文には出ないevent_type想定外の原因がログに出てカードも付与されない", func(t *testing.T) {
-			buf := captureSlog(t)
-			h, pcRepo := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
-				"faction_set_tuners": pack,
-			}))
-			payload, err := json.Marshal(apishop.CardPackPurchasedEvent{
-				EventType:  "unknown",
-				EventID:    "evt-2",
-				PlayerID:   fxPushPlayerID,
-				CardPackID: "faction_set_tuners",
-			})
-			require.NoError(t, err)
-
-			w := servePush(t, h.HandleCardPackPurchased, pushEnvelopeBody(t, payload))
-
-			assert.Equal(t, http.StatusInternalServerError, w.Code)
-			assert.Equal(t, "internal server error", decodeBody(t, w)["error"])
-			records := decodeLogRecords(t, buf)
-			require.NotEmpty(t, records)
-			assert.Contains(t, records[len(records)-1]["error"], `unexpected event_type "unknown"`)
-			cards, getErr := pcRepo.GetPlayerCards(context.Background(), fxPushPlayerID)
-			require.NoError(t, getErr)
-			assert.Empty(t, cards)
-		})
-
-		t.Run("同じイベントを二度投げても、2回目はカードが二重に付与されない", func(t *testing.T) {
-			h, pcRepo := newPubSubPushHandlerFixture(newFakeCardPackRepo(map[string]*domain.CardPack{
-				"faction_set_tuners": pack,
-			}))
-			payload, err := json.Marshal(apishop.CardPackPurchasedEvent{
-				EventType:  apishop.EventTypeCardPackPurchased,
-				EventID:    "evt-repeat",
-				PlayerID:   fxPushPlayerID,
-				CardPackID: "faction_set_tuners",
-			})
-			require.NoError(t, err)
-			body := pushEnvelopeBody(t, payload)
-
-			w1 := servePush(t, h.HandleCardPackPurchased, body)
-			w2 := servePush(t, h.HandleCardPackPurchased, body)
-
-			assert.Equal(t, http.StatusOK, w1.Code)
-			assert.Equal(t, http.StatusOK, w2.Code)
-			cards, getErr := pcRepo.GetPlayerCards(context.Background(), fxPushPlayerID)
-			require.NoError(t, getErr)
-			require.Len(t, cards, 1, "GrantPack は 1 回だけ実行される")
-			assert.Equal(t, 3, cards[0].Count)
-		})
-	})
-}
-
-func TestPubSubPushHandler_HandlePlayerOnboarded(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	packs := map[string]*domain.CardPack{
-		"basic":              {PackID: "basic", IsActive: true, Cards: []domain.CardPackCard{{CardID: "TST-0002", Copies: 2}}},
-		"faction_set_tuners": {PackID: "faction_set_tuners", IsActive: true, Cards: []domain.CardPackCard{{CardID: fxPushCardID, Copies: 3}}},
-	}
-
-	t.Run("player-onboardedのpush受け口", func(t *testing.T) {
-		t.Run("push本文を受け取ると、basicとfactionのカードが付与される", func(t *testing.T) {
-			h, pcRepo := newPubSubPushHandlerFixture(newFakeCardPackRepo(packs))
-			payload, err := json.Marshal(apiscenario.PlayerOnboardedEvent{
-				EventType:        apiscenario.EventTypePlayerOnboarded,
-				EventID:          "evt-1",
-				PlayerID:         fxPushPlayerID,
-				InitialFactionID: "Tuners",
-			})
-			require.NoError(t, err)
-
-			w := servePush(t, h.HandlePlayerOnboarded, pushEnvelopeBody(t, payload))
-
-			assert.Equal(t, http.StatusOK, w.Code)
-			cards, getErr := pcRepo.GetPlayerCards(context.Background(), fxPushPlayerID)
-			require.NoError(t, getErr)
-			assert.ElementsMatch(t, []*domain.PlayerCard{
-				{PlayerID: fxPushPlayerID, CardID: "TST-0002", Count: 2},
-				{PlayerID: fxPushPlayerID, CardID: fxPushCardID, Count: 3},
-			}, cards)
-		})
-
-		t.Run("JSONとして復号できないbodyのとき、400になり応答本文のerrorがenvelope不正を示す文言と完全に一致する", func(t *testing.T) {
-			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
-
-			w := servePush(t, h.HandlePlayerOnboarded, `not-json-at-all`)
-
-			assert.Equal(t, http.StatusBadRequest, w.Code)
-			assert.Equal(t, "pubsub push: malformed envelope", decodeBody(t, w)["error"])
-		})
-
-		t.Run("messageフィールドが無いとき、400になり応答本文のerrorがenvelope不正を示す文言と完全に一致する", func(t *testing.T) {
-			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
-
-			w := servePush(t, h.HandlePlayerOnboarded, `{}`)
-
-			assert.Equal(t, http.StatusBadRequest, w.Code)
-			assert.Equal(t, "pubsub push: malformed envelope", decodeBody(t, w)["error"])
-		})
-
-		t.Run("message.dataが空文字のとき、400になり応答本文のerrorがenvelope不正を示す文言と完全に一致する", func(t *testing.T) {
-			h, _ := newPubSubPushHandlerFixture(newFakeCardPackRepo(nil))
-
-			w := servePush(t, h.HandlePlayerOnboarded, `{"message":{"data":""}}`)
-
-			assert.Equal(t, http.StatusBadRequest, w.Code)
-			assert.Equal(t, "pubsub push: malformed envelope", decodeBody(t, w)["error"])
-		})
-	})
+	return string(encoded)
 }
