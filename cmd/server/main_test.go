@@ -148,9 +148,9 @@ func TestCloudLoggingHandler(t *testing.T) {
 			level        slog.Level
 			wantSeverity string
 		}{
-			{"Infoレベルでログを出力すると、標準出力にseverityキーの値が\"INFO\"である1行のJSONとして出力される", slog.LevelInfo, "INFO"},
-			{"Warnレベルでログを出力すると、標準出力にseverityキーの値が\"WARNING\"である1行のJSONとして出力される", slog.LevelWarn, "WARNING"},
-			{"Errorレベルでログを出力すると、標準出力にseverityキーの値が\"ERROR\"である1行のJSONとして出力される", slog.LevelError, "ERROR"},
+			{"Infoレベルでログを出力すると、標準出力にseverityキーの値が\"INFO\"であるJSONとして出力される", slog.LevelInfo, "INFO"},
+			{"Warnレベルでログを出力すると、標準出力にseverityキーの値が\"WARNING\"であるJSONとして出力される", slog.LevelWarn, "WARNING"},
+			{"Errorレベルでログを出力すると、標準出力にseverityキーの値が\"ERROR\"であるJSONとして出力される", slog.LevelError, "ERROR"},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
@@ -243,7 +243,7 @@ func TestSetupLogger(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	t.Run("起動時の内部認証公開鍵検証", func(t *testing.T) {
-		t.Run("INTERNAL_AUTH_PUBLIC_KEYが空でない文字列だがPEMとして解釈できないとき、起動処理はエラーを返し、そのエラーの内容にINTERNAL_AUTH_PUBLIC_KEY_is_invalidという文言を含む", func(t *testing.T) {
+		t.Run("INTERNAL_AUTH_PUBLIC_KEYが空でない文字列だがPEMとして解釈できないとき、起動処理はエラーを返し、そのエラーの内容に\"INTERNAL_AUTH_PUBLIC_KEY is invalid\"という文言を含む", func(t *testing.T) {
 			orig := slog.Default()
 			defer slog.SetDefault(orig)
 
@@ -267,7 +267,7 @@ func TestRun(t *testing.T) {
 
 func TestMainProcessExit(t *testing.T) {
 	t.Run("起動失敗時のプロセス終了処理", func(t *testing.T) {
-		t.Run("runがエラーを返したとき、card_fatalを含むログを標準エラー出力し、終了コード1でプロセスを終了する", func(t *testing.T) {
+		t.Run("runがエラーを返したとき、\"card fatal\"を含むログを標準エラー出力し、終了コード1でプロセスを終了する", func(t *testing.T) {
 			execPath, err := os.Executable()
 			require.NoError(t, err)
 

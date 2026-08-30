@@ -39,7 +39,7 @@ func jsonResponse(t *testing.T, status int, body any) *http.Response {
 
 func TestClient(t *testing.T) {
 	t.Run("HTTP クライアントの差し替え", func(t *testing.T) {
-		t.Run("差し替えたクライアントが返すレスポンスが、そのまま呼び出し結果に反映される", func(t *testing.T) {
+		t.Run("差し替えたクライアントが返す応答が、そのまま呼び出し結果に反映される", func(t *testing.T) {
 			want := apicard.HealthResponse{Status: "dummy-status"}
 			doer := &stubDoer{response: jsonResponse(t, http.StatusOK, want)}
 
@@ -53,8 +53,8 @@ func TestClient(t *testing.T) {
 		})
 	})
 
-	t.Run("送信リクエストを加工する editor の登録", func(t *testing.T) {
-		t.Run("editorを登録すると、送信される全リクエストにその加工が適用される", func(t *testing.T) {
+	t.Run("送信リクエストを加工する RequestEditor の登録", func(t *testing.T) {
+		t.Run("RequestEditorを登録すると、送信するリクエストにその加工が適用される", func(t *testing.T) {
 			srv := apicardserverfake.NewServer()
 			defer srv.Close()
 
@@ -82,7 +82,7 @@ func TestClient(t *testing.T) {
 			{"status 403 が返るとき、ErrForbiddenに一致するエラーを返す", http.StatusForbidden, apicardclient.ErrForbidden},
 			{"status 404 が返るとき、ErrNotFoundに一致するエラーを返す", http.StatusNotFound, apicardclient.ErrNotFound},
 			{"status 500 が返るとき、ErrInternalServerに一致するエラーを返す", http.StatusInternalServerError, apicardclient.ErrInternalServer},
-			{"status 599 が返るとき、ErrInternalServerに一致するエラーを返す (500以上を包括して扱うことの確認)", 599, apicardclient.ErrInternalServer},
+			{"status 599 が返るとき、ErrInternalServerに一致するエラーを返す", 599, apicardclient.ErrInternalServer},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
@@ -100,7 +100,7 @@ func TestClient(t *testing.T) {
 			})
 		}
 
-		t.Run("status 499 が返るとき、定義済みのどの sentinel にも一致せず、エラーの内容から応答のstatus code (499) を識別できるエラーを返す", func(t *testing.T) {
+		t.Run("status 499 が返るとき、定義済みの一般エラー系 sentinel(ErrBadRequest/ErrUnauthorized/ErrForbidden/ErrNotFound/ErrInternalServer)のいずれにも一致せず、エラーの内容から応答のstatus code (499) を識別できるエラーを返す", func(t *testing.T) {
 			srv := apicardserverfake.NewServer()
 			defer srv.Close()
 			srv.ListDecksFn = func() (int, any) { return 499, nil }
@@ -248,7 +248,7 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("デッキ取得", func(t *testing.T) {
-		t.Run("status 200 が返るとき、応答本文をそのまま戻り値のデッキとして返し、デッキ構成カードは戻り値のDeckCardsフィールドに含まれる", func(t *testing.T) {
+		t.Run("status 200 が返るとき、応答本文のデッキ(デッキ構成カードを含む)をそのまま返す", func(t *testing.T) {
 			deckCards := []apicard.DeckCard{{DeckID: 1, CardID: "dummy-card-id", Count: 2}}
 			want := apicard.Deck{DeckID: 1, DeckName: "dummy-deck", PlayerID: "dummy-player", DeckCards: &deckCards}
 			srv := apicardserverfake.NewServer()
@@ -384,7 +384,7 @@ func TestClient(t *testing.T) {
 			assert.NoError(t, err)
 		})
 
-		t.Run("status 400 が返るとき、ErrDeckInvalidに一致するエラーを返し、そのエラーの内容にはレスポンス本文に設定した文字列が含まれる", func(t *testing.T) {
+		t.Run("status 400 が返るとき、ErrDeckInvalidに一致するエラーを返し、そのエラーの内容には応答本文に設定した文字列が含まれる", func(t *testing.T) {
 			srv := apicardserverfake.NewServer()
 			defer srv.Close()
 			srv.ValidateDeckForBattleFn = func(_ string) (int, any) {
@@ -401,7 +401,7 @@ func TestClient(t *testing.T) {
 			assert.Contains(t, err.Error(), "dummy-invalid-reason")
 		})
 
-		t.Run("status 404 が返るとき、ErrNotFoundに一致するエラーを返す (400の上書きを除き一般の変換規則に従うことの確認)", func(t *testing.T) {
+		t.Run("status 404 が返るとき、ErrNotFoundに一致するエラーを返す", func(t *testing.T) {
 			srv := apicardserverfake.NewServer()
 			defer srv.Close()
 			srv.ValidateDeckForBattleFn = func(_ string) (int, any) { return http.StatusNotFound, nil }
