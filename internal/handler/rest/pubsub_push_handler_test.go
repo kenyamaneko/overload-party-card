@@ -42,7 +42,7 @@ func TestPubSubPushHandler(t *testing.T) {
 			assert.Equal(t, "pubsub push: malformed base64 data", decodeErrorMessage(t, rr))
 		})
 
-		t.Run("message.dataがbase64として解釈でき、注入したport.MessageHandlerがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+		t.Run("message.dataがbase64として解釈でき、デコード後のイベント処理が失敗するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
 			engine := newTestRouter(t, withPlayerOnboardedHandler(func(ctx context.Context, data []byte) error {
 				return errors.New("handler failed")
 			}))
@@ -53,7 +53,7 @@ func TestPubSubPushHandler(t *testing.T) {
 			assert.Equal(t, "internal server error", decodeErrorMessage(t, rr))
 		})
 
-		t.Run("message.dataがbase64として解釈でき、注入したport.MessageHandlerがエラーを返さないとき、200になりレスポンスボディは空になる", func(t *testing.T) {
+		t.Run("message.dataがbase64として解釈でき、デコード後のイベント処理が成功するとき、200になりレスポンスボディは空になる", func(t *testing.T) {
 			engine := newTestRouter(t, withPlayerOnboardedHandler(func(ctx context.Context, data []byte) error {
 				return nil
 			}))
@@ -64,7 +64,7 @@ func TestPubSubPushHandler(t *testing.T) {
 			assert.Empty(t, rr.Body.String())
 		})
 
-		t.Run("port.MessageHandlerが呼び出されるとき、渡される引数はデコード後のmessage.dataの内容と一致する", func(t *testing.T) {
+		t.Run("player-onboardedのpush配信を受けたとき、後続のイベント処理に渡される引数はデコード後のmessage.dataの内容と一致する", func(t *testing.T) {
 			var received []byte
 			engine := newTestRouter(t, withPlayerOnboardedHandler(func(ctx context.Context, data []byte) error {
 				received = data
@@ -77,7 +77,7 @@ func TestPubSubPushHandler(t *testing.T) {
 			assert.Equal(t, "decoded-payload", string(received))
 		})
 
-		t.Run("player-onboarded用とcard-pack-purchased用に別々のport.MessageHandlerを登録したとき、それぞれのエンドポイントは対応するハンドラだけを呼び出す", func(t *testing.T) {
+		t.Run("player-onboarded用とcard-pack-purchased用に別々のイベント処理を登録したとき、それぞれのエンドポイントは対応するイベント処理だけを呼び出す", func(t *testing.T) {
 			var onboardedCalled, purchasedCalled bool
 			engine := newTestRouter(t,
 				withPlayerOnboardedHandler(func(ctx context.Context, data []byte) error {

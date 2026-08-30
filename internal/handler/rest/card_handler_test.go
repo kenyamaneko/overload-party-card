@@ -55,7 +55,7 @@ func TestCardHandlerListAllRaw(t *testing.T) {
 			assert.JSONEq(t, "[]", rr.Body.String())
 		})
 
-		t.Run("port.CardRepo.FindAllがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+		t.Run("カードマスターの取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
 			engine := newTestRouter(t, withCardRepo(&fakeCardRepo{
 				FindAllFn: func(ctx context.Context) ([]*domain.Card, error) { return nil, errors.New("find all failed") },
 			}))
@@ -116,14 +116,14 @@ func TestCardHandlerListForPlayer(t *testing.T) {
 			playerCardRepo *fakePlayerCardRepo
 		}{
 			{
-				name: "port.CardRepo.FindAllがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる",
+				name: "カードマスターの取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる",
 				cardRepo: &fakeCardRepo{FindAllFn: func(ctx context.Context) ([]*domain.Card, error) {
 					return nil, errors.New("find all failed")
 				}},
 				playerCardRepo: &fakePlayerCardRepo{},
 			},
 			{
-				name: "port.CardRepo.FindAllが成功しport.PlayerCardRepo.GetPlayerCardsがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる",
+				name: "カードマスターの取得は成功し、プレイヤーの所持カード取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる",
 				cardRepo: &fakeCardRepo{FindAllFn: func(ctx context.Context) ([]*domain.Card, error) {
 					return []*domain.Card{newTestCard("TST-0001", "SHE", "Compute", "unlimited")}, nil
 				}},

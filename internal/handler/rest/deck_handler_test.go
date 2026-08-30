@@ -147,7 +147,7 @@ func fakeFactionClientOwning(factions ...string) *fakeFactionClient {
 
 func TestDeckHandlerGetDecks(t *testing.T) {
 	t.Run("[handler] デッキ一覧取得", func(t *testing.T) {
-		t.Run("port.DeckRepo.FindByPlayerIDとport.PlayerCardRepo.GetPlayerCardsが両方成功するとき、200になりレスポンスボディはデッキの配列になる", func(t *testing.T) {
+		t.Run("プレイヤーのデッキ一覧と所持カード一覧の両方が取得できるとき、200になりレスポンスボディはデッキの配列になる", func(t *testing.T) {
 			deck := &domain.Deck{PlayerID: testPlayerID, DeckID: 1, DeckName: "デッキ1", Faction: "SHE", ProductID: "PD-TST01", RoutineID: "IN-TST01", SpecialID: "IN-TST02"}
 			engine := newTestRouter(t,
 				withDeckRepo(&fakeDeckRepo{
@@ -174,14 +174,14 @@ func TestDeckHandlerGetDecks(t *testing.T) {
 			pcRepo   *fakePlayerCardRepo
 		}{
 			{
-				name: "port.DeckRepo.FindByPlayerIDがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる",
+				name: "プレイヤーのデッキ一覧の取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる",
 				deckRepo: &fakeDeckRepo{FindByPlayerIDFn: func(ctx context.Context, playerID string) ([]*domain.Deck, error) {
 					return nil, errors.New("find by player id failed")
 				}},
 				pcRepo: &fakePlayerCardRepo{},
 			},
 			{
-				name: "port.DeckRepo.FindByPlayerIDが成功しport.PlayerCardRepo.GetPlayerCardsがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる",
+				name: "デッキ一覧の取得は成功し、プレイヤーの所持カード取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる",
 				deckRepo: &fakeDeckRepo{FindByPlayerIDFn: func(ctx context.Context, playerID string) ([]*domain.Deck, error) {
 					return []*domain.Deck{{PlayerID: testPlayerID, DeckID: 1}}, nil
 				}},
@@ -190,7 +190,7 @@ func TestDeckHandlerGetDecks(t *testing.T) {
 				}},
 			},
 			{
-				name: "あるデッキの構成カード取得(port.DeckRepo.GetDeckCards)がエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる",
+				name: "あるデッキの構成カードの取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる",
 				deckRepo: &fakeDeckRepo{
 					FindByPlayerIDFn: func(ctx context.Context, playerID string) ([]*domain.Deck, error) {
 						return []*domain.Deck{{PlayerID: testPlayerID, DeckID: 1}}, nil
@@ -274,7 +274,7 @@ func TestDeckHandlerGetDeck(t *testing.T) {
 			assert.Equal(t, "invalid deck_id", decodeErrorMessage(t, rr))
 		})
 
-		t.Run("port.DeckRepo.FindByIDがport.ErrNotFoundと一致するエラーを返すとき、404になりボディのerrorフィールドはnot foundを含む文字列になる", func(t *testing.T) {
+		t.Run("指定したdeckIdのデッキが存在しないとき、404になりボディのerrorフィールドはnot foundを含む文字列になる", func(t *testing.T) {
 			engine := newTestRouter(t, withDeckRepo(&fakeDeckRepo{
 				FindByIDFn: func(ctx context.Context, playerID string, deckID int64) (*domain.Deck, error) {
 					return nil, port.ErrNotFound
@@ -287,7 +287,7 @@ func TestDeckHandlerGetDeck(t *testing.T) {
 			assert.Contains(t, decodeErrorMessage(t, rr), "not found")
 		})
 
-		t.Run("port.DeckRepo.FindByIDがport.ErrNotFoundと一致しないエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+		t.Run("デッキの取得で想定外のエラーが発生するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
 			engine := newTestRouter(t, withDeckRepo(&fakeDeckRepo{
 				FindByIDFn: func(ctx context.Context, playerID string, deckID int64) (*domain.Deck, error) {
 					return nil, errors.New("find by id failed")
@@ -300,7 +300,7 @@ func TestDeckHandlerGetDeck(t *testing.T) {
 			assert.Equal(t, "internal server error", decodeErrorMessage(t, rr))
 		})
 
-		t.Run("port.DeckRepo.FindByIDが成功しport.DeckRepo.GetDeckCardsがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+		t.Run("デッキ本体の取得は成功し、構成カードの取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
 			engine := newTestRouter(t, withDeckRepo(&fakeDeckRepo{
 				FindByIDFn: func(ctx context.Context, playerID string, deckID int64) (*domain.Deck, error) {
 					return &domain.Deck{PlayerID: playerID, DeckID: deckID}, nil
@@ -316,7 +316,7 @@ func TestDeckHandlerGetDeck(t *testing.T) {
 			assert.Equal(t, "internal server error", decodeErrorMessage(t, rr))
 		})
 
-		t.Run("port.DeckRepo.FindByIDとport.DeckRepo.GetDeckCardsが成功しport.PlayerCardRepo.GetPlayerCardsがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+		t.Run("デッキ本体と構成カードは取得できたが、プレイヤーの所持カード取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
 			engine := newTestRouter(t,
 				withDeckRepo(&fakeDeckRepo{
 					FindByIDFn: func(ctx context.Context, playerID string, deckID int64) (*domain.Deck, error) {
@@ -337,7 +337,7 @@ func TestDeckHandlerGetDeck(t *testing.T) {
 			assert.Equal(t, "internal server error", decodeErrorMessage(t, rr))
 		})
 
-		t.Run("全ての取得が成功するとき、200になりレスポンスボディ直下がデッキ本体になり、取得した構成カード一覧はdeck_cardsフィールドにのみ含まれる", func(t *testing.T) {
+		t.Run("指定したdeckIdのデッキが存在し、その構成カードとプレイヤーの所持カードがすべて取得できるとき、200になりレスポンスボディ直下がデッキ本体になり、取得した構成カード一覧はdeck_cardsフィールドにのみ含まれる", func(t *testing.T) {
 			fx := newMinimalDeckFixture()
 			opts := append(withDeckMasterData(t, fx),
 				withDeckRepo(&fakeDeckRepo{
@@ -365,7 +365,7 @@ func TestDeckHandlerGetDeck(t *testing.T) {
 			require.Len(t, deckCards, 1)
 		})
 
-		t.Run("全ての取得が成功し共通仕様グループの判定基準を満たすとき、is_validはtrueになる", func(t *testing.T) {
+		t.Run("指定したdeckIdのデッキが存在し、デッキ内容検証・施策整合検証をともに満たし、構成カードの合計枚数がデッキ規定枚数と一致するとき、is_validはtrueになる", func(t *testing.T) {
 			fx := newFullDeckFixture()
 			opts := append(withDeckMasterData(t, fx),
 				withDeckRepo(&fakeDeckRepo{
@@ -388,7 +388,7 @@ func TestDeckHandlerGetDeck(t *testing.T) {
 			assert.True(t, body.IsValid)
 		})
 
-		t.Run("全ての取得が成功し共通仕様グループの判定基準を満たさないとき、is_validはfalseになる", func(t *testing.T) {
+		t.Run("指定したdeckIdのデッキが存在し、デッキ内容検証・施策整合検証をともに満たすが、構成カードの合計枚数がデッキ規定枚数と一致しないとき、is_validはfalseになる", func(t *testing.T) {
 			fx := newMinimalDeckFixture()
 			opts := append(withDeckMasterData(t, fx),
 				withDeckRepo(&fakeDeckRepo{
@@ -424,7 +424,7 @@ func TestDeckHandlerCreateDeck(t *testing.T) {
 			assert.Equal(t, "malformed request body", decodeErrorMessage(t, rr))
 		})
 
-		t.Run("宣言陣営が選択可能陣営のいずれでもないなど、デッキの内容として無効なとき、400になりボディのerrorフィールドはinvalid deckを含む文字列になる", func(t *testing.T) {
+		t.Run("宣言陣営が選択可能陣営のいずれでもないとき、400になりボディのerrorフィールドはinvalid deckを含む文字列になる", func(t *testing.T) {
 			fx := newMinimalDeckFixture()
 			req := fx.createRequest()
 			req.Faction = "NotASelectableFaction"
@@ -462,7 +462,7 @@ func TestDeckHandlerCreateDeck(t *testing.T) {
 			assert.Contains(t, decodeErrorMessage(t, rr), "unowned")
 		})
 
-		t.Run("port.PlayerCardRepo.GetPlayerCardsがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+		t.Run("プレイヤーの所持カード取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
 			fx := newMinimalDeckFixture()
 			engine := newTestRouter(t, withPlayerCardRepo(&fakePlayerCardRepo{GetPlayerCardsFn: func(ctx context.Context, playerID string) ([]*domain.PlayerCard, error) {
 				return nil, errors.New("get player cards failed")
@@ -474,7 +474,7 @@ func TestDeckHandlerCreateDeck(t *testing.T) {
 			assert.Equal(t, "internal server error", decodeErrorMessage(t, rr))
 		})
 
-		t.Run("宣言陣営がport.FactionClient.ListPlayerFactionsの返り値に含まれないとき、400になりボディのerrorフィールドはinvalid deckを含む文字列になる", func(t *testing.T) {
+		t.Run("宣言陣営がプレイヤーの所持陣営に含まれないとき、400になりボディのerrorフィールドはinvalid deckを含む文字列になる", func(t *testing.T) {
 			fx := newMinimalDeckFixture()
 			opts := append(withDeckMasterData(t, fx),
 				withPlayerCardRepo(fakePlayerCardRepoReturning(fx.owned)),
@@ -488,7 +488,7 @@ func TestDeckHandlerCreateDeck(t *testing.T) {
 			assert.Contains(t, decodeErrorMessage(t, rr), "invalid deck")
 		})
 
-		t.Run("port.FactionClient.ListPlayerFactionsがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+		t.Run("プレイヤーの所持陣営取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
 			fx := newMinimalDeckFixture()
 			opts := append(withDeckMasterData(t, fx),
 				withPlayerCardRepo(fakePlayerCardRepoReturning(fx.owned)),
@@ -504,7 +504,7 @@ func TestDeckHandlerCreateDeck(t *testing.T) {
 			assert.Equal(t, "internal server error", decodeErrorMessage(t, rr))
 		})
 
-		t.Run("port.DeckRepo.Createがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+		t.Run("デッキの作成に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
 			fx := newMinimalDeckFixture()
 			opts := append(withDeckMasterData(t, fx),
 				withPlayerCardRepo(fakePlayerCardRepoReturning(fx.owned)),
@@ -521,7 +521,7 @@ func TestDeckHandlerCreateDeck(t *testing.T) {
 			assert.Equal(t, "internal server error", decodeErrorMessage(t, rr))
 		})
 
-		t.Run("port.DeckRepo.Createが成功した後port.DeckRepo.GetDeckCardsがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+		t.Run("デッキの作成は成功したが、作成後の構成カード取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
 			fx := newMinimalDeckFixture()
 			opts := append(withDeckMasterData(t, fx),
 				withPlayerCardRepo(fakePlayerCardRepoReturning(fx.owned)),
@@ -596,7 +596,7 @@ func TestDeckHandlerUpdateDeck(t *testing.T) {
 			assert.Equal(t, "malformed request body", decodeErrorMessage(t, rr))
 		})
 
-		t.Run("宣言陣営が選択可能陣営のいずれでもないなど、デッキの内容として無効なとき、400になりボディのerrorフィールドはinvalid deckを含む文字列になる", func(t *testing.T) {
+		t.Run("宣言陣営が選択可能陣営のいずれでもないとき、400になりボディのerrorフィールドはinvalid deckを含む文字列になる", func(t *testing.T) {
 			fx := newMinimalDeckFixture()
 			req := fx.updateRequest()
 			req.Faction = "NotASelectableFaction"
@@ -634,7 +634,7 @@ func TestDeckHandlerUpdateDeck(t *testing.T) {
 			assert.Contains(t, decodeErrorMessage(t, rr), "unowned")
 		})
 
-		t.Run("port.PlayerCardRepo.GetPlayerCardsがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+		t.Run("プレイヤーの所持カード取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
 			fx := newMinimalDeckFixture()
 			engine := newTestRouter(t, withPlayerCardRepo(&fakePlayerCardRepo{GetPlayerCardsFn: func(ctx context.Context, playerID string) ([]*domain.PlayerCard, error) {
 				return nil, errors.New("get player cards failed")
@@ -646,7 +646,7 @@ func TestDeckHandlerUpdateDeck(t *testing.T) {
 			assert.Equal(t, "internal server error", decodeErrorMessage(t, rr))
 		})
 
-		t.Run("宣言陣営がport.FactionClient.ListPlayerFactionsの返り値に含まれないとき、400になりボディのerrorフィールドはinvalid deckを含む文字列になる", func(t *testing.T) {
+		t.Run("宣言陣営がプレイヤーの所持陣営に含まれないとき、400になりボディのerrorフィールドはinvalid deckを含む文字列になる", func(t *testing.T) {
 			fx := newMinimalDeckFixture()
 			opts := append(withDeckMasterData(t, fx),
 				withPlayerCardRepo(fakePlayerCardRepoReturning(fx.owned)),
@@ -660,7 +660,7 @@ func TestDeckHandlerUpdateDeck(t *testing.T) {
 			assert.Contains(t, decodeErrorMessage(t, rr), "invalid deck")
 		})
 
-		t.Run("port.FactionClient.ListPlayerFactionsがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+		t.Run("プレイヤーの所持陣営取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
 			fx := newMinimalDeckFixture()
 			opts := append(withDeckMasterData(t, fx),
 				withPlayerCardRepo(fakePlayerCardRepoReturning(fx.owned)),
@@ -676,7 +676,7 @@ func TestDeckHandlerUpdateDeck(t *testing.T) {
 			assert.Equal(t, "internal server error", decodeErrorMessage(t, rr))
 		})
 
-		t.Run("port.DeckRepo.Updateがport.ErrNotFoundと一致するエラーを返すとき、404になりボディのerrorフィールドはnot foundを含む文字列になる", func(t *testing.T) {
+		t.Run("更新対象のdeckIdのデッキが存在しないとき、404になりボディのerrorフィールドはnot foundを含む文字列になる", func(t *testing.T) {
 			fx := newMinimalDeckFixture()
 			opts := append(withDeckMasterData(t, fx),
 				withPlayerCardRepo(fakePlayerCardRepoReturning(fx.owned)),
@@ -693,7 +693,7 @@ func TestDeckHandlerUpdateDeck(t *testing.T) {
 			assert.Contains(t, decodeErrorMessage(t, rr), "not found")
 		})
 
-		t.Run("port.DeckRepo.Updateがport.ErrNotFoundと一致しないエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+		t.Run("デッキの更新で想定外のエラーが発生するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
 			fx := newMinimalDeckFixture()
 			opts := append(withDeckMasterData(t, fx),
 				withPlayerCardRepo(fakePlayerCardRepoReturning(fx.owned)),
@@ -710,7 +710,7 @@ func TestDeckHandlerUpdateDeck(t *testing.T) {
 			assert.Equal(t, "internal server error", decodeErrorMessage(t, rr))
 		})
 
-		t.Run("port.DeckRepo.Updateが成功した後port.DeckRepo.GetDeckCardsがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+		t.Run("デッキの更新は成功したが、更新後の構成カード取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
 			fx := newMinimalDeckFixture()
 			opts := append(withDeckMasterData(t, fx),
 				withPlayerCardRepo(fakePlayerCardRepoReturning(fx.owned)),
@@ -772,7 +772,7 @@ func TestDeckHandlerDeleteDeck(t *testing.T) {
 			assert.Equal(t, "invalid deck_id", decodeErrorMessage(t, rr))
 		})
 
-		t.Run("deckIdが数値でport.DeckRepo.Deleteが成功するとき、204になりレスポンスボディは空になる", func(t *testing.T) {
+		t.Run("deckIdが数値でデッキの削除が成功するとき、204になりレスポンスボディは空になる", func(t *testing.T) {
 			engine := newTestRouter(t, withDeckRepo(&fakeDeckRepo{DeleteFn: func(ctx context.Context, playerID string, deckID int64) error {
 				return nil
 			}}))
@@ -783,7 +783,7 @@ func TestDeckHandlerDeleteDeck(t *testing.T) {
 			assert.Empty(t, rr.Body.String())
 		})
 
-		t.Run("port.DeckRepo.Deleteがport.ErrNotFoundと一致するエラーを返すとき、404になりボディのerrorフィールドはnot foundを含む文字列になる", func(t *testing.T) {
+		t.Run("削除対象のdeckIdのデッキが存在しないとき、404になりボディのerrorフィールドはnot foundを含む文字列になる", func(t *testing.T) {
 			engine := newTestRouter(t, withDeckRepo(&fakeDeckRepo{DeleteFn: func(ctx context.Context, playerID string, deckID int64) error {
 				return port.ErrNotFound
 			}}))
@@ -794,7 +794,7 @@ func TestDeckHandlerDeleteDeck(t *testing.T) {
 			assert.Contains(t, decodeErrorMessage(t, rr), "not found")
 		})
 
-		t.Run("port.DeckRepo.Deleteがport.ErrNotFoundと一致しないエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+		t.Run("デッキの削除で想定外のエラーが発生するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
 			engine := newTestRouter(t, withDeckRepo(&fakeDeckRepo{DeleteFn: func(ctx context.Context, playerID string, deckID int64) error {
 				return errors.New("delete failed")
 			}}))
@@ -820,7 +820,7 @@ func TestDeckHandlerValidateDeckForBattle(t *testing.T) {
 			assert.Equal(t, "invalid deck_id", decodeErrorMessage(t, rr))
 		})
 
-		t.Run("deckIdが数値で、port.DeckRepo.FindByIDがport.ErrNotFoundと一致するエラーを返すとき、404になりボディのerrorフィールドはnot foundを含む文字列になる", func(t *testing.T) {
+		t.Run("deckIdが数値で、検証対象のデッキが存在しないとき、404になりボディのerrorフィールドはnot foundを含む文字列になる", func(t *testing.T) {
 			engine := newTestRouter(t, withDeckRepo(&fakeDeckRepo{FindByIDFn: func(ctx context.Context, playerID string, deckID int64) (*domain.Deck, error) {
 				return nil, port.ErrNotFound
 			}}))
@@ -831,7 +831,7 @@ func TestDeckHandlerValidateDeckForBattle(t *testing.T) {
 			assert.Contains(t, decodeErrorMessage(t, rr), "not found")
 		})
 
-		t.Run("deckIdが数値で、port.DeckRepo.FindByIDがport.ErrNotFoundと一致しないエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+		t.Run("deckIdが数値で、デッキの取得中に想定外のエラーが発生するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
 			engine := newTestRouter(t, withDeckRepo(&fakeDeckRepo{FindByIDFn: func(ctx context.Context, playerID string, deckID int64) (*domain.Deck, error) {
 				return nil, errors.New("find by id failed")
 			}}))
@@ -842,7 +842,7 @@ func TestDeckHandlerValidateDeckForBattle(t *testing.T) {
 			assert.Equal(t, "internal server error", decodeErrorMessage(t, rr))
 		})
 
-		t.Run("port.DeckRepo.FindByIDが成功しport.DeckRepo.GetDeckCardsがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+		t.Run("デッキ本体の取得は成功し、構成カードの取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
 			fx := newMinimalDeckFixture()
 			engine := newTestRouter(t, withDeckRepo(&fakeDeckRepo{
 				FindByIDFn: func(ctx context.Context, playerID string, deckID int64) (*domain.Deck, error) {
@@ -876,7 +876,7 @@ func TestDeckHandlerValidateDeckForBattle(t *testing.T) {
 			assert.Contains(t, decodeErrorMessage(t, rr), "invalid deck")
 		})
 
-		t.Run("構成カードの合計枚数がデッキ規定枚数と一致し、port.PlayerCardRepo.GetPlayerCardsがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+		t.Run("構成カードの合計枚数がデッキ規定枚数と一致し、プレイヤーの所持カード取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
 			fx := newFullDeckFixture()
 			opts := append(withDeckMasterData(t, fx),
 				withDeckRepo(&fakeDeckRepo{
@@ -968,7 +968,7 @@ func TestDeckHandlerValidateDeckForBattle(t *testing.T) {
 			assert.Contains(t, decodeErrorMessage(t, rr), "invalid deck")
 		})
 
-		t.Run("構成カードの合計枚数がデッキ規定枚数と一致し、所持・制限・施策整合のすべてを満たすとき、200になりレスポンスボディは空になる", func(t *testing.T) {
+		t.Run("デッキ内容検証・施策整合検証をともに満たし、構成カードの合計枚数がデッキ規定枚数と一致するとき、200になりレスポンスボディは空になる", func(t *testing.T) {
 			fx := newFullDeckFixture()
 			opts := append(withDeckMasterData(t, fx),
 				withDeckRepo(&fakeDeckRepo{

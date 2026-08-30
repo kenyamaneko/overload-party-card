@@ -54,7 +54,7 @@ func TestPlayerCardHandlerGetPlayerCards(t *testing.T) {
 			assert.JSONEq(t, "[]", rr.Body.String())
 		})
 
-		t.Run("port.PlayerCardRepo.GetPlayerCardsがエラーを返すとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+		t.Run("プレイヤーの所持カード取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
 			engine := newTestRouter(t,
 				withPlayerCardRepo(&fakePlayerCardRepo{GetPlayerCardsFn: func(ctx context.Context, playerID string) ([]*domain.PlayerCard, error) {
 					return nil, errors.New("get player cards failed")
