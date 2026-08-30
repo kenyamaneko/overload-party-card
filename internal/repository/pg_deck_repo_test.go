@@ -35,7 +35,7 @@ func newTestDeck(playerID, deckName string, playmatNo, sleeveNo *int64) domain.D
 
 func TestDeckRepoCreate(t *testing.T) {
 	t.Run("[デッキリポジトリ] デッキ作成", func(t *testing.T) {
-		t.Run("デッキを作成すると、新たに採番されたdeck_idを返す", func(t *testing.T) {
+		t.Run("デッキを複数作成すると、それぞれ異なるdeck_idが採番される", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deckA := newTestDeck(playerA, "デッキA", nil, nil)
@@ -49,7 +49,7 @@ func TestDeckRepoCreate(t *testing.T) {
 			require.NotEqual(t, idA, idB)
 		})
 
-		t.Run("作成したデッキをFindByIDで取得すると、指定したDeckName/Faction/ProductID/RoutineID/SpecialID/PlaymatNo/SleeveNoの値が、そのまま返る", func(t *testing.T) {
+		t.Run("作成したデッキを取得し直すと、指定した項目の値が、そのまま返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deck := newTestDeck(playerA, "デッキA", int64Ptr(12), int64Ptr(34))
@@ -70,7 +70,7 @@ func TestDeckRepoCreate(t *testing.T) {
 			require.Equal(t, int64(34), *got.SleeveNo)
 		})
 
-		t.Run("デッキを作成すると、呼び出し側が指定したCreatedAt/UpdatedAtの値が、そのまま保存される", func(t *testing.T) {
+		t.Run("デッキを作成すると、呼び出し側が指定した作成日時・更新日時の値が、そのまま保存される", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deck := newTestDeck(playerA, "デッキA", nil, nil)
@@ -86,7 +86,7 @@ func TestDeckRepoCreate(t *testing.T) {
 			require.True(t, deck.UpdatedAt.Equal(got.UpdatedAt))
 		})
 
-		t.Run("PlaymatNo/SleeveNoを未設定でデッキを作成すると、FindByIDで取得した値も未設定になる", func(t *testing.T) {
+		t.Run("プレイマット番号・スリーブ番号を未設定でデッキを作成すると、取得した値も未設定になる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deck := newTestDeck(playerA, "デッキA", nil, nil)
@@ -100,7 +100,7 @@ func TestDeckRepoCreate(t *testing.T) {
 			require.Nil(t, got.SleeveNo)
 		})
 
-		t.Run("空のdeckCardEntriesでデッキを作成すると、そのデッキの構成カードは0件になる", func(t *testing.T) {
+		t.Run("構成カードを指定せずにデッキを作成すると、そのデッキの構成カードは0件になる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deck := newTestDeck(playerA, "デッキA", nil, nil)
@@ -113,7 +113,7 @@ func TestDeckRepoCreate(t *testing.T) {
 			require.Empty(t, cards)
 		})
 
-		t.Run("1件以上のdeckCardEntriesでデッキを作成すると、その構成カードをGetDeckCardsで取得でき、CardID/ArtNo/Countが指定した値のまま返る", func(t *testing.T) {
+		t.Run("構成カードを指定してデッキを作成すると、その構成カードが指定した値のまま取得できる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deck := newTestDeck(playerA, "デッキA", nil, nil)
@@ -133,7 +133,7 @@ func TestDeckRepoCreate(t *testing.T) {
 			}, cards)
 		})
 
-		t.Run("同じCardIDとArtNoの組を複数含むdeckCardEntriesを指定してデッキを作成しようとすると、エラーを返し、デッキは作成されない", func(t *testing.T) {
+		t.Run("同じカードID・アート番号の組を複数含む構成カードを指定してデッキを作成しようとすると、エラーを返し、デッキは作成されない", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deck := newTestDeck(playerA, "デッキA", nil, nil)
@@ -150,7 +150,7 @@ func TestDeckRepoCreate(t *testing.T) {
 			require.Empty(t, decks)
 		})
 
-		t.Run("同じCardIDとArtNoの組を複数含むdeckCardEntriesでのデッキ作成に失敗した後、重複のない構成で改めてCreateを呼び出すと、デッキが作成される", func(t *testing.T) {
+		t.Run("同じカードID・アート番号の組を複数含む構成でのデッキ作成に失敗した後、重複のない構成で改めて作成すると、デッキが作成される", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deck := newTestDeck(playerA, "デッキA", nil, nil)
@@ -326,7 +326,7 @@ func TestDeckRepoGetDeckCards(t *testing.T) {
 
 func TestDeckRepoUpdate(t *testing.T) {
 	t.Run("[デッキリポジトリ] デッキ更新", func(t *testing.T) {
-		t.Run("存在するデッキを更新すると、指定したDeckName/Faction/ProductID/RoutineID/SpecialID/PlaymatNo/SleeveNoが更新後の値になる", func(t *testing.T) {
+		t.Run("存在するデッキを更新すると、指定した項目が更新後の値になる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deck := newTestDeck(playerA, "デッキA", nil, nil)
@@ -378,7 +378,7 @@ func TestDeckRepoUpdate(t *testing.T) {
 			require.WithinDuration(t, time.Now(), got.UpdatedAt, 5*time.Minute)
 		})
 
-		t.Run("更新前の構成カードは、新しいdeckCardEntriesの内容で完全に置き換わる", func(t *testing.T) {
+		t.Run("更新前の構成カードは、新しく指定した構成カードの内容で完全に置き換わる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deck := newTestDeck(playerA, "デッキA", nil, nil)
@@ -401,7 +401,7 @@ func TestDeckRepoUpdate(t *testing.T) {
 			}, cards)
 		})
 
-		t.Run("空のdeckCardEntriesで更新すると、構成カードは全件削除され0件になる", func(t *testing.T) {
+		t.Run("構成カードを指定せずに更新すると、構成カードは全件削除され0件になる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deck := newTestDeck(playerA, "デッキA", nil, nil)
@@ -420,7 +420,7 @@ func TestDeckRepoUpdate(t *testing.T) {
 			require.Empty(t, cards)
 		})
 
-		t.Run("設定されていたPlaymatNo/SleeveNoを未設定にして更新すると、FindByIDで取得した値も未設定になる", func(t *testing.T) {
+		t.Run("設定されていたプレイマット番号・スリーブ番号を未設定にして更新すると、取得した値も未設定になる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deck := newTestDeck(playerA, "デッキA", int64Ptr(1), int64Ptr(2))
@@ -440,7 +440,7 @@ func TestDeckRepoUpdate(t *testing.T) {
 			require.Nil(t, got.SleeveNo)
 		})
 
-		t.Run("存在するデッキに対し、同じCardIDとArtNoの組を複数含むdeckCardEntriesで更新しようとすると、エラーを返し、更新前の構成カードがGetDeckCardsでそのまま取得できる", func(t *testing.T) {
+		t.Run("存在するデッキに対し、同じカードID・アート番号の組を複数含む構成で更新しようとすると、エラーを返し、更新前の構成カードがそのまま取得できる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deck := newTestDeck(playerA, "デッキA", nil, nil)
@@ -464,7 +464,7 @@ func TestDeckRepoUpdate(t *testing.T) {
 			}, cards)
 		})
 
-		t.Run("同じCardIDとArtNoの組を複数含むdeckCardEntriesでの更新に失敗した後、重複のない構成で改めてUpdateを呼び出すと、その構成に置き換わる", func(t *testing.T) {
+		t.Run("同じカードID・アート番号の組を複数含む構成での更新に失敗した後、重複のない構成で改めて更新すると、その構成に置き換わる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deck := newTestDeck(playerA, "デッキA", nil, nil)
@@ -492,7 +492,7 @@ func TestDeckRepoUpdate(t *testing.T) {
 			}, cards)
 		})
 
-		t.Run("存在しないplayer_id・deck_idの組に対して更新しようとすると、deckCardEntriesが0件のときport.ErrNotFoundを返し、更新は行われない", func(t *testing.T) {
+		t.Run("存在しないplayer_id・deck_idの組に対して更新しようとすると、構成カードが0件のときport.ErrNotFoundを返し、更新は行われない", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deck := newTestDeck(playerA, "デッキA", nil, nil)
@@ -504,7 +504,7 @@ func TestDeckRepoUpdate(t *testing.T) {
 			require.Equal(t, 0, countRows(t, "card.deck_cards"))
 		})
 
-		t.Run("存在しないplayer_id・deck_idの組に対して更新しようとすると、deckCardEntriesが1件以上のときport.ErrNotFoundを返し、更新は行われない", func(t *testing.T) {
+		t.Run("存在しないplayer_id・deck_idの組に対して更新しようとすると、構成カードが1件以上のときport.ErrNotFoundを返し、更新は行われない", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deck := newTestDeck(playerA, "デッキA", nil, nil)
@@ -522,7 +522,7 @@ func TestDeckRepoUpdate(t *testing.T) {
 
 func TestDeckRepoDelete(t *testing.T) {
 	t.Run("[デッキリポジトリ] デッキ削除", func(t *testing.T) {
-		t.Run("存在するデッキを削除すると、そのデッキはFindByIDで取得できなくなる", func(t *testing.T) {
+		t.Run("存在するデッキを削除すると、そのデッキは取得できなくなる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deck := newTestDeck(playerA, "デッキA", nil, nil)
@@ -536,7 +536,7 @@ func TestDeckRepoDelete(t *testing.T) {
 			require.ErrorIs(t, err, port.ErrNotFound)
 		})
 
-		t.Run("デッキを削除すると、その構成カードもGetDeckCardsで0件になる", func(t *testing.T) {
+		t.Run("デッキを削除すると、その構成カードも0件になる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deck := newTestDeck(playerA, "デッキA", nil, nil)
@@ -553,7 +553,7 @@ func TestDeckRepoDelete(t *testing.T) {
 			require.Empty(t, cards)
 		})
 
-		t.Run("別プレイヤーのデッキ・構成カードは、Deleteの対象にならない", func(t *testing.T) {
+		t.Run("別プレイヤーのデッキを削除しても、別プレイヤーのデッキ・構成カードは削除されず取得できたままになる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgDeckRepository(sharedPg.Pool)
 			deckA := newTestDeck(playerA, "デッキA", nil, nil)

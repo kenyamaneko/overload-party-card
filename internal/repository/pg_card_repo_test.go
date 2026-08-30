@@ -24,7 +24,7 @@ func TestCardRepoFindAll(t *testing.T) {
 			require.Empty(t, got)
 		})
 
-		t.Run("is_active=trueのカード定義があるとき、それらを返す", func(t *testing.T) {
+		t.Run("有効なカード定義があるとき、それらを返す", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedCard(t, cardSeed{CardID: "TST-0001", CardName: "テストカードA", Faction: "SHE", CardType: "Resource", Restriction: "unlimited", IsActive: true})
 			repo := repository.NewPgCardRepository(sharedPg.Pool)
@@ -36,7 +36,7 @@ func TestCardRepoFindAll(t *testing.T) {
 			require.Equal(t, "TST-0001", got[0].CardID)
 		})
 
-		t.Run("is_active=falseのカード定義は、返る一覧に含まれない", func(t *testing.T) {
+		t.Run("無効なカード定義は、返る一覧に含まれない", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedCard(t, cardSeed{CardID: "TST-0001", CardName: "テストカードA", Faction: "SHE", CardType: "Resource", Restriction: "unlimited", IsActive: false})
 			repo := repository.NewPgCardRepository(sharedPg.Pool)
@@ -47,7 +47,7 @@ func TestCardRepoFindAll(t *testing.T) {
 			require.Empty(t, got)
 		})
 
-		t.Run("is_active=trueのカード定義が複数件あるとき、card_idの昇順で返る", func(t *testing.T) {
+		t.Run("有効なカード定義が複数件あるとき、card_idの昇順で返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedCards(t, []cardSeed{
 				{CardID: "TST-0003", CardName: "テストカードC", Faction: "SHE", CardType: "Resource", Restriction: "unlimited", IsActive: true},
@@ -95,7 +95,7 @@ func TestCardRepoFindAll(t *testing.T) {
 			require.True(t, updatedAt.Equal(c.UpdatedAt))
 		})
 
-		t.Run("保存したstats(JSON)の内容が、そのまま返る", func(t *testing.T) {
+		t.Run("保存した能力値(JSON)の内容が、そのまま返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedFullCard(t, fullCardSeed{
 				CardID: "TST-0001", CardName: "テストカードA", ResourceLabel: "CPU",
@@ -114,7 +114,7 @@ func TestCardRepoFindAll(t *testing.T) {
 			require.JSONEq(t, `{"cpu":2,"mem":4}`, string(got[0].Stats))
 		})
 
-		t.Run("subtypeがNULLのカード定義を取得すると、返り値のsubtypeも未設定になる", func(t *testing.T) {
+		t.Run("サブタイプが未設定のカード定義を取得すると、返り値のサブタイプも未設定になる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedCard(t, cardSeed{CardID: "TST-0001", CardName: "テストカードA", Faction: "SHE", CardType: "Resource", Restriction: "unlimited", IsActive: true})
 			repo := repository.NewPgCardRepository(sharedPg.Pool)
@@ -126,7 +126,7 @@ func TestCardRepoFindAll(t *testing.T) {
 			require.Nil(t, got[0].Subtype)
 		})
 
-		t.Run("subtypeが設定されたカード定義を取得すると、その値が返る", func(t *testing.T) {
+		t.Run("サブタイプが設定されたカード定義を取得すると、その値が返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedFullCard(t, fullCardSeed{
 				CardID: "TST-0001", CardName: "テストカードA", ResourceLabel: "CPU",
@@ -146,7 +146,7 @@ func TestCardRepoFindAll(t *testing.T) {
 			require.Equal(t, "Container", *got[0].Subtype)
 		})
 
-		t.Run("effect_textがNULLのカード定義を取得すると、返り値のeffect_textも未設定になる", func(t *testing.T) {
+		t.Run("効果テキストが未設定のカード定義を取得すると、返り値の効果テキストも未設定になる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedCard(t, cardSeed{CardID: "TST-0001", CardName: "テストカードA", Faction: "SHE", CardType: "Resource", Restriction: "unlimited", IsActive: true})
 			repo := repository.NewPgCardRepository(sharedPg.Pool)
@@ -158,7 +158,7 @@ func TestCardRepoFindAll(t *testing.T) {
 			require.Nil(t, got[0].EffectText)
 		})
 
-		t.Run("effect_textが設定されたカード定義を取得すると、その値が返る", func(t *testing.T) {
+		t.Run("効果テキストが設定されたカード定義を取得すると、その値が返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedFullCard(t, fullCardSeed{
 				CardID: "TST-0001", CardName: "テストカードA", ResourceLabel: "CPU",
@@ -178,7 +178,7 @@ func TestCardRepoFindAll(t *testing.T) {
 			require.Equal(t, "効果テキストです", *got[0].EffectText)
 		})
 
-		t.Run("effectsがNULLのカード定義を取得すると、返り値のeffectsも未設定になる", func(t *testing.T) {
+		t.Run("効果(JSON)が未設定のカード定義を取得すると、返り値の効果も未設定になる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedCard(t, cardSeed{CardID: "TST-0001", CardName: "テストカードA", Faction: "SHE", CardType: "Resource", Restriction: "unlimited", IsActive: true})
 			repo := repository.NewPgCardRepository(sharedPg.Pool)
@@ -190,7 +190,7 @@ func TestCardRepoFindAll(t *testing.T) {
 			require.Nil(t, got[0].Effects)
 		})
 
-		t.Run("effects(JSON)が設定されたカード定義を取得すると、その内容がそのまま返る", func(t *testing.T) {
+		t.Run("効果(JSON)が設定されたカード定義を取得すると、その内容がそのまま返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedFullCard(t, fullCardSeed{
 				CardID: "TST-0001", CardName: "テストカードA", ResourceLabel: "CPU",

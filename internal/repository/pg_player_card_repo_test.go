@@ -76,7 +76,7 @@ func TestPlayerCardRepoGetPlayerCards(t *testing.T) {
 			require.Equal(t, []int64{0, 1, 2}, []int64{got[0].ArtNo, got[1].ArtNo, got[2].ArtNo})
 		})
 
-		t.Run("保存したPlayerID/CardID/ArtNo/Countの値が、そのまま返る", func(t *testing.T) {
+		t.Run("保存したプレイヤーID・カードID・アート番号・枚数の値が、そのまま返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedPlayerCard(t, playerCardSeed{PlayerID: playerA, CardID: "TST-0001", ArtNo: 3, Count: 9})
 			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
@@ -106,7 +106,7 @@ func TestPlayerCardRepoAddCards(t *testing.T) {
 			require.Equal(t, 5, count)
 		})
 
-		t.Run("指定したカードをart_no0で所持していないプレイヤーに対してAddCardsを実行すると、指定した枚数でart_no0の所持カード行が新規に作られる", func(t *testing.T) {
+		t.Run("指定したカードをアート番号0で所持していないプレイヤーに対して加算すると、指定した枚数でアート番号0の所持カード行が新規に作られる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
 
@@ -118,7 +118,7 @@ func TestPlayerCardRepoAddCards(t *testing.T) {
 			require.Equal(t, 4, count)
 		})
 
-		t.Run("指定したカードを既にart_no0で所持しているプレイヤーに対してAddCardsを実行すると、既存の所持枚数に指定した枚数が加算される", func(t *testing.T) {
+		t.Run("指定したカードを既にアート番号0で所持しているプレイヤーに対して加算すると、既存の所持枚数に指定した枚数が加算される", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedPlayerCard(t, playerCardSeed{PlayerID: playerA, CardID: "TST-0001", ArtNo: 0, Count: 5})
 			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
@@ -131,7 +131,7 @@ func TestPlayerCardRepoAddCards(t *testing.T) {
 			require.Equal(t, 8, count)
 		})
 
-		t.Run("指定したカードをart_no0以外のアート番号で所持しているプレイヤーに対してAddCardsを実行すると、そのアート番号の所持枚数は変化せず、別途art_no0の所持カード行が新規に作られる", func(t *testing.T) {
+		t.Run("指定したカードをアート番号0以外で所持しているプレイヤーに対して加算すると、そのアート番号の所持枚数は変化せず、別途アート番号0の所持カード行が新規に作られる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedPlayerCard(t, playerCardSeed{PlayerID: playerA, CardID: "TST-0001", ArtNo: 5, Count: 2})
 			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
@@ -165,7 +165,7 @@ func TestPlayerCardRepoAddCards(t *testing.T) {
 			require.Equal(t, 5, count2)
 		})
 
-		t.Run("戻り値は、渡した各カードの加算枚数の合計値になる", func(t *testing.T) {
+		t.Run("複数カードを一括で加算したとき、戻り値は各カードの加算枚数の合計値になる", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)
 
@@ -178,7 +178,7 @@ func TestPlayerCardRepoAddCards(t *testing.T) {
 			require.Equal(t, 7, total)
 		})
 
-		t.Run("別プレイヤーの所持カードは、AddCardsの対象にならない", func(t *testing.T) {
+		t.Run("別プレイヤーの所持カードを加算しても、別プレイヤーの所持枚数は変化しない", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedPlayerCard(t, playerCardSeed{PlayerID: playerB, CardID: "TST-0001", ArtNo: 0, Count: 5})
 			repo := repository.NewPgPlayerCardRepository(sharedPg.Pool)

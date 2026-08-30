@@ -23,7 +23,7 @@ func TestInitiativeRepoFindAll(t *testing.T) {
 			require.Empty(t, got)
 		})
 
-		t.Run("is_active=trueの施策定義があるとき、それらを返す", func(t *testing.T) {
+		t.Run("有効な施策定義があるとき、それらを返す", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedProduct(t, productSeed{ProductID: "PD-TST01", Faction: "SHE", ProductName: "テストプロダクトA"})
 			seedInitiative(t, initiativeSeed{InitiativeID: "IN-TST01", ProductID: "PD-TST01", Kind: "routine", Name: "テスト施策A", InsightCost: 1, EffectText: "効果A", Effect: `{}`})
@@ -36,7 +36,7 @@ func TestInitiativeRepoFindAll(t *testing.T) {
 			require.Equal(t, "IN-TST01", got[0].InitiativeID)
 		})
 
-		t.Run("is_active=falseの施策定義は、返る一覧に含まれない", func(t *testing.T) {
+		t.Run("無効な施策定義は、返る一覧に含まれない", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedProduct(t, productSeed{ProductID: "PD-TST01", Faction: "SHE", ProductName: "テストプロダクトA"})
 			seedInactiveInitiative(t, initiativeSeed{InitiativeID: "IN-TST01", ProductID: "PD-TST01", Kind: "routine", Name: "テスト施策A", InsightCost: 1, EffectText: "効果A", Effect: `{}`})
@@ -48,7 +48,7 @@ func TestInitiativeRepoFindAll(t *testing.T) {
 			require.Empty(t, got)
 		})
 
-		t.Run("is_active=trueの施策定義が複数件あるとき、initiative_idの昇順で返る", func(t *testing.T) {
+		t.Run("有効な施策定義が複数件あるとき、initiative_idの昇順で返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedProduct(t, productSeed{ProductID: "PD-TST01", Faction: "SHE", ProductName: "テストプロダクトA"})
 			seedInitiative(t, initiativeSeed{InitiativeID: "IN-TST03", ProductID: "PD-TST01", Kind: "routine", Name: "テスト施策C", InsightCost: 1, EffectText: "効果C", Effect: `{}`})

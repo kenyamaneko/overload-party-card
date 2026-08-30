@@ -13,7 +13,7 @@ import (
 
 func TestProcessedEventRepoInsert(t *testing.T) {
 	t.Run("[処理済みイベントリポジトリ] 処理済みイベント記録", func(t *testing.T) {
-		t.Run("指定したevent_idが未処理のとき、Insertはtrueを返す", func(t *testing.T) {
+		t.Run("指定したevent_idが未処理のとき、記録に成功したことを示すtrueが返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgProcessedEventRepository(sharedPg.Pool)
 
@@ -23,7 +23,7 @@ func TestProcessedEventRepoInsert(t *testing.T) {
 			require.True(t, inserted)
 		})
 
-		t.Run("指定したevent_idが既に処理済みのとき、Insertはfalseを返す", func(t *testing.T) {
+		t.Run("指定したevent_idが既に処理済みのとき、記録が行われなかったことを示すfalseが返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgProcessedEventRepository(sharedPg.Pool)
 			eventID := "44444444-4444-4444-4444-444444444444"
@@ -36,7 +36,7 @@ func TestProcessedEventRepoInsert(t *testing.T) {
 			require.False(t, inserted)
 		})
 
-		t.Run("既に処理済みのevent_idに対して、異なるevent_typeを指定してInsertを呼んでも、DBに保存されているevent_typeは最初に登録した値のまま変わらない", func(t *testing.T) {
+		t.Run("既に処理済みのevent_idに対して、異なるevent_typeを指定して記録しようとしても、DBに保存されているevent_typeは最初に登録した値のまま変わらない", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			repo := repository.NewPgProcessedEventRepository(sharedPg.Pool)
 			eventID := "44444444-4444-4444-4444-444444444444"

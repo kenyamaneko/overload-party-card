@@ -23,7 +23,7 @@ func TestProductRepoFindAll(t *testing.T) {
 			require.Empty(t, got)
 		})
 
-		t.Run("is_active=trueのプロダクト定義があるとき、それらを返す", func(t *testing.T) {
+		t.Run("有効なプロダクト定義があるとき、それらを返す", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedProduct(t, productSeed{ProductID: "PD-TST01", Faction: "SHE", ProductName: "テストプロダクトA"})
 			repo := repository.NewPgProductRepository(sharedPg.Pool)
@@ -35,7 +35,7 @@ func TestProductRepoFindAll(t *testing.T) {
 			require.Equal(t, "PD-TST01", got[0].ProductID)
 		})
 
-		t.Run("is_active=falseのプロダクト定義は、返る一覧に含まれない", func(t *testing.T) {
+		t.Run("無効なプロダクト定義は、返る一覧に含まれない", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedInactiveProduct(t, productSeed{ProductID: "PD-TST01", Faction: "SHE", ProductName: "テストプロダクトA"})
 			repo := repository.NewPgProductRepository(sharedPg.Pool)
@@ -46,7 +46,7 @@ func TestProductRepoFindAll(t *testing.T) {
 			require.Empty(t, got)
 		})
 
-		t.Run("is_active=trueのプロダクト定義が複数件あるとき、product_idの昇順で返る", func(t *testing.T) {
+		t.Run("有効なプロダクト定義が複数件あるとき、product_idの昇順で返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedProduct(t, productSeed{ProductID: "PD-TST03", Faction: "SHE", ProductName: "テストプロダクトC"})
 			seedProduct(t, productSeed{ProductID: "PD-TST01", Faction: "SHE", ProductName: "テストプロダクトA"})
@@ -61,7 +61,7 @@ func TestProductRepoFindAll(t *testing.T) {
 				[]string{got[0].ProductID, got[1].ProductID, got[2].ProductID})
 		})
 
-		t.Run("保存したfaction/product_name/is_activeの値が、そのまま返る", func(t *testing.T) {
+		t.Run("保存した勢力・プロダクト名・有効フラグの値が、そのまま返る", func(t *testing.T) {
 			sharedPg.Truncate(t)
 			seedProduct(t, productSeed{ProductID: "PD-TST01", Faction: "Tenki", ProductName: "テストプロダクトA"})
 			repo := repository.NewPgProductRepository(sharedPg.Pool)
