@@ -91,7 +91,7 @@ func findLineContaining(t *testing.T, output, target string) string {
 }
 
 func TestRunHTTP(t *testing.T) {
-	t.Run("HTTPサーバの起動と停止", func(t *testing.T) {
+	t.Run("[プロセス起動] HTTPサーバの起動と停止", func(t *testing.T) {
 		t.Run("起動処理のコンテキストがキャンセルされたとき、エラーを返さずに戻り、戻った後は当該アドレスへの新規接続が確立しなくなる", func(t *testing.T) {
 			ln, err := net.Listen("tcp", "127.0.0.1:0")
 			require.NoError(t, err)
@@ -142,7 +142,7 @@ func TestRunHTTP(t *testing.T) {
 }
 
 func TestCloudLoggingHandler(t *testing.T) {
-	t.Run("Cloud Logging形式のログ整形", func(t *testing.T) {
+	t.Run("[プロセス起動] Cloud Logging形式のログ整形", func(t *testing.T) {
 		tests := []struct {
 			name         string
 			level        slog.Level
@@ -183,7 +183,7 @@ func TestCloudLoggingHandler(t *testing.T) {
 }
 
 func TestSetupLogger(t *testing.T) {
-	t.Run("環境別のログ初期化", func(t *testing.T) {
+	t.Run("[プロセス起動] 環境別のログ初期化", func(t *testing.T) {
 		prodStgTests := []struct {
 			name string
 			env  config.Env
@@ -242,7 +242,7 @@ func TestSetupLogger(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
-	t.Run("起動時の内部認証公開鍵検証", func(t *testing.T) {
+	t.Run("[プロセス起動] 起動時の内部認証公開鍵検証", func(t *testing.T) {
 		t.Run("INTERNAL_AUTH_PUBLIC_KEYが空でない文字列だがPEMとして解釈できないとき、起動処理はエラーを返し、そのエラーの内容に\"INTERNAL_AUTH_PUBLIC_KEY is invalid\"という文言を含む", func(t *testing.T) {
 			orig := slog.Default()
 			defer slog.SetDefault(orig)
@@ -266,7 +266,7 @@ func TestRun(t *testing.T) {
 }
 
 func TestMainProcessExit(t *testing.T) {
-	t.Run("起動失敗時のプロセス終了処理", func(t *testing.T) {
+	t.Run("[プロセス起動] 起動失敗時のプロセス終了処理", func(t *testing.T) {
 		t.Run("runがエラーを返したとき、\"card fatal\"を含むログを標準エラー出力し、終了コード1でプロセスを終了する", func(t *testing.T) {
 			execPath, err := os.Executable()
 			require.NoError(t, err)

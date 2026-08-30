@@ -22,7 +22,7 @@ func (f *fakeInitiativeRepo) FindAll(ctx context.Context) ([]*domain.Initiative,
 }
 
 func TestInitiativeCacheFindByID(t *testing.T) {
-	t.Run("[cache] 施策定義の取得", func(t *testing.T) {
+	t.Run("[施策キャッシュ] 施策定義の取得", func(t *testing.T) {
 		t.Run("複数件の施策定義を読み込んだあと、読み込み済みのinitiative_id TST-0001を指定して取得すると、そのinitiative_idに対応する施策定義が返る", func(t *testing.T) {
 			c := cache.NewInitiativeCache()
 			repo := &fakeInitiativeRepo{initiatives: []*domain.Initiative{
@@ -53,7 +53,7 @@ func TestInitiativeCacheFindByID(t *testing.T) {
 }
 
 func TestInitiativeCacheLoad(t *testing.T) {
-	t.Run("[cache] 施策定義の読み込み", func(t *testing.T) {
+	t.Run("[施策キャッシュ] 施策定義の読み込み", func(t *testing.T) {
 		cases := []struct {
 			name           string
 			repo           *fakeInitiativeRepo
@@ -83,7 +83,7 @@ func TestInitiativeCacheLoad(t *testing.T) {
 }
 
 func TestInitiativeCacheAll(t *testing.T) {
-	t.Run("[cache] 施策定義の全件取得", func(t *testing.T) {
+	t.Run("[施策キャッシュ] 施策定義の全件取得", func(t *testing.T) {
 		t.Run("initiative_idがTST-0002、TST-0001の順で読み込まれても、全件取得するとinitiative_idの昇順で返る", func(t *testing.T) {
 			c := cache.NewInitiativeCache()
 			repo := &fakeInitiativeRepo{initiatives: []*domain.Initiative{
@@ -102,7 +102,7 @@ func TestInitiativeCacheAll(t *testing.T) {
 }
 
 func TestInitiativeCacheCount(t *testing.T) {
-	t.Run("[cache] 施策定義の件数", func(t *testing.T) {
+	t.Run("[施策キャッシュ] 施策定義の件数", func(t *testing.T) {
 		t.Run("読み込み前の件数は0になる", func(t *testing.T) {
 			c := cache.NewInitiativeCache()
 
@@ -124,7 +124,7 @@ func TestInitiativeCacheCount(t *testing.T) {
 }
 
 func TestInitiativeCacheLoadFromBytes(t *testing.T) {
-	t.Run("[cache] JSONからの施策定義読み込み", func(t *testing.T) {
+	t.Run("[施策キャッシュ] JSONからの施策定義読み込み", func(t *testing.T) {
 		t.Run("施策定義1件以上を含むJSONデータから読み込むと、その施策定義が取得できるようになる", func(t *testing.T) {
 			c := cache.NewInitiativeCache()
 

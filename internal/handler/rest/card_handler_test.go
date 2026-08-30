@@ -14,7 +14,7 @@ import (
 )
 
 func TestCardHandlerListAllRaw(t *testing.T) {
-	t.Run("[handler] カードマスター全件配信", func(t *testing.T) {
+	t.Run("[カードAPI] カードマスター全件配信", func(t *testing.T) {
 		t.Run("カード定義が取得できるとき、200になり各要素がカード定義の内容と一致する", func(t *testing.T) {
 			card := newTestCard("TST-0001", "SHE", "Compute", "unlimited")
 			engine := newTestRouter(t, withCardRepo(&fakeCardRepo{
@@ -69,7 +69,7 @@ func TestCardHandlerListAllRaw(t *testing.T) {
 }
 
 func TestCardHandlerListForPlayer(t *testing.T) {
-	t.Run("[handler] 所持状態付きカード一覧取得", func(t *testing.T) {
+	t.Run("[カードAPI] 所持状態付きカード一覧取得", func(t *testing.T) {
 		t.Run("カードがプレイヤーの所持カード一覧に1件以上含まれるとき、そのカードのis_ownedはtrueになる", func(t *testing.T) {
 			card := newTestCard("TST-0001", "SHE", "Compute", "unlimited")
 			engine := newTestRouter(t,

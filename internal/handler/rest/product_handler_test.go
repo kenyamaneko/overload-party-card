@@ -33,7 +33,7 @@ func newTestInitiativeCache(t *testing.T, initiatives ...domain.Initiative) *cac
 }
 
 func TestProductHandlerListAll(t *testing.T) {
-	t.Run("[handler] プロダクトマスター配信", func(t *testing.T) {
+	t.Run("[プロダクトAPI] プロダクトマスター配信", func(t *testing.T) {
 		t.Run("プロダクトが1件以上登録されているとき、200になり各要素の内容がプロダクトキャッシュの登録値と一致する", func(t *testing.T) {
 			product := domain.Product{ProductID: "PD-TST01", Faction: "SHE", ProductName: "テストプロダクト", IsActive: true}
 			initiative := domain.Initiative{InitiativeID: "IN-TST01", ProductID: "PD-TST01", Kind: domain.InitiativeKindRoutine, Name: "テスト施策", InsightCost: 1, EffectText: "効果", Effect: json.RawMessage(`{}`), IsActive: true}

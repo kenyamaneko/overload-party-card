@@ -28,7 +28,7 @@ func newPlayerOnboardedPayload(t *testing.T, eventID, playerID, initialFactionID
 }
 
 func TestPlayerOnboardedSubscriberHandle(t *testing.T) {
-	t.Run("[pubsub] player-onboarded-card-subのイベント処理", func(t *testing.T) {
+	t.Run("[プレイヤーオンボーディング購読] player-onboarded-card-subのイベント処理", func(t *testing.T) {
 		t.Run("受信したメッセージの内容がJSONとして解釈できないとき、エラーになる", func(t *testing.T) {
 			sub := pubsub.NewPlayerOnboardedSubscriber(&fakePackGranter{}, &fakeProcessedEventRepo{})
 

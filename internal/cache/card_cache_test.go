@@ -22,7 +22,7 @@ func (f *fakeCardRepo) FindAll(ctx context.Context) ([]*domain.Card, error) {
 }
 
 func TestCardCacheGet(t *testing.T) {
-	t.Run("[cache] カード定義の取得", func(t *testing.T) {
+	t.Run("[カードキャッシュ] カード定義の取得", func(t *testing.T) {
 		t.Run("一度もカード定義を読み込んでいない状態でcard_id TST-0001を指定して取得すると、見つからない", func(t *testing.T) {
 			c := cache.NewCardCache()
 
@@ -61,7 +61,7 @@ func TestCardCacheGet(t *testing.T) {
 }
 
 func TestCardCacheLoad(t *testing.T) {
-	t.Run("[cache] カード定義の読み込み", func(t *testing.T) {
+	t.Run("[カードキャッシュ] カード定義の読み込み", func(t *testing.T) {
 		cases := []struct {
 			name           string
 			repo           *fakeCardRepo
@@ -100,7 +100,7 @@ func TestCardCacheLoad(t *testing.T) {
 }
 
 func TestCardCacheCount(t *testing.T) {
-	t.Run("[cache] カード定義の件数", func(t *testing.T) {
+	t.Run("[カードキャッシュ] カード定義の件数", func(t *testing.T) {
 		t.Run("読み込み前の件数は0になる", func(t *testing.T) {
 			c := cache.NewCardCache()
 
@@ -122,7 +122,7 @@ func TestCardCacheCount(t *testing.T) {
 }
 
 func TestCardCacheAll(t *testing.T) {
-	t.Run("[cache] カード定義の全件取得", func(t *testing.T) {
+	t.Run("[カードキャッシュ] カード定義の全件取得", func(t *testing.T) {
 		t.Run("カード定義を読み込んだあと、全件取得すると読み込んだ全件を含む", func(t *testing.T) {
 			c := cache.NewCardCache()
 			repo := &fakeCardRepo{cards: []*domain.Card{
@@ -141,7 +141,7 @@ func TestCardCacheAll(t *testing.T) {
 }
 
 func TestCardCacheLoadFromBytes(t *testing.T) {
-	t.Run("[cache] JSONからのカード定義読み込み", func(t *testing.T) {
+	t.Run("[カードキャッシュ] JSONからのカード定義読み込み", func(t *testing.T) {
 		t.Run("カード定義1件以上を含むJSONデータから読み込むと、そのカード定義が取得できるようになる", func(t *testing.T) {
 			c := cache.NewCardCache()
 

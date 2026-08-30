@@ -38,7 +38,7 @@ func jsonResponse(t *testing.T, status int, body any) *http.Response {
 }
 
 func TestClient(t *testing.T) {
-	t.Run("HTTP クライアントの差し替え", func(t *testing.T) {
+	t.Run("[カードAPIクライアント] HTTP クライアントの差し替え", func(t *testing.T) {
 		t.Run("差し替えたクライアントが返す応答が、そのまま呼び出し結果に反映される", func(t *testing.T) {
 			want := apicard.HealthResponse{Status: "dummy-status"}
 			doer := &stubDoer{response: jsonResponse(t, http.StatusOK, want)}
@@ -53,7 +53,7 @@ func TestClient(t *testing.T) {
 		})
 	})
 
-	t.Run("送信リクエストを加工する RequestEditor の登録", func(t *testing.T) {
+	t.Run("[カードAPIクライアント] 送信リクエストを加工する RequestEditor の登録", func(t *testing.T) {
 		t.Run("RequestEditorを登録すると、送信するリクエストにその加工が適用される", func(t *testing.T) {
 			srv := apicardserverfake.NewServer()
 			defer srv.Close()
@@ -71,7 +71,7 @@ func TestClient(t *testing.T) {
 		})
 	})
 
-	t.Run("HTTP status から sentinel error への変換", func(t *testing.T) {
+	t.Run("[カードAPIクライアント] HTTP status から sentinel error への変換", func(t *testing.T) {
 		tests := []struct {
 			name    string
 			status  int
@@ -120,7 +120,7 @@ func TestClient(t *testing.T) {
 		})
 	})
 
-	t.Run("デッキ一覧取得", func(t *testing.T) {
+	t.Run("[カードAPIクライアント] デッキ一覧取得", func(t *testing.T) {
 		t.Run("status 200 が返るとき、応答本文のデッキ一覧をそのまま返す", func(t *testing.T) {
 			want := []apicard.Deck{{DeckID: 1, DeckName: "dummy-deck", PlayerID: "dummy-player"}}
 			srv := apicardserverfake.NewServer()
@@ -137,7 +137,7 @@ func TestClient(t *testing.T) {
 		})
 	})
 
-	t.Run("ヘルスチェック", func(t *testing.T) {
+	t.Run("[カードAPIクライアント] ヘルスチェック", func(t *testing.T) {
 		t.Run("status 200 が返るとき、応答本文のstatusフィールドを含むHealthResponseを返す", func(t *testing.T) {
 			want := apicard.HealthResponse{Status: "healthy"}
 			srv := apicardserverfake.NewServer()
@@ -154,7 +154,7 @@ func TestClient(t *testing.T) {
 		})
 	})
 
-	t.Run("カード定義一覧取得", func(t *testing.T) {
+	t.Run("[カードAPIクライアント] カード定義一覧取得", func(t *testing.T) {
 		t.Run("status 200 が返るとき、応答本文のカード定義一覧をそのまま返す", func(t *testing.T) {
 			want := []apicard.CardDefinition{{CardID: "dummy-card-id", CardName: "dummy-card-name", Stats: json.RawMessage("{}")}}
 			srv := apicardserverfake.NewServer()
@@ -185,7 +185,7 @@ func TestClient(t *testing.T) {
 		})
 	})
 
-	t.Run("所持カード一覧取得", func(t *testing.T) {
+	t.Run("[カードAPIクライアント] 所持カード一覧取得", func(t *testing.T) {
 		t.Run("status 200 が返るとき、応答本文の所持カード一覧をそのまま返す", func(t *testing.T) {
 			want := []apicard.PlayerCardWithDef{{CardID: "dummy-card-id", CardName: "dummy-card-name", Count: 1, Stats: json.RawMessage("{}")}}
 			srv := apicardserverfake.NewServer()
@@ -216,7 +216,7 @@ func TestClient(t *testing.T) {
 		})
 	})
 
-	t.Run("所持状態付きカード一覧取得", func(t *testing.T) {
+	t.Run("[カードAPIクライアント] 所持状態付きカード一覧取得", func(t *testing.T) {
 		t.Run("status 200 が返るとき、応答本文の所持状態付きカード一覧をそのまま返す", func(t *testing.T) {
 			want := []apicard.CardWithOwnership{{CardID: "dummy-card-id", CardName: "dummy-card-name", IsOwned: true, Stats: json.RawMessage("{}")}}
 			srv := apicardserverfake.NewServer()
@@ -247,7 +247,7 @@ func TestClient(t *testing.T) {
 		})
 	})
 
-	t.Run("デッキ取得", func(t *testing.T) {
+	t.Run("[カードAPIクライアント] デッキ取得", func(t *testing.T) {
 		t.Run("status 200 が返るとき、応答本文のデッキ(デッキ構成カードを含む)をそのまま返す", func(t *testing.T) {
 			deckCards := []apicard.DeckCard{{DeckID: 1, CardID: "dummy-card-id", Count: 2}}
 			want := apicard.Deck{DeckID: 1, DeckName: "dummy-deck", PlayerID: "dummy-player", DeckCards: &deckCards}
@@ -279,7 +279,7 @@ func TestClient(t *testing.T) {
 		})
 	})
 
-	t.Run("デッキ作成", func(t *testing.T) {
+	t.Run("[カードAPIクライアント] デッキ作成", func(t *testing.T) {
 		t.Run("status 201 が返るとき、応答本文のデッキを返す", func(t *testing.T) {
 			want := apicard.Deck{DeckID: 1, DeckName: "dummy-deck", PlayerID: "dummy-player"}
 			srv := apicardserverfake.NewServer()
@@ -310,7 +310,7 @@ func TestClient(t *testing.T) {
 		})
 	})
 
-	t.Run("デッキ更新", func(t *testing.T) {
+	t.Run("[カードAPIクライアント] デッキ更新", func(t *testing.T) {
 		t.Run("status 200 が返るとき、応答本文のデッキを返す", func(t *testing.T) {
 			want := apicard.Deck{DeckID: 1, DeckName: "dummy-deck-updated", PlayerID: "dummy-player"}
 			srv := apicardserverfake.NewServer()
@@ -341,7 +341,7 @@ func TestClient(t *testing.T) {
 		})
 	})
 
-	t.Run("デッキ削除", func(t *testing.T) {
+	t.Run("[カードAPIクライアント] デッキ削除", func(t *testing.T) {
 		t.Run("status 204 が返るとき、エラーを返さない", func(t *testing.T) {
 			srv := apicardserverfake.NewServer()
 			defer srv.Close()
@@ -370,7 +370,7 @@ func TestClient(t *testing.T) {
 		})
 	})
 
-	t.Run("デッキのバトル使用可否検証", func(t *testing.T) {
+	t.Run("[カードAPIクライアント] デッキのバトル使用可否検証", func(t *testing.T) {
 		t.Run("status 200 が返るとき、エラーを返さない", func(t *testing.T) {
 			srv := apicardserverfake.NewServer()
 			defer srv.Close()

@@ -21,7 +21,7 @@ func setValidEnv(t *testing.T) {
 }
 
 func TestConfigFromEnv(t *testing.T) {
-	t.Run("[config] 起動設定の読み込み", func(t *testing.T) {
+	t.Run("[起動設定] 起動設定の読み込み", func(t *testing.T) {
 		t.Run("環境変数PORTが未設定のとき、起動設定の読み込みはエラーになる", func(t *testing.T) {
 			setValidEnv(t)
 			require.NoError(t, os.Unsetenv("PORT"))

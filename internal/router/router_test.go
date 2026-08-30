@@ -147,7 +147,7 @@ func pubsubEnvelopeBody(t *testing.T, payload string) string {
 }
 
 func TestRouterHealth(t *testing.T) {
-	t.Run("[router] ヘルスチェック", func(t *testing.T) {
+	t.Run("[ルーティング] ヘルスチェック", func(t *testing.T) {
 		t.Run("GET /healthは常に200になり、レスポンスボディは{\"status\":\"ok\"}になる", func(t *testing.T) {
 			engine := newTestEngine(t, nil, nil, nil, nil, &internalauth.MockVerifier{})
 
@@ -162,7 +162,7 @@ func TestRouterHealth(t *testing.T) {
 }
 
 func TestRouterInternalV1NoAuth(t *testing.T) {
-	t.Run("[router] internal/v1配下の認証除外", func(t *testing.T) {
+	t.Run("[ルーティング] internal/v1配下の認証除外", func(t *testing.T) {
 		t.Run("GET /internal/v1/cardsは、X-Internal-Authヘッダが無くてもハンドラが呼び出され200になる", func(t *testing.T) {
 			engine := newTestEngine(t, &stubCardRepo{findAllFn: func(ctx context.Context) ([]*domain.Card, error) {
 				return nil, nil
@@ -220,7 +220,7 @@ func TestRouterInternalV1NoAuth(t *testing.T) {
 }
 
 func TestRouterAPIV1Auth(t *testing.T) {
-	t.Run("[router] api/v1/cards配下の認証", func(t *testing.T) {
+	t.Run("[ルーティング] api/v1/cards配下の認証", func(t *testing.T) {
 		cases := []struct {
 			name      string
 			verifier  internalauth.Verifier

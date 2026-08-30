@@ -14,7 +14,7 @@ import (
 )
 
 func TestPlayerCardHandlerGetPlayerCards(t *testing.T) {
-	t.Run("[handler] プレイヤー所持カード一覧取得", func(t *testing.T) {
+	t.Run("[所持カードAPI] プレイヤー所持カード一覧取得", func(t *testing.T) {
 		t.Run("所持カードそれぞれのcard_idがカード定義キャッシュに存在するとき、200になり所持数量とカード定義が組み合わさって反映される", func(t *testing.T) {
 			cardCache := newTestCardCache(newTestCard("TST-0001", "SHE", "Compute", "unlimited"))
 			engine := newTestRouter(t,

@@ -28,7 +28,7 @@ func newCardPackPurchasedPayload(t *testing.T, eventID, playerID, cardPackID str
 }
 
 func TestCardPackPurchasedSubscriberHandle(t *testing.T) {
-	t.Run("[pubsub] card-pack-purchased-card-subのイベント処理", func(t *testing.T) {
+	t.Run("[カードパック購入購読] card-pack-purchased-card-subのイベント処理", func(t *testing.T) {
 		t.Run("受信したメッセージの内容がJSONとして解釈できないとき、エラーになる", func(t *testing.T) {
 			sub := pubsub.NewCardPackPurchasedSubscriber(&fakePackGranter{}, &fakeProcessedEventRepo{})
 

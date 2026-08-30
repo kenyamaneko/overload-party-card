@@ -22,7 +22,7 @@ func (f *fakeProductRepo) FindAll(ctx context.Context) ([]*domain.Product, error
 }
 
 func TestProductCacheFindByID(t *testing.T) {
-	t.Run("[cache] プロダクト定義の取得", func(t *testing.T) {
+	t.Run("[プロダクトキャッシュ] プロダクト定義の取得", func(t *testing.T) {
 		t.Run("複数件のプロダクト定義を読み込んだあと、読み込み済みのproduct_id TST-0001を指定して取得すると、そのproduct_idに対応するプロダクト定義が返る", func(t *testing.T) {
 			c := cache.NewProductCache()
 			repo := &fakeProductRepo{products: []*domain.Product{
@@ -53,7 +53,7 @@ func TestProductCacheFindByID(t *testing.T) {
 }
 
 func TestProductCacheLoad(t *testing.T) {
-	t.Run("[cache] プロダクト定義の読み込み", func(t *testing.T) {
+	t.Run("[プロダクトキャッシュ] プロダクト定義の読み込み", func(t *testing.T) {
 		cases := []struct {
 			name           string
 			repo           *fakeProductRepo
@@ -83,7 +83,7 @@ func TestProductCacheLoad(t *testing.T) {
 }
 
 func TestProductCacheCount(t *testing.T) {
-	t.Run("[cache] プロダクト定義の件数", func(t *testing.T) {
+	t.Run("[プロダクトキャッシュ] プロダクト定義の件数", func(t *testing.T) {
 		t.Run("読み込み前の件数は0になる", func(t *testing.T) {
 			c := cache.NewProductCache()
 
@@ -105,7 +105,7 @@ func TestProductCacheCount(t *testing.T) {
 }
 
 func TestProductCacheAll(t *testing.T) {
-	t.Run("[cache] プロダクト定義の全件取得", func(t *testing.T) {
+	t.Run("[プロダクトキャッシュ] プロダクト定義の全件取得", func(t *testing.T) {
 		t.Run("プロダクト定義を読み込んだあと、全件取得すると読み込んだ全件を含む", func(t *testing.T) {
 			c := cache.NewProductCache()
 			repo := &fakeProductRepo{products: []*domain.Product{
@@ -126,7 +126,7 @@ func TestProductCacheAll(t *testing.T) {
 }
 
 func TestProductCacheLoadFromBytes(t *testing.T) {
-	t.Run("[cache] JSONからのプロダクト定義読み込み", func(t *testing.T) {
+	t.Run("[プロダクトキャッシュ] JSONからのプロダクト定義読み込み", func(t *testing.T) {
 		t.Run("プロダクト定義1件以上を含むJSONデータから読み込むと、そのプロダクト定義が取得できるようになる", func(t *testing.T) {
 			c := cache.NewProductCache()
 

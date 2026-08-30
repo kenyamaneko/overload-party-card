@@ -146,7 +146,7 @@ func fakeFactionClientOwning(factions ...string) *fakeFactionClient {
 }
 
 func TestDeckHandlerGetDecks(t *testing.T) {
-	t.Run("[handler] デッキ一覧取得", func(t *testing.T) {
+	t.Run("[デッキAPI] デッキ一覧取得", func(t *testing.T) {
 		t.Run("プレイヤーのデッキ一覧と所持カード一覧の両方が取得できるとき、200になりレスポンスボディはデッキの配列になる", func(t *testing.T) {
 			deck := &domain.Deck{PlayerID: testPlayerID, DeckID: 1, DeckName: "デッキ1", Faction: "SHE", ProductID: "PD-TST01", RoutineID: "IN-TST01", SpecialID: "IN-TST02"}
 			engine := newTestRouter(t,
@@ -264,7 +264,7 @@ func TestDeckHandlerGetDecks(t *testing.T) {
 }
 
 func TestDeckHandlerGetDeck(t *testing.T) {
-	t.Run("[handler] デッキ詳細取得", func(t *testing.T) {
+	t.Run("[デッキAPI] デッキ詳細取得", func(t *testing.T) {
 		t.Run("deckIdパスパラメータが数値として解釈できないとき、400になりボディのerrorフィールドはinvalid deck_idになる", func(t *testing.T) {
 			engine := newTestRouter(t)
 
@@ -414,7 +414,7 @@ func TestDeckHandlerGetDeck(t *testing.T) {
 }
 
 func TestDeckHandlerCreateDeck(t *testing.T) {
-	t.Run("[handler] デッキ作成", func(t *testing.T) {
+	t.Run("[デッキAPI] デッキ作成", func(t *testing.T) {
 		t.Run("リクエストボディが妥当なJSONとして解釈できないとき、400になりボディのerrorフィールドはmalformed request bodyになる", func(t *testing.T) {
 			engine := newTestRouter(t)
 
@@ -577,7 +577,7 @@ func TestDeckHandlerCreateDeck(t *testing.T) {
 }
 
 func TestDeckHandlerUpdateDeck(t *testing.T) {
-	t.Run("[handler] デッキ更新", func(t *testing.T) {
+	t.Run("[デッキAPI] デッキ更新", func(t *testing.T) {
 		t.Run("deckIdパスパラメータが数値として解釈できないとき、400になりボディのerrorフィールドはinvalid deck_idになる", func(t *testing.T) {
 			engine := newTestRouter(t)
 
@@ -762,7 +762,7 @@ func TestDeckHandlerUpdateDeck(t *testing.T) {
 }
 
 func TestDeckHandlerDeleteDeck(t *testing.T) {
-	t.Run("[handler] デッキ削除", func(t *testing.T) {
+	t.Run("[デッキAPI] デッキ削除", func(t *testing.T) {
 		t.Run("deckIdパスパラメータが数値として解釈できないとき、400になりボディのerrorフィールドはinvalid deck_idになる", func(t *testing.T) {
 			engine := newTestRouter(t)
 
@@ -810,7 +810,7 @@ func TestDeckHandlerDeleteDeck(t *testing.T) {
 func TestDeckHandlerValidateDeckForBattle(t *testing.T) {
 	const path = "/api/v1/cards/decks/1/validate-for-battle"
 
-	t.Run("[handler] デッキのバトル可否検証", func(t *testing.T) {
+	t.Run("[デッキAPI] デッキのバトル可否検証", func(t *testing.T) {
 		t.Run("deckIdパスパラメータが数値として解釈できないとき、400になりボディのerrorフィールドはinvalid deck_idになる", func(t *testing.T) {
 			engine := newTestRouter(t)
 

@@ -13,7 +13,7 @@ import (
 )
 
 func TestPubSubPushHandler(t *testing.T) {
-	t.Run("[handler] Pub/Sub push受信", func(t *testing.T) {
+	t.Run("[Pub/Sub push受け口] Pub/Sub push受信", func(t *testing.T) {
 		malformedEnvelopeCases := []struct {
 			name string
 			body string

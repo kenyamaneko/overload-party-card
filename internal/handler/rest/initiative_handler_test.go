@@ -14,7 +14,7 @@ import (
 )
 
 func TestInitiativeHandlerListAll(t *testing.T) {
-	t.Run("[handler] 施策マスター配信", func(t *testing.T) {
+	t.Run("[施策API] 施策マスター配信", func(t *testing.T) {
 		t.Run("施策が1件以上登録されているとき、200になり登録した施策の内容と一致する配列になる", func(t *testing.T) {
 			initiative := domain.Initiative{
 				InitiativeID: "IN-TST01",

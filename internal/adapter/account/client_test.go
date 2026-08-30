@@ -13,7 +13,7 @@ import (
 )
 
 func TestClientListPlayerFactions(t *testing.T) {
-	t.Run("[account] 所持ファクション一覧の取得", func(t *testing.T) {
+	t.Run("[アカウントサービス連携] 所持ファクション一覧の取得", func(t *testing.T) {
 		t.Run("accountサービスが200とファクション一覧を含むJSONを返したとき、所持ファクション一覧の取得はそのファクション一覧をそのまま返す", func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
