@@ -61,7 +61,7 @@ func TestDeckContentValidation(t *testing.T) {
 			})
 		}
 
-		t.Run("カードエントリの指定枚数が1以上のとき、デッキを作成してもこの条件によるエラーにはならない", func(t *testing.T) {
+		t.Run("カードエントリの指定枚数が1のとき、デッキを作成してもこの条件によるエラーにはならない", func(t *testing.T) {
 			interactor, _, playerCardRepo, _ := newDeckFixture(t)
 			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 1})
 			req := apicard.DeckCreateRequest{
@@ -105,7 +105,7 @@ func TestDeckContentValidation(t *testing.T) {
 			require.NoError(t, err)
 		})
 
-		t.Run("指定したカード・アートNoの組について、プレイヤーの所持枚数が要求枚数より少ないとき、デッキを作成するとエラーになる", func(t *testing.T) {
+		t.Run("指定したカード・アート番号の組について、プレイヤーの所持枚数が要求枚数より少ないとき、デッキを作成するとエラーになる", func(t *testing.T) {
 			interactor, _, playerCardRepo, _ := newDeckFixture(t)
 			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 2})
 			req := apicard.DeckCreateRequest{
@@ -120,7 +120,7 @@ func TestDeckContentValidation(t *testing.T) {
 			assert.ErrorIs(t, err, port.ErrUnowned)
 		})
 
-		t.Run("指定したカード・アートNoの組について、プレイヤーがその組を1件も所持していない(所持記録が無い)とき、デッキを作成するとエラーになる", func(t *testing.T) {
+		t.Run("指定したカード・アート番号の組について、プレイヤーがその組を1件も所持していない(所持記録が無い)とき、デッキを作成するとエラーになる", func(t *testing.T) {
 			interactor, _, _, _ := newDeckFixture(t)
 			req := apicard.DeckCreateRequest{
 				DeckName: "Test Deck", Faction: fxFaction,
@@ -134,7 +134,7 @@ func TestDeckContentValidation(t *testing.T) {
 			assert.ErrorIs(t, err, port.ErrUnowned)
 		})
 
-		t.Run("指定したカード・アートNoの組について、プレイヤーの所持枚数が要求枚数とちょうど同じとき、デッキを作成してもこの条件によるエラーにはならない", func(t *testing.T) {
+		t.Run("指定したカード・アート番号の組について、プレイヤーの所持枚数が要求枚数とちょうど同じとき、デッキを作成してもこの条件によるエラーにはならない", func(t *testing.T) {
 			interactor, _, playerCardRepo, _ := newDeckFixture(t)
 			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 2})
 			req := apicard.DeckCreateRequest{
@@ -148,7 +148,7 @@ func TestDeckContentValidation(t *testing.T) {
 			require.NoError(t, err)
 		})
 
-		t.Run("同一カードIDに対しアートNoが異なる複数のエントリを指定したとき、それらの指定枚数は合算されたうえで制限枚数判定に使われ、合算した投入枚数が制限区分の上限を超えればデッキを作成するとエラーになる", func(t *testing.T) {
+		t.Run("同一カードIDに対しアート番号が異なる複数のエントリを指定し、合算した投入枚数が制限区分の上限を超えるとき、デッキを作成するとエラーになる", func(t *testing.T) {
 			interactor, _, playerCardRepo, _ := newDeckFixture(t)
 			playerCardRepo.seed(fxPlayerID,
 				&domain.PlayerCard{CardID: "TST-LIMITED", ArtNo: 1, Count: 1},
@@ -222,7 +222,7 @@ func TestDeckContentValidation(t *testing.T) {
 			assert.ErrorIs(t, err, port.ErrInvalidDeck)
 		})
 
-		t.Run("カードの制限区分に対応する投入上限が制限区分ごとの上限テーブルに定義されていない(未知の制限区分値)とき、デッキを作成するとエラーになり、そのエラーはデッキバリデーション違反や制限超過とは異なる種別になる", func(t *testing.T) {
+		t.Run("カードの制限区分に対応する投入上限が制限区分ごとの上限テーブルに定義されていない(未知の制限区分値)とき、デッキを作成するとエラーになり、そのエラーはデッキ内容検証の違反や制限超過とは異なる種別になる", func(t *testing.T) {
 			interactor, _, playerCardRepo, _ := newDeckFixture(t)
 			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-UNKNOWNRESTRICTION", ArtNo: 1, Count: 1})
 			req := apicard.DeckCreateRequest{
@@ -284,7 +284,7 @@ func TestDeckContentValidation(t *testing.T) {
 			assert.ErrorIs(t, err, port.ErrRestrictionExceeded)
 		})
 
-		t.Run("宣言陣営が選択可能陣営のいずれかであり、各カードエントリの指定枚数が正の数で合計がデッキ上限枚数以内であり、指定したカード・アートNoの組をすべて要求枚数以上所持しており、指定したカードIDがすべてカード定義に存在し陣営が宣言陣営またはNeutralであり、同一カードIDごとの合計投入枚数がすべて制限区分の上限以内であるとき、デッキを作成してもエラーにはならない", func(t *testing.T) {
+		t.Run("宣言陣営が選択可能陣営のいずれかであり、各カードエントリの指定枚数が正の数で合計がデッキ上限枚数以内であり、指定したカード・アート番号の組をすべて要求枚数以上所持しており、指定したカードIDがすべてカード定義に存在し陣営が宣言陣営またはNeutralであり、同一カードIDごとの合計投入枚数がすべて制限区分の上限以内であるとき、デッキを作成してもエラーにはならない", func(t *testing.T) {
 			interactor, _, playerCardRepo, _ := newDeckFixture(t)
 			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
 			req := apicard.DeckCreateRequest{
@@ -602,7 +602,7 @@ func TestCreateDeck(t *testing.T) {
 			assert.Equal(t, int64(42), resp.DeckID)
 		})
 
-		t.Run("デッキ作成が成功したとき、返るデッキのdeck_name/faction/product_id/routine_id/special_id/playmat_no/sleeve_noは、リクエストで指定した値と一致する", func(t *testing.T) {
+		t.Run("デッキ作成が成功したとき、返るデッキのデッキ名・陣営・プロダクトID・ルーチン施策ID・スペシャル施策ID・プレイマット番号・スリーブ番号は、リクエストで指定した値と一致する", func(t *testing.T) {
 			interactor, _, playerCardRepo, _ := newDeckFixture(t)
 			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
 			playmatNo := int64(5)
@@ -812,7 +812,7 @@ func TestGetDeck(t *testing.T) {
 			assert.ErrorIs(t, err, injected)
 		})
 
-		t.Run("取得したデッキがデッキ内容検証・陣営所持検証・施策整合検証の全てを満たし、構成カードの合計投入枚数がデッキ上限枚数ちょうど(30枚)のとき、返るデッキのis_validはtrueになる", func(t *testing.T) {
+		t.Run("取得したデッキがデッキ内容検証・施策整合検証をともに満たし、構成カードの合計投入枚数がデッキ上限枚数ちょうど(30枚)のとき、返るデッキのis_validはtrueになる", func(t *testing.T) {
 			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
 			deckRepo.seed(
 				domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction, ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID},
@@ -826,7 +826,7 @@ func TestGetDeck(t *testing.T) {
 			assert.True(t, resp.IsValid)
 		})
 
-		t.Run("取得したデッキがデッキ内容検証・陣営所持検証・施策整合検証のいずれか一つでも満たさないとき、返るデッキのis_validはfalseになる", func(t *testing.T) {
+		t.Run("取得したデッキの構成カード枚数の合計がデッキ上限枚数と一致しないとき、返るデッキのis_validはfalseになる", func(t *testing.T) {
 			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
 			cards := baselineDeckCards(fxPlayerID, 1)
 			cards[0].Count = 2 // 合計を 29 に減らし、デッキ上限枚数と不一致にする
@@ -856,7 +856,7 @@ func TestGetDeck(t *testing.T) {
 			assert.Equal(t, want, *resp.DeckCards)
 		})
 
-		t.Run("取得に成功したとき、返るデッキのdeck_name/faction/product_id/routine_id/special_idは、取得したデッキの内容と一致する", func(t *testing.T) {
+		t.Run("取得に成功したとき、返るデッキのデッキ名・陣営・プロダクトID・ルーチン施策ID・スペシャル施策IDは、取得したデッキの内容と一致する", func(t *testing.T) {
 			interactor, deckRepo, _, _ := newDeckFixture(t)
 			deckRepo.seed(
 				domain.Deck{PlayerID: fxPlayerID, DeckID: 1, DeckName: "My Deck", Faction: fxFaction, ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID},
@@ -1021,7 +1021,7 @@ func TestUpdateDeck(t *testing.T) {
 			assert.ErrorIs(t, err, injected)
 		})
 
-		t.Run("デッキ更新が成功したとき、返るデッキのdeck_name/faction/product_id/routine_id/special_id/playmat_no/sleeve_noは、リクエストで指定した値と一致する", func(t *testing.T) {
+		t.Run("デッキ更新が成功したとき、返るデッキのデッキ名・陣営・プロダクトID・ルーチン施策ID・スペシャル施策ID・プレイマット番号・スリーブ番号は、リクエストで指定した値と一致する", func(t *testing.T) {
 			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
 			deckRepo.seed(domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction}, nil)
 			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)

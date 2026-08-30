@@ -55,7 +55,7 @@ func TestListCardsWithOwnership(t *testing.T) {
 			assert.Empty(t, result)
 		})
 
-		t.Run("カードTST-0001をプレイヤーがどのアートNo変体も所持していないとき、返る一覧のTST-0001はis_ownedがfalseになる", func(t *testing.T) {
+		t.Run("カードTST-0001をプレイヤーがどのアート番号変体も所持していないとき、返る一覧のTST-0001はis_ownedがfalseになる", func(t *testing.T) {
 			interactor, cardRepo, _ := newCardFixture()
 			cardRepo.cards = []*domain.Card{{CardID: "TST-0001", Faction: fxFaction, Restriction: gamedesign.RestrictionUnlimited, Stats: json.RawMessage(`{}`)}}
 
@@ -66,7 +66,7 @@ func TestListCardsWithOwnership(t *testing.T) {
 			assert.False(t, result[0].IsOwned)
 		})
 
-		t.Run("カードTST-0001のいずれかのアートNo変体をプレイヤーが1件以上所持しているとき、返る一覧のTST-0001はis_ownedがtrueになる", func(t *testing.T) {
+		t.Run("カードTST-0001のいずれかのアート番号変体をプレイヤーが1件以上所持しているとき、返る一覧のTST-0001はis_ownedがtrueになる", func(t *testing.T) {
 			interactor, cardRepo, playerCardRepo := newCardFixture()
 			cardRepo.cards = []*domain.Card{{CardID: "TST-0001", Faction: fxFaction, Restriction: gamedesign.RestrictionUnlimited, Stats: json.RawMessage(`{}`)}}
 			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 2, Count: 1})
@@ -78,7 +78,7 @@ func TestListCardsWithOwnership(t *testing.T) {
 			assert.True(t, result[0].IsOwned)
 		})
 
-		t.Run("返る一覧の各カードのcard_name/faction/card_type/restriction等の内容は、カード定義取得元が返した内容と一致する", func(t *testing.T) {
+		t.Run("カード定義取得元がカード定義を返すとき、返る一覧の各カードの内容(is_owned以外)は、その内容とそのまま一致する", func(t *testing.T) {
 			interactor, cardRepo, _ := newCardFixture()
 			subtype := "VM"
 			effectText := "draw a card"

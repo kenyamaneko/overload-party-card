@@ -45,7 +45,7 @@ func TestGetPlayerCards(t *testing.T) {
 			assert.Empty(t, result)
 		})
 
-		t.Run("プレイヤーが所持するカードのカードIDがカード定義キャッシュに存在しないとき、エラーを返す", func(t *testing.T) {
+		t.Run("プレイヤーが所持するカードのカードIDがカード定義キャッシュに存在しないとき、キャッシュ不整合を示すエラーを返す", func(t *testing.T) {
 			interactor, playerCardRepo, _ := newPlayerCardFixture()
 			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-UNDEFINED", ArtNo: 1, Count: 1})
 
@@ -55,7 +55,7 @@ func TestGetPlayerCards(t *testing.T) {
 			assert.ErrorContains(t, err, "cache")
 		})
 
-		t.Run("プレイヤーが所持するカードがすべてカード定義キャッシュに存在するとき、返る一覧の各要素には所持カードのcard_id/art_no/countと、カード定義キャッシュ上の対応するカード定義の内容(card_name/faction/card_type/restriction等)が組み合わさって反映される", func(t *testing.T) {
+		t.Run("プレイヤーが所持するカードがすべてカード定義キャッシュに存在するとき、返る一覧の各要素は所持カードの内容とカード定義キャッシュ上の対応するカード定義の内容を組み合わせたものになる", func(t *testing.T) {
 			interactor, playerCardRepo, cc := newPlayerCardFixture()
 			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 3, Count: 2})
 			cc.InjectForTest("TST-0001", &domain.Card{

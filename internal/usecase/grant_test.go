@@ -22,7 +22,7 @@ func newGrantFixture() (*GrantInteractor, *fakeCardPackRepo, *fakePlayerCardRepo
 
 func TestGrantPack(t *testing.T) {
 	t.Run("[パック配布]カードパック配布", func(t *testing.T) {
-		t.Run("指定したパックIDがパックマスターに存在しないとき、その不在を表すエラーを含むエラーを返す", func(t *testing.T) {
+		t.Run("指定したパックIDがパックマスターに存在しないとき、パック不在を表すエラーを返す", func(t *testing.T) {
 			interactor, cardPackRepo, _ := newGrantFixture()
 			cardPackRepo.getErr = port.ErrNotFound
 
@@ -32,7 +32,7 @@ func TestGrantPack(t *testing.T) {
 			assert.ErrorIs(t, err, port.ErrNotFound)
 		})
 
-		t.Run("パックマスターの取得元がその他のエラーを返すとき、そのエラーを含むエラーを返す", func(t *testing.T) {
+		t.Run("パックマスターの取得元がその他のエラーを返すとき、そのエラーを返す", func(t *testing.T) {
 			interactor, cardPackRepo, _ := newGrantFixture()
 			injected := errors.New("card pack repo unavailable")
 			cardPackRepo.getErr = injected
@@ -43,7 +43,7 @@ func TestGrantPack(t *testing.T) {
 			assert.ErrorIs(t, err, injected)
 		})
 
-		t.Run("取得したパックが運用停止中(is_active=false)のとき、運用停止を表すエラーを返す", func(t *testing.T) {
+		t.Run("取得したパックが運用停止中(is_activeがfalse)のとき、運用停止を表すエラーを返す", func(t *testing.T) {
 			interactor, cardPackRepo, _ := newGrantFixture()
 			cardPackRepo.pack = &domain.CardPack{
 				PackID:   "PK-0001",
