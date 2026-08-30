@@ -29,7 +29,7 @@ func newCardPackPurchasedPayload(t *testing.T, eventID, playerID, cardPackID str
 
 func TestCardPackPurchasedSubscriberHandle(t *testing.T) {
 	t.Run("[pubsub] card-pack-purchased-card-subのイベント処理", func(t *testing.T) {
-		t.Run("payloadがJSONとして解釈できないとき、エラーになる", func(t *testing.T) {
+		t.Run("受信したメッセージの内容がJSONとして解釈できないとき、エラーになる", func(t *testing.T) {
 			sub := pubsub.NewCardPackPurchasedSubscriber(&fakePackGranter{}, &fakeProcessedEventRepo{})
 
 			err := sub.Handle(context.Background(), []byte("not json"))
@@ -37,7 +37,7 @@ func TestCardPackPurchasedSubscriberHandle(t *testing.T) {
 			assert.ErrorContains(t, err, "bad payload")
 		})
 
-		t.Run("デコードしたevent_typeが処理対象のイベント種別と一致しないとき、エラーになる", func(t *testing.T) {
+		t.Run("受け取ったイベントのevent_typeが処理対象のイベント種別と一致しないとき、エラーになる", func(t *testing.T) {
 			sub := pubsub.NewCardPackPurchasedSubscriber(&fakePackGranter{}, &fakeProcessedEventRepo{})
 			payload := []byte(`{"event_type":"unrelated_event","event_id":"evt-1","player_id":"TST-0001","card_pack_id":"TST-0002"}`)
 
@@ -76,7 +76,7 @@ func TestCardPackPurchasedSubscriberHandle(t *testing.T) {
 			assert.ErrorContains(t, err, `grant "TST-0002"`)
 		})
 
-		t.Run("payloadが未処理のevent_id・player_id・card_pack_idを含む正常な内容のとき、そのplayer_idに対しcard_pack_idのパックの配布が要求され、正常終了になる", func(t *testing.T) {
+		t.Run("受け取ったイベントが未処理のevent_id・player_id・card_pack_idを含む正常な内容のとき、そのplayer_idに対しcard_pack_idのパックの配布が要求され、正常終了になる", func(t *testing.T) {
 			granter := &fakePackGranter{copiesFor: map[string]int{"TST-0002": 3}}
 			sub := pubsub.NewCardPackPurchasedSubscriber(granter, &fakeProcessedEventRepo{inserted: true})
 			payload := newCardPackPurchasedPayload(t, "evt-1", "TST-0001", "TST-0002")

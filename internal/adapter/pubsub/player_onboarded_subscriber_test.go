@@ -29,7 +29,7 @@ func newPlayerOnboardedPayload(t *testing.T, eventID, playerID, initialFactionID
 
 func TestPlayerOnboardedSubscriberHandle(t *testing.T) {
 	t.Run("[pubsub] player-onboarded-card-subのイベント処理", func(t *testing.T) {
-		t.Run("payloadがJSONとして解釈できないとき、エラーになる", func(t *testing.T) {
+		t.Run("受信したメッセージの内容がJSONとして解釈できないとき、エラーになる", func(t *testing.T) {
 			sub := pubsub.NewPlayerOnboardedSubscriber(&fakePackGranter{}, &fakeProcessedEventRepo{})
 
 			err := sub.Handle(context.Background(), []byte("not json"))
@@ -37,7 +37,7 @@ func TestPlayerOnboardedSubscriberHandle(t *testing.T) {
 			assert.ErrorContains(t, err, "bad payload")
 		})
 
-		t.Run("デコードしたevent_typeが処理対象のイベント種別と一致しないとき、エラーになる", func(t *testing.T) {
+		t.Run("受け取ったイベントのevent_typeが処理対象のイベント種別と一致しないとき、エラーになる", func(t *testing.T) {
 			sub := pubsub.NewPlayerOnboardedSubscriber(&fakePackGranter{}, &fakeProcessedEventRepo{})
 			payload := []byte(`{"event_type":"unrelated_event","event_id":"evt-1","player_id":"TST-0001","initial_faction_id":"SHE"}`)
 
@@ -66,7 +66,7 @@ func TestPlayerOnboardedSubscriberHandle(t *testing.T) {
 			assert.Empty(t, granter.calls)
 		})
 
-		t.Run("basicパックの配布に失敗したとき、faction_set_*パックの配布は要求されず、エラーになる", func(t *testing.T) {
+		t.Run("basicパックの配布に失敗したとき、faction_set_sheパックの配布は要求されず、エラーになる", func(t *testing.T) {
 			granter := &fakePackGranter{errFor: map[string]error{"basic": errors.New("grant failed")}}
 			sub := pubsub.NewPlayerOnboardedSubscriber(granter, &fakeProcessedEventRepo{inserted: true})
 			payload := newPlayerOnboardedPayload(t, "evt-1", "TST-0001", "SHE")
@@ -77,7 +77,7 @@ func TestPlayerOnboardedSubscriberHandle(t *testing.T) {
 			assert.Equal(t, []grantCall{{playerID: "TST-0001", packID: "basic"}}, granter.calls)
 		})
 
-		t.Run("payloadが未処理のevent_id・player_id・initial_faction_id SHEを含む正常な内容のとき、basicパックとfaction_set_sheパックの配布が要求され、正常終了になる", func(t *testing.T) {
+		t.Run("受け取ったイベントが未処理のevent_id・player_id・initial_faction_id SHEを含む正常な内容のとき、basicパックとfaction_set_sheパックの配布が要求され、正常終了になる", func(t *testing.T) {
 			granter := &fakePackGranter{copiesFor: map[string]int{"basic": 3, "faction_set_she": 5}}
 			sub := pubsub.NewPlayerOnboardedSubscriber(granter, &fakeProcessedEventRepo{inserted: true})
 			payload := newPlayerOnboardedPayload(t, "evt-1", "TST-0001", "SHE")
