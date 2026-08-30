@@ -286,12 +286,6 @@ func baselineOwnedCards() []*domain.PlayerCard {
 	return owned
 }
 
-// baselineRequest は陣営 SHE・baselineCards (合計 30 枚)・有効なプロダクト/施策の組み合わせによる
-// 妥当なデッキ作成・更新リクエストを返す。
-func baselineRequest() (deckName, faction, productID, routineID, specialID string, cards []apicard.DeckCardEntry) {
-	return "Test Deck", fxFaction, fxProductID, fxRoutineID, fxSpecialID, baselineCards()
-}
-
 // newDeckFixture は正常系デッキ操作に必要な依存 (カード・プロダクト・施策) を投入済みの
 // DeckInteractor と、振る舞いを差し替えるための fake を返す。factionClient は既定で
 // fxFaction (SHE) を所持している状態にする。

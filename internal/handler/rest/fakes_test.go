@@ -173,10 +173,6 @@ func withInitiativeCache(ic *cache.InitiativeCache) testRouterOption {
 	return func(c *testRouterConfig) { c.initiativeCache = ic }
 }
 
-func withVerifier(v internalauth.Verifier) testRouterOption {
-	return func(c *testRouterConfig) { c.verifier = v }
-}
-
 func withPlayerOnboardedHandler(h port.MessageHandler) testRouterOption {
 	return func(c *testRouterConfig) { c.playerOnboardedHandler = h }
 }
