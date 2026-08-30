@@ -35,7 +35,7 @@ func (r *PgCardRepository) FindAll(ctx context.Context) ([]*domain.Card, error) 
 	}
 	defer rows.Close()
 
-	var cards []*domain.Card
+	cards := make([]*domain.Card, 0)
 	for rows.Next() {
 		c, err := scanCard(rows)
 		if err != nil {

@@ -121,21 +121,26 @@ func (s *DeckInteractor) GetDecks(ctx context.Context, playerID string) ([]*apic
 }
 
 // GetDeck は指定デッキとそのカード構成を返します。
-func (s *DeckInteractor) GetDeck(ctx context.Context, playerID string, deckID int64) (*apicard.Deck, []apicard.DeckCard, error) {
+func (s *DeckInteractor) GetDeck(ctx context.Context, playerID string, deckID int64) (*apicard.Deck, error) {
 	deck, err := s.deckRepo.FindByID(ctx, playerID, deckID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("find deck: %w", err)
+		return nil, fmt.Errorf("find deck: %w", err)
 	}
 
 	cards, err := s.deckRepo.GetDeckCards(ctx, playerID, deckID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("get deck cards: %w", err)
+		return nil, fmt.Errorf("get deck cards: %w", err)
+	}
+
+	ownedCards, err := s.playerCardRepo.GetPlayerCards(ctx, playerID)
+	if err != nil {
+		return nil, fmt.Errorf("get owned cards: %w", err)
 	}
 
 	apiCards := presenter.ToDeckCards(cards)
-	apiDeck := presenter.ToDeck(deck, cards, false)
+	apiDeck := presenter.ToDeck(deck, cards, s.computeIsValid(deck, cards, ownedCards))
 	apiDeck.DeckCards = &apiCards
-	return apiDeck, apiCards, nil
+	return apiDeck, nil
 }
 
 // UpdateDeck は既存デッキを更新します。所持カードと制限をバリデーションします。

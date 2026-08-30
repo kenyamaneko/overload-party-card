@@ -21,8 +21,7 @@ func toHTTPStatus(err error) int {
 	case errors.Is(err, port.ErrUnowned):
 		return http.StatusForbidden
 	case errors.Is(err, port.ErrInvalidDeck),
-		errors.Is(err, port.ErrRestrictionExceeded),
-		errors.Is(err, port.ErrInvalidArgument):
+		errors.Is(err, port.ErrRestrictionExceeded):
 		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError

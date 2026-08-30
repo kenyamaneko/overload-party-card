@@ -2,885 +2,1202 @@ package usecase
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/kenyamaneko/overload-party-card/internal/cache"
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
 	"github.com/kenyamaneko/overload-party-card/internal/port"
+	"github.com/kenyamaneko/overload-party-card/internal/presenter"
 	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 	gamedesign "github.com/kenyamaneko/overload-party-common/packages/game-design-constants"
 )
 
-// mockFactionClient は port.FactionClient のテスト用 fake。
-type mockFactionClient struct {
-	factions []string
-	err      error
+// baselineDeckCards は baselineCards を永続化済み DeckCard 形式に詰め替えて返す。
+func baselineDeckCards(playerID string, deckID int64) []domain.DeckCard {
+	return entriesToDeckCards(playerID, deckID, presenter.DeckCardEntriesFromRequest(baselineCards()))
 }
 
-func (m *mockFactionClient) ListPlayerFactions(_ context.Context, _ string) ([]string, error) {
-	return m.factions, m.err
-}
-
-type mockDeckRepo struct {
-	decks      map[string][]*domain.Deck
-	deckCards  map[int64][]domain.DeckCard
-	nextDeckID int64
-}
-
-func newMockDeckRepo() *mockDeckRepo {
-	return &mockDeckRepo{
-		decks:      make(map[string][]*domain.Deck),
-		deckCards:  make(map[int64][]domain.DeckCard),
-		nextDeckID: 1,
-	}
-}
-
-func (m *mockDeckRepo) Create(_ context.Context, deck domain.Deck, deckCardEntries []domain.DeckCardEntry) (int64, error) {
-	id := m.nextDeckID
-	m.nextDeckID++
-	deck.DeckID = id
-	stored := deck
-	m.decks[stored.PlayerID] = append(m.decks[stored.PlayerID], &stored)
-	cards := make([]domain.DeckCard, len(deckCardEntries))
-	for i, e := range deckCardEntries {
-		cards[i] = domain.DeckCard{
-			PlayerID: stored.PlayerID,
-			DeckID:   id,
-			CardID:   e.CardID,
-			ArtNo:    e.ArtNo,
-			Count:    e.Count,
-		}
-	}
-	m.deckCards[id] = cards
-	return id, nil
-}
-
-func (m *mockDeckRepo) FindByPlayerID(_ context.Context, playerID string) ([]*domain.Deck, error) {
-	return m.decks[playerID], nil
-}
-
-func (m *mockDeckRepo) FindByID(_ context.Context, playerID string, deckID int64) (*domain.Deck, error) {
-	for _, d := range m.decks[playerID] {
-		if d.DeckID == deckID {
-			return d, nil
-		}
-	}
-	return nil, fmt.Errorf("deck %d for player %s: %w", deckID, playerID, port.ErrNotFound)
-}
-
-func (m *mockDeckRepo) GetDeckCards(_ context.Context, _ string, deckID int64) ([]domain.DeckCard, error) {
-	return m.deckCards[deckID], nil
-}
-
-func (m *mockDeckRepo) Update(_ context.Context, deck domain.Deck, deckCardEntries []domain.DeckCardEntry) error {
-	stored := deck
-	for i, d := range m.decks[deck.PlayerID] {
-		if d.DeckID == deck.DeckID {
-			m.decks[deck.PlayerID][i] = &stored
-			break
-		}
-	}
-	cards := make([]domain.DeckCard, len(deckCardEntries))
-	for i, e := range deckCardEntries {
-		cards[i] = domain.DeckCard{
-			PlayerID: deck.PlayerID,
-			DeckID:   deck.DeckID,
-			CardID:   e.CardID,
-			ArtNo:    e.ArtNo,
-			Count:    e.Count,
-		}
-	}
-	m.deckCards[deck.DeckID] = cards
-	return nil
-}
-
-func (m *mockDeckRepo) Delete(_ context.Context, playerID string, deckID int64) error {
-	for i, d := range m.decks[playerID] {
-		if d.DeckID == deckID {
-			m.decks[playerID] = append(m.decks[playerID][:i], m.decks[playerID][i+1:]...)
-			break
-		}
-	}
-	delete(m.deckCards, deckID)
-	return nil
-}
-
-func setupDeckInteractor(t *testing.T) (*DeckInteractor, *mockDeckRepo, *inMemoryPlayerCardRepo, *cache.CardCache) {
-	svc, repo, pcRepo, cc, _ := setupDeckInteractorWithFactions(t, gamedesign.SelectableFactions)
-	return svc, repo, pcRepo, cc
-}
-
-func setupDeckInteractorWithFactions(t *testing.T, ownedFactions []string) (*DeckInteractor, *mockDeckRepo, *inMemoryPlayerCardRepo, *cache.CardCache, *mockFactionClient) {
-	t.Helper()
-	repo := newMockDeckRepo()
-	cc := cache.NewCardCache()
-
-	unlimitedCards := []struct {
-		id      string
-		name    string
-		faction string
-		typ     string
-	}{
-		{"C-001", "Compute A", "SHE", "Compute"},
-		{"C-002", "Compute B", "SHE", "Compute"},
-		{"C-003", "Database A", "SHE", "Database"},
-		{"C-004", "Strategy A", "SHE", "Strategy"},
-		{"C-005", "Incident A", "SHE", "Incident"},
-		{"C-006", "Platform A", "SHE", "Platform"},
-		{"C-007", "Compute C", "Neutral", "Compute"},
-		{"C-008", "Database B", "Neutral", "Database"},
-		{"C-009", "Strategy B", "Neutral", "Strategy"},
-		{"C-010", "Incident B", "Neutral", "Incident"},
-		{"C-011", "Compute D", "Tenki", "Compute"},
-	}
-	for _, c := range unlimitedCards {
-		cc.InjectForTest(c.id, &domain.Card{
-			CardID: c.id, CardName: c.name, Faction: c.faction, CardType: c.typ,
-			Restriction: "unlimited", IsActive: true,
-			Stats: json.RawMessage(`{}`),
-		})
-	}
-
-	cc.InjectForTest("C-050", &domain.Card{
-		CardID: "C-050", CardName: "Limited Spell", Faction: "SHE", CardType: "Strategy",
-		Restriction: "limited", IsActive: true,
-		Stats: json.RawMessage(`{}`),
-	})
-
-	cc.InjectForTest("C-060", &domain.Card{
-		CardID: "C-060", CardName: "SemiLimited Trap", Faction: "SHE", CardType: "Incident",
-		Restriction: "semi_limited", IsActive: true,
-		Stats: json.RawMessage(`{}`),
-	})
-
-	cc.InjectForTest("TST-0001", &domain.Card{
-		CardID: "TST-0001", CardName: "Forbidden Card", Faction: "SHE", CardType: "Strategy",
-		Restriction: "forbidden", IsActive: true,
-		Stats: json.RawMessage(`{}`),
-	})
-
-	pc := cache.NewProductCache()
-	require.NoError(t, pc.LoadFromBytes([]byte(testProductsJSON)))
-	ic := cache.NewInitiativeCache()
-	require.NoError(t, ic.LoadFromBytes([]byte(testInitiativesJSON)))
-
-	pcRepo := newInMemoryPlayerCardRepo()
-	fc := &mockFactionClient{factions: ownedFactions}
-	svc := NewDeckInteractor(repo, pcRepo, cc, pc, ic, fc)
-	return svc, repo, pcRepo, cc, fc
-}
-
-// testProductsJSON は SHE プロダクト PD-TST と別陣営 (Tenki) の PD-TST2 を持つテスト用定義。
-const testProductID = "PD-TST"
-const testRoutineID = "IN-TST-R"
-const testSpecialID = "IN-TST-S"
-const testProductsJSON = `[
-  {"product_id":"PD-TST","faction":"SHE","product_name":"Test"},
-  {"product_id":"PD-TST2","faction":"Tenki","product_name":"Other"}
-]`
-
-// testInitiativesJSON は PD-TST / PD-TST2 それぞれのルーチン・スペシャルを持つ。
-// effect は検証に使わないため最小限。
-const testInitiativesJSON = `[
-  {"initiative_id":"IN-TST-R","product_id":"PD-TST","kind":"routine","name":"R","insight_cost":100,"effect_text":"","effect":{"ops":[]}},
-  {"initiative_id":"IN-TST-S","product_id":"PD-TST","kind":"special","name":"S","insight_cost":200,"effect_text":"","effect":{"ops":[]}},
-  {"initiative_id":"IN-TST-R2","product_id":"PD-TST2","kind":"routine","name":"R2","insight_cost":100,"effect_text":"","effect":{"ops":[]}},
-  {"initiative_id":"IN-TST-S2","product_id":"PD-TST2","kind":"special","name":"S2","insight_cost":200,"effect_text":"","effect":{"ops":[]}}
-]`
-
-func grantCards(repo *inMemoryPlayerCardRepo, playerID string, cards ...*domain.PlayerCard) {
-	for _, c := range cards {
-		c.PlayerID = playerID
-	}
-	repo.Seed(playerID, cards)
-}
-
-func makeEntries(pairs ...interface{}) []apicard.DeckCardEntry {
-	var entries []apicard.DeckCardEntry
-	for i := 0; i < len(pairs); i += 2 {
-		entries = append(entries, apicard.DeckCardEntry{
-			CardID: pairs[i].(string),
-			ArtNo:  0,
-			Count:  pairs[i+1].(int),
-		})
-	}
-	return entries
-}
-
-func grantUnlimited(repo *inMemoryPlayerCardRepo, playerID string, cardIDs ...string) {
-	for _, id := range cardIDs {
-		grantCards(repo, playerID, &domain.PlayerCard{CardID: id, ArtNo: 0, Count: 3})
-	}
-}
-
-func factionEntries(cardIDs []string) []apicard.DeckCardEntry {
-	entries := make([]apicard.DeckCardEntry, 0, len(cardIDs))
-	for _, id := range cardIDs {
-		entries = append(entries, apicard.DeckCardEntry{CardID: id, ArtNo: 0, Count: 1})
-	}
-	return entries
-}
-
-var allTenCards = []string{"C-001", "C-002", "C-003", "C-004", "C-005", "C-006", "C-007", "C-008", "C-009", "C-010"}
-
-func full30Entries() []apicard.DeckCardEntry {
-	return makeEntries(
-		"C-001", 3, "C-002", 3, "C-003", 3, "C-004", 3, "C-005", 3,
-		"C-006", 3, "C-007", 3, "C-008", 3, "C-009", 3, "C-010", 3,
-	)
-}
-
-func TestCreateDeck(t *testing.T) {
-	t.Run("デッキ作成", func(t *testing.T) {
-		t.Run("デッキ枚数の妥当性", func(t *testing.T) {
-			tests := []struct {
-				name      string
-				deckName  string
-				grant     func(pcRepo *inMemoryPlayerCardRepo, pid string)
-				entries   []apicard.DeckCardEntry
-				wantValid bool
-			}{
-				{
-					name:     "30枚ちょうどのとき、IsValid=trueになる",
-					deckName: "Full Deck",
-					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
-						grantUnlimited(pcRepo, pid, allTenCards...)
-					},
-					entries:   full30Entries(),
-					wantValid: true,
-				},
-				{
-					name:     "29枚のとき、IsValid=falseになる",
-					deckName: "Almost Full",
-					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
-						grantUnlimited(pcRepo, pid, "C-001", "C-002", "C-003", "C-004", "C-005", "C-006", "C-007", "C-008", "C-009")
-						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-010", ArtNo: 0, Count: 2})
-					},
-					entries: makeEntries(
-						"C-001", 3, "C-002", 3, "C-003", 3, "C-004", 3, "C-005", 3,
-						"C-006", 3, "C-007", 3, "C-008", 3, "C-009", 3, "C-010", 2,
-					),
-					wantValid: false,
-				},
-				{
-					name:      "0枚のとき、IsValid=falseになる",
-					deckName:  "Empty Deck",
-					grant:     func(pcRepo *inMemoryPlayerCardRepo, pid string) {},
-					entries:   []apicard.DeckCardEntry{},
-					wantValid: false,
-				},
+func TestDeckContentValidation(t *testing.T) {
+	t.Run("[デッキ]デッキ内容検証", func(t *testing.T) {
+		t.Run("宣言陣営が選択可能陣営のいずれでもない(例:Neutral)とき、デッキを作成するとエラーになる", func(t *testing.T) {
+			interactor, _, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 1})
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: gamedesign.FactionNeutral,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: 1}},
 			}
 
-			for _, tt := range tests {
-				t.Run(tt.name, func(t *testing.T) {
-					svc, _, pcRepo, _ := setupDeckInteractor(t)
-					pid := "p1"
-					tt.grant(pcRepo, pid)
-
-					deck, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-						DeckName:  tt.deckName,
-						Faction:   "SHE",
-						ProductID: testProductID,
-						RoutineID: testRoutineID,
-						SpecialID: testSpecialID,
-						Cards:     tt.entries,
-					})
-
-					require.NoError(t, err)
-					assert.Equal(t, tt.wantValid, deck.IsValid)
-					assert.Equal(t, tt.deckName, deck.DeckName)
-					assert.Equal(t, "SHE", deck.Faction)
-				})
-			}
-		})
-
-		t.Run("入力バリデーション", func(t *testing.T) {
-			tests := []struct {
-				name         string
-				faction      string
-				grant        func(pcRepo *inMemoryPlayerCardRepo, pid string)
-				entries      []apicard.DeckCardEntry
-				wantSentinel error
-				wantErrMsg   string
-			}{
-				{
-					name:    "陣営が空のとき、選択不可エラーになる",
-					faction: "",
-					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
-						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
-					},
-					entries:      makeEntries("C-001", 3),
-					wantSentinel: port.ErrInvalidDeck,
-					wantErrMsg:   `faction "" is not selectable`,
-				},
-				{
-					name:    "陣営がNeutralのとき、選択不可エラーになる",
-					faction: "Neutral",
-					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
-						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-007", ArtNo: 0, Count: 3})
-					},
-					entries:      makeEntries("C-007", 3),
-					wantSentinel: port.ErrInvalidDeck,
-					wantErrMsg:   `faction "Neutral" is not selectable`,
-				},
-				{
-					name:    "未知の陣営 (Atlantis)のとき、選択不可エラーになる",
-					faction: "Atlantis",
-					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
-						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
-					},
-					entries:      makeEntries("C-001", 3),
-					wantSentinel: port.ErrInvalidDeck,
-					wantErrMsg:   `faction "Atlantis" is not selectable`,
-				},
-				{
-					name:    "31枚のとき、30枚上限超過エラーになる",
-					faction: "SHE",
-					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
-						grantUnlimited(pcRepo, pid, allTenCards...)
-						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-050", ArtNo: 0, Count: 1})
-					},
-					entries: makeEntries(
-						"C-001", 3, "C-002", 3, "C-003", 3, "C-004", 3, "C-005", 3,
-						"C-006", 3, "C-007", 3, "C-008", 3, "C-009", 3, "C-010", 3,
-						"C-050", 1,
-					),
-					wantSentinel: port.ErrInvalidDeck,
-					wantErrMsg:   "deck cannot exceed 30 cards",
-				},
-				{
-					name:    "未所持カードを含むとき、所持枚数不足エラーになる",
-					faction: "SHE",
-					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
-						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
-					},
-					entries:      makeEntries("C-001", 3, "C-002", 1),
-					wantSentinel: port.ErrUnowned,
-					wantErrMsg:   "not enough owned",
-				},
-				{
-					name:    "無制限カード4枚のとき、制限枚数超過エラーになる",
-					faction: "SHE",
-					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
-						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 4})
-					},
-					entries:      makeEntries("C-001", 4),
-					wantSentinel: port.ErrRestrictionExceeded,
-					wantErrMsg:   "exceeds restriction limit (4/3)",
-				},
-				{
-					name:    "制限カード2枚のとき、制限枚数超過エラーになる",
-					faction: "SHE",
-					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
-						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-050", ArtNo: 0, Count: 2})
-					},
-					entries:      makeEntries("C-050", 2),
-					wantSentinel: port.ErrRestrictionExceeded,
-					wantErrMsg:   "exceeds restriction limit (2/1)",
-				},
-				{
-					name:    "準制限カード3枚のとき、制限枚数超過エラーになる",
-					faction: "SHE",
-					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
-						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-060", ArtNo: 0, Count: 3})
-					},
-					entries:      makeEntries("C-060", 3),
-					wantSentinel: port.ErrRestrictionExceeded,
-					wantErrMsg:   "exceeds restriction limit (3/2)",
-				},
-				{
-					name:    "禁止カード1枚のとき、制限枚数超過エラーになる",
-					faction: "SHE",
-					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
-						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 0, Count: 1})
-					},
-					entries:      makeEntries("TST-0001", 1),
-					wantSentinel: port.ErrRestrictionExceeded,
-					wantErrMsg:   "exceeds restriction limit (1/0)",
-				},
-				{
-					name:    "枚数0のとき、枚数不正エラーになる",
-					faction: "SHE",
-					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
-						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
-					},
-					entries:      []apicard.DeckCardEntry{{CardID: "C-001", ArtNo: 0, Count: 0}},
-					wantSentinel: port.ErrInvalidDeck,
-					wantErrMsg:   "count must be positive",
-				},
-				{
-					name:    "枚数-1のとき、枚数不正エラーになる",
-					faction: "SHE",
-					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
-						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
-					},
-					entries:      []apicard.DeckCardEntry{{CardID: "C-001", ArtNo: 0, Count: -1}},
-					wantSentinel: port.ErrInvalidDeck,
-					wantErrMsg:   "count must be positive",
-				},
-				{
-					name:    "カード定義に存在しないIDのとき、カード未定義エラーになる",
-					faction: "SHE",
-					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
-						grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-999", ArtNo: 0, Count: 3})
-					},
-					entries:      makeEntries("C-999", 1),
-					wantSentinel: port.ErrInvalidDeck,
-					wantErrMsg:   "card C-999 not found in card definitions",
-				},
-				{
-					name:    "同カードをアート違いで合算すると、制限枚数超過エラーになる",
-					faction: "SHE",
-					grant: func(pcRepo *inMemoryPlayerCardRepo, pid string) {
-						grantCards(pcRepo, pid,
-							&domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3},
-							&domain.PlayerCard{CardID: "C-001", ArtNo: 1, Count: 3},
-						)
-					},
-					entries: []apicard.DeckCardEntry{
-						{CardID: "C-001", ArtNo: 0, Count: 3},
-						{CardID: "C-001", ArtNo: 1, Count: 1},
-					},
-					wantSentinel: port.ErrRestrictionExceeded,
-					wantErrMsg:   "exceeds restriction limit (4/3)",
-				},
-			}
-
-			for _, tt := range tests {
-				t.Run(tt.name, func(t *testing.T) {
-					svc, _, pcRepo, _ := setupDeckInteractor(t)
-					pid := "p1"
-					tt.grant(pcRepo, pid)
-
-					_, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-						DeckName:  "Test",
-						Faction:   tt.faction,
-						ProductID: testProductID,
-						RoutineID: testRoutineID,
-						SpecialID: testSpecialID,
-						Cards:     tt.entries,
-					})
-
-					require.Error(t, err)
-					assert.ErrorIs(t, err, tt.wantSentinel)
-					assert.Contains(t, err.Error(), tt.wantErrMsg)
-				})
-			}
-		})
-
-		t.Run("カード定義の制限区分が未知の値のとき、デッキ検証がエラーになる", func(t *testing.T) {
-			svc, _, pcRepo, cc := setupDeckInteractor(t)
-			pid := "p1"
-			cc.InjectForTest("TST-0002", &domain.Card{
-				CardID: "TST-0002", CardName: "Unknown Restriction", Faction: "SHE", CardType: "Strategy",
-				Restriction: "banned", IsActive: true,
-				Stats: json.RawMessage(`{}`),
-			})
-			grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "TST-0002", ArtNo: 0, Count: 1})
-
-			_, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-				DeckName: "Test", Faction: "SHE", ProductID: testProductID,
-				RoutineID: testRoutineID, SpecialID: testSpecialID,
-				Cards: makeEntries("TST-0002", 1),
-			})
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
 
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), `unknown restriction "banned"`)
+			assert.ErrorIs(t, err, port.ErrInvalidDeck)
 		})
 
-		t.Run("カード0枚で作成したデッキの応答では、構成カード一覧が省略される", func(t *testing.T) {
-			svc, _, _, _ := setupDeckInteractor(t)
-			pid := "p1"
+		countCases := []struct {
+			name  string
+			count int
+		}{
+			{"カードエントリの指定枚数が0のとき、デッキを作成するとエラーになる", 0},
+			{"カードエントリの指定枚数が負の数(-1)のとき、デッキを作成するとエラーになる", -1},
+		}
+		for _, tc := range countCases {
+			t.Run(tc.name, func(t *testing.T) {
+				interactor, _, playerCardRepo, _ := newDeckFixture(t)
+				playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 3})
+				req := apicard.DeckCreateRequest{
+					DeckName: "Test Deck", Faction: fxFaction,
+					ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+					Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: tc.count}},
+				}
 
-			deck, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-				DeckName: "Empty", Faction: "SHE", ProductID: testProductID,
-				RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: []apicard.DeckCardEntry{},
-			})
-
-			require.NoError(t, err)
-			assert.Nil(t, deck.DeckCards)
-		})
-
-		// 枚数不足でも陣営検証は通過する (IsValid=false になるだけでエラーにはならない)。
-		t.Run("陣営構成が選択陣営とNeutralのみのとき、通過する", func(t *testing.T) {
-			tests := []struct {
-				name    string
-				cardIDs []string
-			}{
-				{"選択陣営カードのみのとき、通過する", []string{"C-001"}},
-				{"選択陣営＋Neutral のとき、通過する", []string{"C-001", "C-007"}},
-				{"Neutral のみのとき、通過する", []string{"C-007"}},
-			}
-
-			for _, tt := range tests {
-				t.Run(tt.name, func(t *testing.T) {
-					svc, _, pcRepo, _ := setupDeckInteractor(t)
-					pid := "p1"
-					grantUnlimited(pcRepo, pid, tt.cardIDs...)
-
-					_, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-						DeckName: "Test", Faction: "SHE", ProductID: testProductID,
-						RoutineID: testRoutineID, SpecialID: testSpecialID,
-						Cards: factionEntries(tt.cardIDs),
-					})
-
-					require.NoError(t, err)
-				})
-			}
-		})
-
-		t.Run("陣営構成に他陣営が混ざるとき、拒否される", func(t *testing.T) {
-			tests := []struct {
-				name    string
-				cardIDs []string
-			}{
-				{"他陣営カードのみのとき、拒否される", []string{"C-011"}},
-				{"選択陣営＋他陣営のとき、拒否される", []string{"C-001", "C-011"}},
-				{"選択陣営＋他陣営＋Neutral のとき、拒否される", []string{"C-001", "C-011", "C-007"}},
-				{"他陣営＋Neutral のとき、拒否される", []string{"C-011", "C-007"}},
-			}
-
-			for _, tt := range tests {
-				t.Run(tt.name, func(t *testing.T) {
-					svc, _, pcRepo, _ := setupDeckInteractor(t)
-					pid := "p1"
-					grantUnlimited(pcRepo, pid, tt.cardIDs...)
-
-					_, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-						DeckName: "Test", Faction: "SHE", ProductID: testProductID,
-						RoutineID: testRoutineID, SpecialID: testSpecialID,
-						Cards: factionEntries(tt.cardIDs),
-					})
-
-					require.Error(t, err)
-					assert.ErrorIs(t, err, port.ErrInvalidDeck)
-					assert.Contains(t, err.Error(), "only SHE and Neutral cards are allowed")
-				})
-			}
-		})
-
-		t.Run("宣言陣営の所持検証", func(t *testing.T) {
-			t.Run("未所持の陣営 (SHE)を宣言すると、拒否される", func(t *testing.T) {
-				svc, _, pcRepo, _, _ := setupDeckInteractorWithFactions(t, []string{"Tenki"}) // SHE は未所持
-				pid := "p1"
-				grantUnlimited(pcRepo, pid, "C-001")
-
-				_, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-					DeckName: "Test", Faction: "SHE", ProductID: testProductID,
-					RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: makeEntries("C-001", 1),
-				})
+				_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
 
 				require.Error(t, err)
 				assert.ErrorIs(t, err, port.ErrInvalidDeck)
-				assert.Contains(t, err.Error(), "not owned")
 			})
+		}
 
-			t.Run("所持する陣営 (SHE)を宣言するとき、通過する", func(t *testing.T) {
-				svc, _, pcRepo, _, _ := setupDeckInteractorWithFactions(t, []string{"SHE"})
-				pid := "p1"
-				grantUnlimited(pcRepo, pid, "C-001")
+		t.Run("カードエントリの指定枚数が1のとき、デッキを作成してもこの条件によるエラーにはならない", func(t *testing.T) {
+			interactor, _, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 1})
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: 1}},
+			}
 
-				_, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-					DeckName: "Test", Faction: "SHE", ProductID: testProductID,
-					RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: makeEntries("C-001", 1),
-				})
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.NoError(t, err)
+		})
+
+		t.Run("全カードエントリの合計投入枚数がデッキ上限枚数を超え31枚のとき、デッキを作成するとエラーになる", func(t *testing.T) {
+			interactor, _, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+			cards := append(baselineCards(), apicard.DeckCardEntry{CardID: "TST-0011", ArtNo: 1, Count: 1})
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: cards,
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrInvalidDeck)
+		})
+
+		t.Run("全カードエントリの合計投入枚数がデッキ上限枚数ちょうど30枚のとき、デッキを作成してもこの条件によるエラーにはならない", func(t *testing.T) {
+			interactor, _, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: baselineCards(),
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.NoError(t, err)
+		})
+
+		t.Run("指定したカード・アート番号の組について、プレイヤーの所持枚数が要求枚数より少ないとき、デッキを作成するとエラーになる", func(t *testing.T) {
+			interactor, _, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 2})
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: 3}},
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrUnowned)
+		})
+
+		t.Run("指定したカード・アート番号の組について、プレイヤーがその組を1件も所持していない(所持記録が無い)とき、デッキを作成するとエラーになる", func(t *testing.T) {
+			interactor, _, _, _ := newDeckFixture(t)
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: 1}},
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrUnowned)
+		})
+
+		t.Run("指定したカード・アート番号の組について、プレイヤーの所持枚数が要求枚数とちょうど同じとき、デッキを作成してもこの条件によるエラーにはならない", func(t *testing.T) {
+			interactor, _, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 2})
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: 2}},
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.NoError(t, err)
+		})
+
+		t.Run("同一カードIDに対しアート番号が異なる複数のエントリを指定し、合算した投入枚数が制限区分の上限を超えるとき、デッキを作成するとエラーになる", func(t *testing.T) {
+			interactor, _, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID,
+				&domain.PlayerCard{CardID: "TST-LIMITED", ArtNo: 1, Count: 1},
+				&domain.PlayerCard{CardID: "TST-LIMITED", ArtNo: 2, Count: 1},
+			)
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{
+					{CardID: "TST-LIMITED", ArtNo: 1, Count: 1},
+					{CardID: "TST-LIMITED", ArtNo: 2, Count: 1},
+				},
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrRestrictionExceeded)
+		})
+
+		t.Run("指定したカードIDがカード定義に存在しないとき、デッキを作成するとエラーになる", func(t *testing.T) {
+			interactor, _, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-UNDEFINED", ArtNo: 1, Count: 1})
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-UNDEFINED", ArtNo: 1, Count: 1}},
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrInvalidDeck)
+		})
+
+		factionCases := []struct {
+			name   string
+			cardID string
+		}{
+			{"カードの陣営が宣言陣営(SHE)と一致するとき、デッキを作成してもエラーにならない", "TST-0001"},
+			{"カードの陣営がNeutralのとき、宣言陣営が何であってもデッキを作成してもエラーにならない", "TST-NEUTRAL"},
+		}
+		for _, tc := range factionCases {
+			t.Run(tc.name, func(t *testing.T) {
+				interactor, _, playerCardRepo, _ := newDeckFixture(t)
+				playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: tc.cardID, ArtNo: 1, Count: 1})
+				req := apicard.DeckCreateRequest{
+					DeckName: "Test Deck", Faction: fxFaction,
+					ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+					Cards: []apicard.DeckCardEntry{{CardID: tc.cardID, ArtNo: 1, Count: 1}},
+				}
+
+				_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
 
 				require.NoError(t, err)
 			})
+		}
+
+		t.Run("カードの陣営が宣言陣営ともNeutralとも異なる(他の選択可能陣営である)とき、デッキを作成するとエラーになる", func(t *testing.T) {
+			interactor, _, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-OTHERFACTION", ArtNo: 1, Count: 1})
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-OTHERFACTION", ArtNo: 1, Count: 1}},
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrInvalidDeck)
 		})
 
-		t.Run("施策の検証", func(t *testing.T) {
-			tests := []struct {
-				name       string
-				productID  string
-				routineID  string
-				specialID  string
-				wantErrMsg string
-			}{
-				{
-					name:       "不明なプロダクトのとき、プロダクトが見つからずエラーになる",
-					productID:  "PD-NOPE",
-					routineID:  testRoutineID,
-					specialID:  testSpecialID,
-					wantErrMsg: "not found",
-				},
-				{
-					name:       "他陣営のプロダクトのとき、デッキの陣営と一致せずエラーになる",
-					productID:  "PD-TST2",
-					routineID:  testRoutineID,
-					specialID:  testSpecialID,
-					wantErrMsg: "not deck faction",
-				},
-				{
-					name:       "不明なルーチンIDのとき、ルーチンでないためエラーになる",
-					productID:  testProductID,
-					routineID:  "IN-NOPE",
-					specialID:  testSpecialID,
-					wantErrMsg: "is not a routine",
-				},
-				{
-					name:       "不明なスペシャルIDのとき、スペシャルでないためエラーになる",
-					productID:  testProductID,
-					routineID:  testRoutineID,
-					specialID:  "IN-NOPE",
-					wantErrMsg: "is not a special",
-				},
-				{
-					name:       "スペシャルにルーチンIDを指定するとき、スペシャルでないためエラーになる",
-					productID:  testProductID,
-					routineID:  testRoutineID,
-					specialID:  testRoutineID,
-					wantErrMsg: "is not a special",
-				},
-				{
-					name:       "ルーチンにスペシャルIDを指定するとき、ルーチンでないためエラーになる",
-					productID:  testProductID,
-					routineID:  testSpecialID,
-					specialID:  testSpecialID,
-					wantErrMsg: "is not a routine",
-				},
-				{
-					name:       "別プロダクトのルーチンを指定するとき、ルーチンでないためエラーになる",
-					productID:  testProductID,
-					routineID:  "IN-TST-R2",
-					specialID:  testSpecialID,
-					wantErrMsg: "is not a routine",
-				},
+		t.Run("カードの制限区分に対応する投入上限が制限区分ごとの上限テーブルに定義されていない(未知の制限区分値)とき、デッキを作成するとエラーになり、そのエラーはデッキ内容検証の違反や制限超過とは異なる種別になる", func(t *testing.T) {
+			interactor, _, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-UNKNOWNRESTRICTION", ArtNo: 1, Count: 1})
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-UNKNOWNRESTRICTION", ArtNo: 1, Count: 1}},
 			}
 
-			for _, tt := range tests {
-				t.Run(tt.name, func(t *testing.T) {
-					svc, _, pcRepo, _ := setupDeckInteractor(t)
-					pid := "p1"
-					grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
 
-					_, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-						DeckName:  "Test",
-						Faction:   "SHE",
-						ProductID: tt.productID,
-						RoutineID: tt.routineID,
-						SpecialID: tt.specialID,
-						Cards:     makeEntries("C-001", 3),
-					})
-
-					require.Error(t, err)
-					assert.ErrorIs(t, err, port.ErrInvalidDeck)
-					assert.Contains(t, err.Error(), tt.wantErrMsg)
-				})
-			}
+			require.Error(t, err)
+			assert.NotErrorIs(t, err, port.ErrInvalidDeck)
+			assert.NotErrorIs(t, err, port.ErrRestrictionExceeded)
+			assert.NotErrorIs(t, err, port.ErrUnowned)
+			assert.ErrorContains(t, err, "restriction")
 		})
 
-		t.Run("制限枚数ちょうどは通過する", func(t *testing.T) {
-			tests := []struct {
-				name   string
-				cardID string
-				count  int
-			}{
-				{"制限カード1枚 (上限ちょうど) のとき、通過する", "C-050", 1},
-				{"準制限カード2枚 (上限ちょうど) のとき、通過する", "C-060", 2},
-				{"無制限カード3枚 (上限ちょうど) のとき、通過する", "C-001", 3},
+		t.Run("制限区分がlimited(投入上限1枚)のカードについて、同一カードIDの合計投入枚数が2枚のとき、デッキを作成するとエラーになる", func(t *testing.T) {
+			interactor, _, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-LIMITED", ArtNo: 1, Count: 2})
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-LIMITED", ArtNo: 1, Count: 2}},
 			}
 
-			for _, tt := range tests {
-				t.Run(tt.name, func(t *testing.T) {
-					svc, _, pcRepo, _ := setupDeckInteractor(t)
-					pid := "p1"
-					grantCards(pcRepo, pid, &domain.PlayerCard{CardID: tt.cardID, ArtNo: 0, Count: tt.count})
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
 
-					_, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-						DeckName:  "OK Deck",
-						Faction:   "SHE",
-						ProductID: testProductID,
-						RoutineID: testRoutineID,
-						SpecialID: testSpecialID,
-						Cards:     makeEntries(tt.cardID, tt.count),
-					})
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrRestrictionExceeded)
+		})
 
-					require.NoError(t, err)
-				})
+		t.Run("制限区分がlimited(投入上限1枚)のカードについて、同一カードIDの合計投入枚数が1枚のとき、デッキを作成してもこの条件によるエラーにはならない", func(t *testing.T) {
+			interactor, _, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-LIMITED", ArtNo: 1, Count: 1})
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-LIMITED", ArtNo: 1, Count: 1}},
 			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.NoError(t, err)
+		})
+
+		t.Run("制限区分がforbidden(投入上限0枚)のカードを1枚でも投入したとき、デッキを作成するとエラーになる", func(t *testing.T) {
+			interactor, _, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-FORBIDDEN", ArtNo: 1, Count: 1})
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-FORBIDDEN", ArtNo: 1, Count: 1}},
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrRestrictionExceeded)
+		})
+
+		t.Run("宣言陣営が選択可能陣営のいずれかであり、各カードエントリの指定枚数が正の数で合計がデッキ上限枚数以内であり、指定したカード・アート番号の組をすべて要求枚数以上所持しており、指定したカードIDがすべてカード定義に存在し陣営が宣言陣営またはNeutralであり、同一カードIDごとの合計投入枚数がすべて制限区分の上限以内であるとき、デッキを作成してもエラーにはならない", func(t *testing.T) {
+			interactor, _, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: baselineCards(),
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.NoError(t, err)
+		})
+	})
+}
+
+func TestFactionOwnershipValidation(t *testing.T) {
+	t.Run("[デッキ]陣営所持検証", func(t *testing.T) {
+		t.Run("プレイヤーの所持陣営一覧の取得元がエラーを返すとき、そのエラーをそのまま返す", func(t *testing.T) {
+			interactor, _, playerCardRepo, factionClient := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 1})
+			injected := errors.New("faction client unavailable")
+			factionClient.err = injected
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: 1}},
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, injected)
+		})
+
+		t.Run("プレイヤーの所持陣営一覧に宣言陣営が含まれないとき、デッキを作成するとエラーになる", func(t *testing.T) {
+			interactor, _, playerCardRepo, factionClient := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 1})
+			factionClient.factions = []string{fxFaction2}
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: 1}},
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrInvalidDeck)
+		})
+
+		t.Run("プレイヤーの所持陣営一覧に宣言陣営が含まれるとき、デッキを作成してもエラーにはならない", func(t *testing.T) {
+			interactor, _, playerCardRepo, factionClient := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 1})
+			factionClient.factions = []string{fxFaction}
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: 1}},
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.NoError(t, err)
+		})
+	})
+}
+
+func TestInitiativeConsistencyValidation(t *testing.T) {
+	t.Run("[デッキ]施策整合検証", func(t *testing.T) {
+		t.Run("指定したプロダクトIDがプロダクト定義に存在しないとき、デッキを作成するとエラーになる", func(t *testing.T) {
+			interactor, _, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 1})
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: "PD-UNKNOWN", RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: 1}},
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrInvalidDeck)
+		})
+
+		t.Run("指定したプロダクトの陣営が宣言陣営と異なるとき、デッキを作成するとエラーになる", func(t *testing.T) {
+			interactor, _, playerCardRepo, factionClient := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-OTHERFACTION", ArtNo: 1, Count: 1})
+			factionClient.factions = []string{fxFaction2}
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction2,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-OTHERFACTION", ArtNo: 1, Count: 1}},
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrInvalidDeck)
+		})
+
+		routineCases := []struct {
+			name      string
+			routineID string
+		}{
+			{"指定したルーチン施策IDが施策定義に存在しないとき、デッキを作成するとエラーになる", "IN-9999-X"},
+			{"指定したルーチン施策IDが施策定義には存在するが指定プロダクトに属さないとき、デッキを作成するとエラーになる", "IN-0002-R"},
+			{"指定したルーチン施策IDが施策定義には存在し指定プロダクトにも属するがルーチン区分でないとき、デッキを作成するとエラーになる", "IN-0001-S"},
+		}
+		for _, tc := range routineCases {
+			t.Run(tc.name, func(t *testing.T) {
+				interactor, _, playerCardRepo, _ := newDeckFixture(t)
+				playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 1})
+				req := apicard.DeckCreateRequest{
+					DeckName: "Test Deck", Faction: fxFaction,
+					ProductID: fxProductID, RoutineID: tc.routineID, SpecialID: fxSpecialID,
+					Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: 1}},
+				}
+
+				_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+				require.Error(t, err)
+				assert.ErrorIs(t, err, port.ErrInvalidDeck)
+			})
+		}
+
+		specialCases := []struct {
+			name      string
+			specialID string
+		}{
+			{"指定したスペシャル施策IDが施策定義に存在しないとき、デッキを作成するとエラーになる", "IN-9999-Y"},
+			{"指定したスペシャル施策IDが施策定義には存在するが指定プロダクトに属さないとき、デッキを作成するとエラーになる", "IN-0002-S"},
+			{"指定したスペシャル施策IDが施策定義には存在し指定プロダクトにも属するがスペシャル区分でないとき、デッキを作成するとエラーになる", "IN-0001-R"},
+		}
+		for _, tc := range specialCases {
+			t.Run(tc.name, func(t *testing.T) {
+				interactor, _, playerCardRepo, _ := newDeckFixture(t)
+				playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 1})
+				req := apicard.DeckCreateRequest{
+					DeckName: "Test Deck", Faction: fxFaction,
+					ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: tc.specialID,
+					Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: 1}},
+				}
+
+				_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+				require.Error(t, err)
+				assert.ErrorIs(t, err, port.ErrInvalidDeck)
+			})
+		}
+
+		t.Run("指定したプロダクトIDがプロダクト定義に存在しその陣営が宣言陣営と一致し、指定したルーチン施策IDがそのプロダクトに属するルーチン区分の施策であり、指定したスペシャル施策IDがそのプロダクトに属するスペシャル区分の施策であるとき、デッキを作成してもエラーにはならない", func(t *testing.T) {
+			interactor, _, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 1})
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: 1}},
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.NoError(t, err)
+		})
+	})
+}
+
+func TestCreateDeck(t *testing.T) {
+	t.Run("[デッキ]デッキ作成", func(t *testing.T) {
+		t.Run("プレイヤーの所持カード取得元がエラーを返すとき、そのエラーを返しデッキは作成されない", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			injected := errors.New("player card repo unavailable")
+			playerCardRepo.getErr = injected
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: baselineCards(),
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, injected)
+			assert.Empty(t, deckRepo.decks)
+		})
+
+		t.Run("リクエストのカード構成がデッキ内容検証のいずれかの条件に違反するとき、その検証が返すエラーをそのまま返し、デッキは作成されない", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 1})
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: 0}},
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrInvalidDeck)
+			assert.Empty(t, deckRepo.decks)
+		})
+
+		t.Run("リクエストの宣言陣営が陣営所持検証の条件に違反する(プレイヤーが宣言陣営を所持していない)とき、その検証が返すエラーをそのまま返し、デッキは作成されない", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, factionClient := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 1})
+			factionClient.factions = []string{fxFaction2}
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: 1}},
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrInvalidDeck)
+			assert.Empty(t, deckRepo.decks)
+		})
+
+		t.Run("リクエストのプロダクト・ルーチン施策・スペシャル施策の組み合わせが施策整合検証のいずれかの条件に違反するとき、その検証が返すエラーをそのまま返し、デッキは作成されない", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 1})
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: "PD-UNKNOWN", RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: 1}},
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrInvalidDeck)
+			assert.Empty(t, deckRepo.decks)
+		})
+
+		t.Run("デッキ内容検証・陣営所持検証・施策整合検証をすべて満たし、カードエントリの合計投入枚数がデッキ上限枚数未満(29枚)のとき、エラーを返さずデッキを作成し、作成されたデッキのis_validはfalseになる", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+			cards := baselineCards()
+			cards[0].Count = 2 // 合計を 30 から 29 に減らす
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: cards,
+			}
+
+			resp, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.NoError(t, err)
+			assert.False(t, resp.IsValid)
+			assert.Len(t, deckRepo.decks, 1)
+		})
+
+		t.Run("デッキ内容検証・陣営所持検証・施策整合検証をすべて満たし、カードエントリの合計投入枚数がデッキ上限枚数ちょうど(30枚)のとき、エラーを返さずデッキを作成し、作成されたデッキのis_validはtrueになる", func(t *testing.T) {
+			interactor, _, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: baselineCards(),
+			}
+
+			resp, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.NoError(t, err)
+			assert.True(t, resp.IsValid)
+		})
+
+		t.Run("デッキの永続化処理がエラーを返すとき、そのエラーを返す", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+			injected := errors.New("deck repo unavailable")
+			deckRepo.createErr = injected
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: baselineCards(),
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, injected)
+		})
+
+		t.Run("デッキ作成後のデッキ構成カード再取得がエラーを返すとき、そのエラーを返す", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+			injected := errors.New("deck repo unavailable")
+			deckRepo.getDeckCardsErr = injected
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: baselineCards(),
+			}
+
+			_, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, injected)
+		})
+
+		t.Run("デッキ作成が成功したとき、返るデッキのdeck_idは永続化処理が採番したIDと一致する", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+			deckRepo.nextDeckID = 42
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: baselineCards(),
+			}
+
+			resp, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.NoError(t, err)
+			assert.Equal(t, int64(42), resp.DeckID)
+		})
+
+		t.Run("デッキ作成が成功したとき、返るデッキのデッキ名・陣営・プロダクトID・ルーチン施策ID・スペシャル施策ID・プレイマット番号・スリーブ番号は、リクエストで指定した値と一致する", func(t *testing.T) {
+			interactor, _, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+			playmatNo := int64(5)
+			sleeveNo := int64(9)
+			req := apicard.DeckCreateRequest{
+				DeckName: "My Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				PlaymatNo: &playmatNo, SleeveNo: &sleeveNo,
+				Cards: baselineCards(),
+			}
+
+			resp, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.NoError(t, err)
+			assert.Equal(t, "My Deck", resp.DeckName)
+			assert.Equal(t, fxFaction, resp.Faction)
+			assert.Equal(t, fxProductID, resp.ProductID)
+			assert.Equal(t, fxRoutineID, resp.RoutineID)
+			assert.Equal(t, fxSpecialID, resp.SpecialID)
+			assert.Equal(t, &playmatNo, resp.PlaymatNo)
+			assert.Equal(t, &sleeveNo, resp.SleeveNo)
+		})
+
+		t.Run("デッキ作成が成功したとき、返るデッキのdeck_cardsは、作成後に再取得したデッキ構成カードの内容になる", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+			refetched := []domain.DeckCard{{PlayerID: fxPlayerID, DeckID: 1, CardID: "TST-0099", ArtNo: 7, Count: 4}}
+			deckRepo.getDeckCardsOverride = refetched
+			req := apicard.DeckCreateRequest{
+				DeckName: "Test Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: baselineCards(),
+			}
+
+			resp, err := interactor.CreateDeck(context.Background(), fxPlayerID, req)
+
+			require.NoError(t, err)
+			require.NotNil(t, resp.DeckCards)
+			want := []apicard.DeckCard{{PlayerID: fxPlayerID, DeckID: 1, CardID: "TST-0099", ArtNo: 7, Count: 4}}
+			assert.Equal(t, want, *resp.DeckCards)
 		})
 	})
 }
 
 func TestGetDecks(t *testing.T) {
-	t.Run("デッキ一覧の取得", func(t *testing.T) {
-		t.Run("30枚のデッキと6枚のデッキを持つとき、一覧では前者だけが有効と判定される", func(t *testing.T) {
-			svc, _, pcRepo, _ := setupDeckInteractor(t)
-			pid := "p1"
-			grantUnlimited(pcRepo, pid, allTenCards...)
+	t.Run("[デッキ]デッキ一覧取得", func(t *testing.T) {
+		t.Run("プレイヤーのデッキ一覧の取得元がエラーを返すとき、そのエラーを返す", func(t *testing.T) {
+			interactor, deckRepo, _, _ := newDeckFixture(t)
+			injected := errors.New("deck repo unavailable")
+			deckRepo.findByPlayerErr = injected
 
-			full, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-				DeckName: "Full", Faction: "SHE", ProductID: testProductID,
-				RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: full30Entries(),
-			})
+			_, err := interactor.GetDecks(context.Background(), fxPlayerID)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, injected)
+		})
+
+		t.Run("デッキ一覧の取得が成功し、プレイヤーの所持カード取得元がエラーを返すとき、そのエラーを返す", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			deckRepo.seed(domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction}, nil)
+			injected := errors.New("player card repo unavailable")
+			playerCardRepo.getErr = injected
+
+			_, err := interactor.GetDecks(context.Background(), fxPlayerID)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, injected)
+		})
+
+		t.Run("プレイヤーがデッキを1件も持たないとき、空の一覧を返す", func(t *testing.T) {
+			interactor, _, _, _ := newDeckFixture(t)
+
+			result, err := interactor.GetDecks(context.Background(), fxPlayerID)
+
 			require.NoError(t, err)
+			assert.Empty(t, result)
+		})
 
-			partial, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-				DeckName: "Partial", Faction: "SHE", ProductID: testProductID,
-				RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: makeEntries("C-001", 3, "C-002", 3),
-			})
+		t.Run("いずれかのデッキについてデッキ構成カードの取得元がエラーを返すとき、そのエラーを返す", func(t *testing.T) {
+			interactor, deckRepo, _, _ := newDeckFixture(t)
+			deckRepo.seed(domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction}, nil)
+			injected := errors.New("deck repo unavailable")
+			deckRepo.getDeckCardsErr = injected
+
+			_, err := interactor.GetDecks(context.Background(), fxPlayerID)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, injected)
+		})
+
+		t.Run("あるデッキの構成カード枚数の合計がデッキ上限枚数(30枚)と一致しないとき、そのデッキのis_validはfalseになる", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			deckRepo.seed(
+				domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction, ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID},
+				[]domain.DeckCard{{PlayerID: fxPlayerID, DeckID: 1, CardID: "TST-0001", ArtNo: 1, Count: 5}},
+			)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 5})
+
+			result, err := interactor.GetDecks(context.Background(), fxPlayerID)
+
 			require.NoError(t, err)
+			require.Len(t, result, 1)
+			assert.False(t, result[0].IsValid)
+		})
 
-			decks, err := svc.GetDecks(context.Background(), pid)
+		t.Run("合計がちょうど30枚で、デッキ内容検証・施策整合検証をともに満たすとき、そのデッキのis_validはtrueになる", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			deckRepo.seed(
+				domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction, ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID},
+				baselineDeckCards(fxPlayerID, 1),
+			)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+
+			result, err := interactor.GetDecks(context.Background(), fxPlayerID)
+
 			require.NoError(t, err)
-			require.Len(t, decks, 2)
+			require.Len(t, result, 1)
+			assert.True(t, result[0].IsValid)
+		})
 
-			byID := make(map[int64]*apicard.Deck, len(decks))
-			for _, d := range decks {
-				byID[d.DeckID] = d
-			}
-			assert.True(t, byID[full.DeckID].IsValid)
-			assert.False(t, byID[partial.DeckID].IsValid)
+		t.Run("合計が30枚ちょうどでも、デッキ内容検証の条件に違反する(例:制限枚数超過のカードを含む)とき、そのデッキのis_validはfalseになる", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			cards := baselineDeckCards(fxPlayerID, 1)
+			cards[0].CardID = "TST-LIMITED" // 制限区分 limited (投入上限1枚) のカードを3枚投入し、超過させる
+			deckRepo.seed(
+				domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction, ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID},
+				cards,
+			)
+			owned := baselineOwnedCards()
+			owned[0].CardID = "TST-LIMITED"
+			playerCardRepo.seed(fxPlayerID, owned...)
+
+			result, err := interactor.GetDecks(context.Background(), fxPlayerID)
+
+			require.NoError(t, err)
+			require.Len(t, result, 1)
+			assert.False(t, result[0].IsValid)
+		})
+
+		t.Run("合計が30枚ちょうどでも、施策整合検証の条件に違反する(例:ルーチン施策が選択プロダクトと別のプロダクトに属する)とき、そのデッキのis_validはfalseになる", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			deckRepo.seed(
+				domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction, ProductID: fxProductID, RoutineID: "IN-0002-R", SpecialID: fxSpecialID},
+				baselineDeckCards(fxPlayerID, 1),
+			)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+
+			result, err := interactor.GetDecks(context.Background(), fxPlayerID)
+
+			require.NoError(t, err)
+			require.Len(t, result, 1)
+			assert.False(t, result[0].IsValid)
+		})
+
+		t.Run("プレイヤーが宣言陣営を現在所持していなくても、構成カード枚数の合計が30枚ちょうどでデッキ内容検証・施策整合検証をともに満たすなら、そのデッキのis_validはtrueになる", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, factionClient := newDeckFixture(t)
+			factionClient.factions = nil
+			deckRepo.seed(
+				domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction, ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID},
+				baselineDeckCards(fxPlayerID, 1),
+			)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+
+			result, err := interactor.GetDecks(context.Background(), fxPlayerID)
+
+			require.NoError(t, err)
+			require.Len(t, result, 1)
+			assert.True(t, result[0].IsValid)
+		})
+	})
+}
+
+func TestGetDeck(t *testing.T) {
+	t.Run("[デッキ]デッキ詳細取得", func(t *testing.T) {
+		t.Run("指定したデッキの取得元がエラーを返すとき、そのエラーを返す", func(t *testing.T) {
+			interactor, deckRepo, _, _ := newDeckFixture(t)
+			injected := errors.New("deck repo unavailable")
+			deckRepo.findByIDErr = injected
+
+			_, err := interactor.GetDeck(context.Background(), fxPlayerID, 1)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, injected)
+		})
+
+		t.Run("デッキ構成カードの取得元がエラーを返すとき、そのエラーを返す", func(t *testing.T) {
+			interactor, deckRepo, _, _ := newDeckFixture(t)
+			deckRepo.seed(domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction}, nil)
+			injected := errors.New("deck repo unavailable")
+			deckRepo.getDeckCardsErr = injected
+
+			_, err := interactor.GetDeck(context.Background(), fxPlayerID, 1)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, injected)
+		})
+
+		t.Run("プレイヤーの所持カード取得元がエラーを返すとき、そのエラーを返す", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			deckRepo.seed(domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction}, nil)
+			injected := errors.New("player card repo unavailable")
+			playerCardRepo.getErr = injected
+
+			_, err := interactor.GetDeck(context.Background(), fxPlayerID, 1)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, injected)
+		})
+
+		t.Run("取得したデッキがデッキ内容検証・施策整合検証をともに満たし、構成カードの合計投入枚数がデッキ上限枚数ちょうど(30枚)のとき、返るデッキのis_validはtrueになる", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			deckRepo.seed(
+				domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction, ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID},
+				baselineDeckCards(fxPlayerID, 1),
+			)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+
+			resp, err := interactor.GetDeck(context.Background(), fxPlayerID, 1)
+
+			require.NoError(t, err)
+			assert.True(t, resp.IsValid)
+		})
+
+		t.Run("取得したデッキがデッキ内容検証・施策整合検証をともに満たすが、構成カード枚数の合計がデッキ上限枚数と一致しないとき、返るデッキのis_validはfalseになる", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			cards := baselineDeckCards(fxPlayerID, 1)
+			cards[0].Count = 2 // 合計を 29 に減らし、デッキ上限枚数と不一致にする
+			deckRepo.seed(
+				domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction, ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID},
+				cards,
+			)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+
+			resp, err := interactor.GetDeck(context.Background(), fxPlayerID, 1)
+
+			require.NoError(t, err)
+			assert.False(t, resp.IsValid)
+		})
+
+		t.Run("取得に成功したとき、返るデッキのdeck_cardsは取得したデッキ構成カードの内容になる", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			cards := []domain.DeckCard{{PlayerID: fxPlayerID, DeckID: 1, CardID: "TST-0001", ArtNo: 1, Count: 1}}
+			deckRepo.seed(domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction}, cards)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 1})
+
+			resp, err := interactor.GetDeck(context.Background(), fxPlayerID, 1)
+
+			require.NoError(t, err)
+			require.NotNil(t, resp.DeckCards)
+			want := []apicard.DeckCard{{PlayerID: fxPlayerID, DeckID: 1, CardID: "TST-0001", ArtNo: 1, Count: 1}}
+			assert.Equal(t, want, *resp.DeckCards)
+		})
+
+		t.Run("取得に成功したとき、返るデッキのデッキ名・陣営・プロダクトID・ルーチン施策ID・スペシャル施策IDは、取得したデッキの内容と一致する", func(t *testing.T) {
+			interactor, deckRepo, _, _ := newDeckFixture(t)
+			deckRepo.seed(
+				domain.Deck{PlayerID: fxPlayerID, DeckID: 1, DeckName: "My Deck", Faction: fxFaction, ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID},
+				nil,
+			)
+
+			resp, err := interactor.GetDeck(context.Background(), fxPlayerID, 1)
+
+			require.NoError(t, err)
+			assert.Equal(t, "My Deck", resp.DeckName)
+			assert.Equal(t, fxFaction, resp.Faction)
+			assert.Equal(t, fxProductID, resp.ProductID)
+			assert.Equal(t, fxRoutineID, resp.RoutineID)
+			assert.Equal(t, fxSpecialID, resp.SpecialID)
 		})
 	})
 }
 
 func TestUpdateDeck(t *testing.T) {
-	t.Run("デッキ更新", func(t *testing.T) {
-		t.Run("不完全なデッキを30枚に更新すると、有効になり一覧に反映される", func(t *testing.T) {
-			svc, _, pcRepo, _ := setupDeckInteractor(t)
-			pid := "p1"
-			grantUnlimited(pcRepo, pid, allTenCards...)
+	t.Run("[デッキ]デッキ更新", func(t *testing.T) {
+		t.Run("プレイヤーの所持カード取得元がエラーを返すとき、そのエラーを返しデッキは更新されない", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			original := domain.Deck{PlayerID: fxPlayerID, DeckID: 1, DeckName: "Original", Faction: fxFaction}
+			deckRepo.seed(original, nil)
+			injected := errors.New("player card repo unavailable")
+			playerCardRepo.getErr = injected
+			req := apicard.DeckUpdateRequest{
+				DeckName: "Updated", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: baselineCards(),
+			}
 
-			created, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-				DeckName: "Original", Faction: "SHE", ProductID: testProductID,
-				RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: makeEntries("C-001", 3, "C-002", 3),
-			})
-			require.NoError(t, err)
-			assert.False(t, created.IsValid)
-
-			updated, err := svc.UpdateDeck(context.Background(), pid, created.DeckID, apicard.DeckUpdateRequest{
-				DeckName: "Updated Full", Faction: "SHE", ProductID: testProductID,
-				RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: full30Entries(),
-			})
-
-			require.NoError(t, err)
-			assert.Equal(t, "Updated Full", updated.DeckName)
-			assert.True(t, updated.IsValid)
-			require.NotNil(t, updated.DeckCards)
-			assert.Len(t, *updated.DeckCards, 10)
-		})
-
-		t.Run("未所持カードを含む構成へ更新すると、拒否され一覧は元の構成のまま残る", func(t *testing.T) {
-			svc, _, pcRepo, _ := setupDeckInteractor(t)
-			pid := "p1"
-			grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
-
-			created, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-				DeckName: "Original", Faction: "SHE", ProductID: testProductID,
-				RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: makeEntries("C-001", 3),
-			})
-			require.NoError(t, err)
-
-			_, err = svc.UpdateDeck(context.Background(), pid, created.DeckID, apicard.DeckUpdateRequest{
-				DeckName: "Renamed", Faction: "SHE", ProductID: testProductID,
-				RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: makeEntries("C-002", 1),
-			})
+			_, err := interactor.UpdateDeck(context.Background(), fxPlayerID, 1, req)
 
 			require.Error(t, err)
-			assert.ErrorIs(t, err, port.ErrUnowned)
+			assert.ErrorIs(t, err, injected)
+			assert.Equal(t, original, deckRepo.decks[1])
+		})
 
-			decks, err := svc.GetDecks(context.Background(), pid)
+		t.Run("リクエストのカード構成がデッキ内容検証のいずれかの条件に違反するとき、その検証が返すエラーをそのまま返し、デッキは更新されない", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			original := domain.Deck{PlayerID: fxPlayerID, DeckID: 1, DeckName: "Original", Faction: fxFaction}
+			deckRepo.seed(original, nil)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 1})
+			req := apicard.DeckUpdateRequest{
+				DeckName: "Updated", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: 0}},
+			}
+
+			_, err := interactor.UpdateDeck(context.Background(), fxPlayerID, 1, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrInvalidDeck)
+			assert.Equal(t, original, deckRepo.decks[1])
+		})
+
+		t.Run("リクエストの宣言陣営が陣営所持検証の条件に違反する(プレイヤーが宣言陣営を所持していない)とき、その検証が返すエラーをそのまま返し、デッキは更新されない", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, factionClient := newDeckFixture(t)
+			original := domain.Deck{PlayerID: fxPlayerID, DeckID: 1, DeckName: "Original", Faction: fxFaction}
+			deckRepo.seed(original, nil)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 1})
+			factionClient.factions = []string{fxFaction2}
+			req := apicard.DeckUpdateRequest{
+				DeckName: "Updated", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: 1}},
+			}
+
+			_, err := interactor.UpdateDeck(context.Background(), fxPlayerID, 1, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrInvalidDeck)
+			assert.Equal(t, original, deckRepo.decks[1])
+		})
+
+		t.Run("リクエストのプロダクト・ルーチン施策・スペシャル施策の組み合わせが施策整合検証のいずれかの条件に違反するとき、その検証が返すエラーをそのまま返し、デッキは更新されない", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			original := domain.Deck{PlayerID: fxPlayerID, DeckID: 1, DeckName: "Original", Faction: fxFaction}
+			deckRepo.seed(original, nil)
+			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 1, Count: 1})
+			req := apicard.DeckUpdateRequest{
+				DeckName: "Updated", Faction: fxFaction,
+				ProductID: "PD-UNKNOWN", RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: []apicard.DeckCardEntry{{CardID: "TST-0001", ArtNo: 1, Count: 1}},
+			}
+
+			_, err := interactor.UpdateDeck(context.Background(), fxPlayerID, 1, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrInvalidDeck)
+			assert.Equal(t, original, deckRepo.decks[1])
+		})
+
+		t.Run("デッキ内容検証・陣営所持検証・施策整合検証をすべて満たし、カードエントリの合計投入枚数がデッキ上限枚数未満(29枚)のとき、エラーを返さず更新し、返るデッキのis_validはfalseになる", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			deckRepo.seed(domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction}, nil)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+			cards := baselineCards()
+			cards[0].Count = 2 // 合計を 30 から 29 に減らす
+			req := apicard.DeckUpdateRequest{
+				DeckName: "Updated", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: cards,
+			}
+
+			resp, err := interactor.UpdateDeck(context.Background(), fxPlayerID, 1, req)
+
 			require.NoError(t, err)
-			require.Len(t, decks, 1)
-			assert.Equal(t, "Original", decks[0].DeckName)
-			require.NotNil(t, decks[0].DeckCards)
-			require.Len(t, *decks[0].DeckCards, 1)
-			assert.Equal(t, "C-001", (*decks[0].DeckCards)[0].CardID)
+			assert.False(t, resp.IsValid)
+		})
+
+		t.Run("デッキ内容検証・陣営所持検証・施策整合検証をすべて満たし、カードエントリの合計投入枚数がデッキ上限枚数ちょうど(30枚)のとき、エラーを返さず更新し、返るデッキのis_validはtrueになる", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			deckRepo.seed(domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction}, nil)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+			req := apicard.DeckUpdateRequest{
+				DeckName: "Updated", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: baselineCards(),
+			}
+
+			resp, err := interactor.UpdateDeck(context.Background(), fxPlayerID, 1, req)
+
+			require.NoError(t, err)
+			assert.True(t, resp.IsValid)
+		})
+
+		t.Run("デッキの永続化処理がエラーを返すとき、そのエラーを返す", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			deckRepo.seed(domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction}, nil)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+			injected := errors.New("deck repo unavailable")
+			deckRepo.updateErr = injected
+			req := apicard.DeckUpdateRequest{
+				DeckName: "Updated", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: baselineCards(),
+			}
+
+			_, err := interactor.UpdateDeck(context.Background(), fxPlayerID, 1, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, injected)
+		})
+
+		t.Run("デッキ更新後のデッキ構成カード再取得がエラーを返すとき、そのエラーを返す", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			deckRepo.seed(domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction}, nil)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+			injected := errors.New("deck repo unavailable")
+			deckRepo.getDeckCardsErr = injected
+			req := apicard.DeckUpdateRequest{
+				DeckName: "Updated", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				Cards: baselineCards(),
+			}
+
+			_, err := interactor.UpdateDeck(context.Background(), fxPlayerID, 1, req)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, injected)
+		})
+
+		t.Run("デッキ更新が成功したとき、返るデッキのデッキ名・陣営・プロダクトID・ルーチン施策ID・スペシャル施策ID・プレイマット番号・スリーブ番号は、リクエストで指定した値と一致する", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			deckRepo.seed(domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction}, nil)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+			playmatNo := int64(3)
+			sleeveNo := int64(8)
+			req := apicard.DeckUpdateRequest{
+				DeckName: "Updated Deck", Faction: fxFaction,
+				ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID,
+				PlaymatNo: &playmatNo, SleeveNo: &sleeveNo,
+				Cards: baselineCards(),
+			}
+
+			resp, err := interactor.UpdateDeck(context.Background(), fxPlayerID, 1, req)
+
+			require.NoError(t, err)
+			assert.Equal(t, "Updated Deck", resp.DeckName)
+			assert.Equal(t, fxFaction, resp.Faction)
+			assert.Equal(t, fxProductID, resp.ProductID)
+			assert.Equal(t, fxRoutineID, resp.RoutineID)
+			assert.Equal(t, fxSpecialID, resp.SpecialID)
+			assert.Equal(t, &playmatNo, resp.PlaymatNo)
+			assert.Equal(t, &sleeveNo, resp.SleeveNo)
 		})
 	})
 }
 
 func TestDeleteDeck(t *testing.T) {
-	t.Run("デッキ削除", func(t *testing.T) {
-		t.Run("作成したデッキを削除するとき、一覧から消える", func(t *testing.T) {
-			svc, _, pcRepo, _ := setupDeckInteractor(t)
-			pid := "p1"
-			grantCards(pcRepo, pid, &domain.PlayerCard{CardID: "C-001", ArtNo: 0, Count: 3})
+	t.Run("[デッキ]デッキ削除", func(t *testing.T) {
+		t.Run("指定したデッキの削除処理がエラーを返すとき(例:対象デッキが存在しない)、そのエラーをそのまま返す", func(t *testing.T) {
+			interactor, deckRepo, _, _ := newDeckFixture(t)
+			deckRepo.deleteErr = port.ErrNotFound
 
-			created, _ := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-				DeckName: "To Delete", Faction: "SHE", ProductID: testProductID,
-				RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: makeEntries("C-001", 3),
-			})
+			err := interactor.DeleteDeck(context.Background(), fxPlayerID, 1)
 
-			err := svc.DeleteDeck(context.Background(), pid, created.DeckID)
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrNotFound)
+		})
+
+		t.Run("削除処理が成功したとき、エラーを返さない", func(t *testing.T) {
+			interactor, deckRepo, _, _ := newDeckFixture(t)
+			deckRepo.seed(domain.Deck{PlayerID: fxPlayerID, DeckID: 1}, nil)
+
+			err := interactor.DeleteDeck(context.Background(), fxPlayerID, 1)
+
 			require.NoError(t, err)
-			decks, _ := svc.GetDecks(context.Background(), pid)
-			assert.Empty(t, decks)
 		})
 	})
 }
 
 func TestValidateDeckForBattle(t *testing.T) {
-	t.Run("対戦用デッキ検証", func(t *testing.T) {
-		t.Run("30枚デッキのとき、エラーにならない", func(t *testing.T) {
-			svc, _, pcRepo, _ := setupDeckInteractor(t)
-			pid := "p1"
-			grantUnlimited(pcRepo, pid, allTenCards...)
+	t.Run("[デッキ]バトル可否検証", func(t *testing.T) {
+		t.Run("指定したデッキの取得元がエラーを返すとき、そのエラーを返す", func(t *testing.T) {
+			interactor, deckRepo, _, _ := newDeckFixture(t)
+			injected := errors.New("deck repo unavailable")
+			deckRepo.findByIDErr = injected
 
-			deck, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-				DeckName: "Full Deck", Faction: "SHE", ProductID: testProductID,
-				RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: full30Entries(),
-			})
-			require.NoError(t, err)
+			err := interactor.ValidateDeckForBattle(context.Background(), fxPlayerID, 1)
 
-			err = svc.ValidateDeckForBattle(context.Background(), pid, deck.DeckID)
-			assert.NoError(t, err)
+			require.Error(t, err)
+			assert.ErrorIs(t, err, injected)
 		})
 
-		t.Run("30枚に満たないデッキは、無効として拒否される", func(t *testing.T) {
-			svc, _, pcRepo, _ := setupDeckInteractor(t)
-			pid := "p1"
-			grantUnlimited(pcRepo, pid, "C-001", "C-002")
+		t.Run("デッキ構成カードの取得元がエラーを返すとき、そのエラーを返す", func(t *testing.T) {
+			interactor, deckRepo, _, _ := newDeckFixture(t)
+			deckRepo.seed(domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction}, nil)
+			injected := errors.New("deck repo unavailable")
+			deckRepo.getDeckCardsErr = injected
 
-			deck, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-				DeckName: "Partial", Faction: "SHE", ProductID: testProductID,
-				RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: makeEntries("C-001", 3, "C-002", 3),
-			})
-			require.NoError(t, err)
+			err := interactor.ValidateDeckForBattle(context.Background(), fxPlayerID, 1)
 
-			err = svc.ValidateDeckForBattle(context.Background(), pid, deck.DeckID)
+			require.Error(t, err)
+			assert.ErrorIs(t, err, injected)
+		})
+
+		t.Run("デッキの構成カード枚数の合計がデッキ上限枚数を超え31枚のとき、エラーになる", func(t *testing.T) {
+			interactor, deckRepo, _, _ := newDeckFixture(t)
+			cards := append(baselineDeckCards(fxPlayerID, 1), domain.DeckCard{PlayerID: fxPlayerID, DeckID: 1, CardID: "TST-0011", ArtNo: 1, Count: 1})
+			deckRepo.seed(domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction}, cards)
+
+			err := interactor.ValidateDeckForBattle(context.Background(), fxPlayerID, 1)
+
 			require.Error(t, err)
 			assert.ErrorIs(t, err, port.ErrInvalidDeck)
-			assert.Contains(t, err.Error(), "need exactly 30")
 		})
 
-		t.Run("存在しないデッキを対戦検証すると、ErrNotFoundになる", func(t *testing.T) {
-			svc, _, _, _ := setupDeckInteractor(t)
-			pid := "p1"
+		t.Run("デッキの構成カード枚数の合計がデッキ上限枚数に満たない29枚のとき、エラーになる", func(t *testing.T) {
+			interactor, deckRepo, _, _ := newDeckFixture(t)
+			cards := baselineDeckCards(fxPlayerID, 1)
+			cards[0].Count = 2
+			deckRepo.seed(domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction}, cards)
 
-			err := svc.ValidateDeckForBattle(context.Background(), pid, 9999)
+			err := interactor.ValidateDeckForBattle(context.Background(), fxPlayerID, 1)
+
 			require.Error(t, err)
-			assert.ErrorIs(t, err, port.ErrNotFound)
+			assert.ErrorIs(t, err, port.ErrInvalidDeck)
 		})
 
-		t.Run("保存後に制限改定で禁止になったカードを含むデッキは、対戦検証で拒否される", func(t *testing.T) {
-			svc, _, pcRepo, cc := setupDeckInteractor(t)
-			pid := "p1"
-			grantUnlimited(pcRepo, pid, allTenCards...)
+		t.Run("デッキの構成カード枚数の合計がデッキ上限枚数ちょうど30枚のとき、この条件によるエラーにはならない", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			deckRepo.seed(
+				domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction, ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID},
+				baselineDeckCards(fxPlayerID, 1),
+			)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
 
-			deck, err := svc.CreateDeck(context.Background(), pid, apicard.DeckCreateRequest{
-				DeckName: "Full Deck", Faction: "SHE", ProductID: testProductID,
-				RoutineID: testRoutineID, SpecialID: testSpecialID, Cards: full30Entries(),
-			})
+			err := interactor.ValidateDeckForBattle(context.Background(), fxPlayerID, 1)
+
 			require.NoError(t, err)
+		})
 
-			cc.InjectForTest("C-001", &domain.Card{
-				CardID: "C-001", CardName: "Compute A", Faction: "SHE", CardType: "Compute",
-				Restriction: "forbidden", IsActive: true,
-				Stats: json.RawMessage(`{}`),
-			})
+		t.Run("構成カード枚数の合計がデッキ上限枚数ちょうどで、プレイヤーの所持カード取得元がエラーを返すとき、そのエラーを返す", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			deckRepo.seed(domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction}, baselineDeckCards(fxPlayerID, 1))
+			injected := errors.New("player card repo unavailable")
+			playerCardRepo.getErr = injected
 
-			err = svc.ValidateDeckForBattle(context.Background(), pid, deck.DeckID)
+			err := interactor.ValidateDeckForBattle(context.Background(), fxPlayerID, 1)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, injected)
+		})
+
+		t.Run("構成カード枚数の合計がデッキ上限枚数ちょうどで、デッキ内容検証の条件に違反するとき、その検証が返すエラーをそのまま返す", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			cards := baselineDeckCards(fxPlayerID, 1)
+			cards[0].CardID = "TST-LIMITED" // 制限区分 limited (投入上限1枚) のカードを3枚投入し、超過させる
+			deckRepo.seed(domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction, ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID}, cards)
+			owned := baselineOwnedCards()
+			owned[0].CardID = "TST-LIMITED"
+			playerCardRepo.seed(fxPlayerID, owned...)
+
+			err := interactor.ValidateDeckForBattle(context.Background(), fxPlayerID, 1)
+
 			require.Error(t, err)
 			assert.ErrorIs(t, err, port.ErrRestrictionExceeded)
-			assert.Contains(t, err.Error(), "exceeds restriction limit (3/0)")
+		})
+
+		t.Run("構成カード枚数の合計がデッキ上限枚数ちょうどで、施策整合検証の条件に違反するとき、その検証が返すエラーをそのまま返す", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			deckRepo.seed(
+				domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction, ProductID: fxProductID, RoutineID: "IN-0002-R", SpecialID: fxSpecialID},
+				baselineDeckCards(fxPlayerID, 1),
+			)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+
+			err := interactor.ValidateDeckForBattle(context.Background(), fxPlayerID, 1)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, port.ErrInvalidDeck)
+		})
+
+		t.Run("構成カード枚数の合計がデッキ上限枚数ちょうどで、デッキ内容検証・施策整合検証をともに満たすとき、エラーを返さない", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
+			deckRepo.seed(
+				domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction, ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID},
+				baselineDeckCards(fxPlayerID, 1),
+			)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+
+			err := interactor.ValidateDeckForBattle(context.Background(), fxPlayerID, 1)
+
+			require.NoError(t, err)
+		})
+
+		t.Run("プレイヤーが宣言陣営を現在所持していなくても、構成カード枚数の合計がデッキ上限枚数ちょうどでデッキ内容検証・施策整合検証をともに満たすなら、エラーを返さない", func(t *testing.T) {
+			interactor, deckRepo, playerCardRepo, factionClient := newDeckFixture(t)
+			factionClient.factions = nil
+			deckRepo.seed(
+				domain.Deck{PlayerID: fxPlayerID, DeckID: 1, Faction: fxFaction, ProductID: fxProductID, RoutineID: fxRoutineID, SpecialID: fxSpecialID},
+				baselineDeckCards(fxPlayerID, 1),
+			)
+			playerCardRepo.seed(fxPlayerID, baselineOwnedCards()...)
+
+			err := interactor.ValidateDeckForBattle(context.Background(), fxPlayerID, 1)
+
+			require.NoError(t, err)
 		})
 	})
 }

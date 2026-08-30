@@ -52,6 +52,42 @@ paths:
                 items:
                   $ref: "#/components/schemas/Initiative"
 
+  /internal/v1/pubsub/player-onboarded:
+    post:
+      operationId: pubsubPlayerOnboarded
+      summary: player-onboarded-card-sub の Cloud Pub/Sub push 配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PubSubPushEnvelope"
+      responses:
+        "200":
+          description: 処理完了
+        "400":
+          description: envelope または base64 データが不正
+        "500":
+          description: イベント処理に失敗
+
+  /internal/v1/pubsub/card-pack-purchased:
+    post:
+      operationId: pubsubCardPackPurchased
+      summary: card-pack-purchased-card-sub の Cloud Pub/Sub push 配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PubSubPushEnvelope"
+      responses:
+        "200":
+          description: 処理完了
+        "400":
+          description: envelope または base64 データが不正
+        "500":
+          description: イベント処理に失敗
+
   /api/v1/cards/products:
     get:
       operationId: listProductsForPlayer
@@ -168,11 +204,11 @@ paths:
         - $ref: "#/components/parameters/DeckIdPath"
       responses:
         "200":
-          description: デッキ詳細
+          description: デッキ詳細 (カード構成は deck.deck_cards に含まれる)
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DeckDetailResponse"
+                $ref: "#/components/schemas/Deck"
         "400":
           description: deckId が不正
         "401":
@@ -278,6 +314,21 @@ components:
         status:
           type: string
           example: ok
+
+    # ─── Pub/Sub push ──────────────────────────────────────────────────
+    PubSubPushEnvelope:
+      type: object
+      description: Cloud Pub/Sub push subscription が送るリクエスト本文の envelope。
+      required: [message]
+      properties:
+        message:
+          type: object
+          required: [data]
+          properties:
+            data:
+              type: string
+              format: byte
+              description: base64 エンコードされたイベント payload。
 
     # ─── Card ──────────────────────────────────────────────────────────
     CardDefinition:
@@ -799,18 +850,6 @@ components:
         sleeve_no:
           type: integer
           format: int64
-
-    DeckDetailResponse:
-      type: object
-      description: GET /players/{playerId}/decks/{deckId} のレスポンス封筒。
-      required: [deck, cards]
-      properties:
-        deck:
-          $ref: "#/components/schemas/Deck"
-        cards:
-          type: array
-          items:
-            $ref: "#/components/schemas/DeckCard"
 
     # ─── Enums (流出するもの) ──────────────────────────────────────────
     PassiveEffectType:

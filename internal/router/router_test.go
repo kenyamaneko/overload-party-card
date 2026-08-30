@@ -1,8 +1,9 @@
-package router
+package router_test
 
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,8 @@ import (
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
 	"github.com/kenyamaneko/overload-party-card/internal/handler/rest"
+	"github.com/kenyamaneko/overload-party-card/internal/port"
+	"github.com/kenyamaneko/overload-party-card/internal/router"
 	"github.com/kenyamaneko/overload-party-card/internal/usecase"
 
 	internalauth "github.com/kenyamaneko/overload-party-gateway/packages/internalauth-go"
@@ -25,216 +28,230 @@ func init() {
 	gin.SetMode(gin.TestMode)
 }
 
-// stubCardRepo は固定のカードマスター 1 件を返す port.CardRepo スタブ。
-type stubCardRepo struct{}
-
-// FindAll は TST ダミーカード 1 件を返す。
-func (stubCardRepo) FindAll(context.Context) ([]*domain.Card, error) {
-	return []*domain.Card{{CardID: "TST-0001"}}, nil
+// stubCardRepo is a port.CardRepo test double; FindAll uses findAllFn if set, else panics.
+type stubCardRepo struct {
+	findAllFn func(ctx context.Context) ([]*domain.Card, error)
 }
 
-// stubPlayerCardRepo は所持カードなしを返す port.PlayerCardRepo スタブ。
+func (s *stubCardRepo) FindAll(ctx context.Context) ([]*domain.Card, error) {
+	if s.findAllFn == nil {
+		panic("stubCardRepo.FindAll called unexpectedly")
+	}
+	return s.findAllFn(ctx)
+}
+
+// stubPlayerCardRepo is a port.PlayerCardRepo test double that panics on use; router-level
+// tests never exercise a code path that reaches it.
 type stubPlayerCardRepo struct{}
 
-// GetPlayerCards は所持カードなしを返す。
-func (stubPlayerCardRepo) GetPlayerCards(context.Context, string) ([]*domain.PlayerCard, error) {
-	return []*domain.PlayerCard{}, nil
+func (s *stubPlayerCardRepo) GetPlayerCards(ctx context.Context, playerID string) ([]*domain.PlayerCard, error) {
+	panic("stubPlayerCardRepo.GetPlayerCards called unexpectedly")
 }
 
-// AddCards は加算 0 件で成功する。
-func (stubPlayerCardRepo) AddCards(context.Context, string, []domain.CardPackCard) (int, error) {
-	return 0, nil
+func (s *stubPlayerCardRepo) AddCards(ctx context.Context, playerID string, cards []domain.CardPackCard) (int, error) {
+	panic("stubPlayerCardRepo.AddCards called unexpectedly")
 }
 
-// stubDeckRepo はデッキなしを返す port.DeckRepo スタブ。
+// stubDeckRepo is a port.DeckRepo test double that panics on use.
 type stubDeckRepo struct{}
 
-// Create は固定の deck_id で成功する。
-func (stubDeckRepo) Create(context.Context, domain.Deck, []domain.DeckCardEntry) (int64, error) {
-	return 1, nil
+func (s *stubDeckRepo) Create(ctx context.Context, deck domain.Deck, entries []domain.DeckCardEntry) (int64, error) {
+	panic("stubDeckRepo.Create called unexpectedly")
 }
 
-// FindByPlayerID はデッキなしを返す。
-func (stubDeckRepo) FindByPlayerID(context.Context, string) ([]*domain.Deck, error) {
-	return []*domain.Deck{}, nil
+func (s *stubDeckRepo) FindByPlayerID(ctx context.Context, playerID string) ([]*domain.Deck, error) {
+	panic("stubDeckRepo.FindByPlayerID called unexpectedly")
 }
 
-// FindByID は空のデッキを返す。
-func (stubDeckRepo) FindByID(context.Context, string, int64) (*domain.Deck, error) {
-	return &domain.Deck{}, nil
+func (s *stubDeckRepo) FindByID(ctx context.Context, playerID string, deckID int64) (*domain.Deck, error) {
+	panic("stubDeckRepo.FindByID called unexpectedly")
 }
 
-// GetDeckCards はデッキカードなしを返す。
-func (stubDeckRepo) GetDeckCards(context.Context, string, int64) ([]domain.DeckCard, error) {
-	return []domain.DeckCard{}, nil
+func (s *stubDeckRepo) GetDeckCards(ctx context.Context, playerID string, deckID int64) ([]domain.DeckCard, error) {
+	panic("stubDeckRepo.GetDeckCards called unexpectedly")
 }
 
-// Update は常に成功する。
-func (stubDeckRepo) Update(context.Context, domain.Deck, []domain.DeckCardEntry) error {
-	return nil
+func (s *stubDeckRepo) Update(ctx context.Context, deck domain.Deck, entries []domain.DeckCardEntry) error {
+	panic("stubDeckRepo.Update called unexpectedly")
 }
 
-// Delete は常に成功する。
-func (stubDeckRepo) Delete(context.Context, string, int64) error {
-	return nil
+func (s *stubDeckRepo) Delete(ctx context.Context, playerID string, deckID int64) error {
+	panic("stubDeckRepo.Delete called unexpectedly")
 }
 
-// stubFactionClient は固定の所持ファクションを返す port.FactionClient スタブ。
+// stubFactionClient is a port.FactionClient test double that panics on use.
 type stubFactionClient struct{}
 
-// ListPlayerFactions は TST ダミーファクション 1 件を返す。
-func (stubFactionClient) ListPlayerFactions(context.Context, string) ([]string, error) {
-	return []string{"TST-FACTION"}, nil
+func (s *stubFactionClient) ListPlayerFactions(ctx context.Context, playerID string) ([]string, error) {
+	panic("stubFactionClient.ListPlayerFactions called unexpectedly")
 }
 
-// stubInitiativeJSON は InitiativeCache へロードする施策フィクスチャ (空だとロードがエラーになる)。
-const stubInitiativeJSON = `[{"initiative_id":"IN-TST-0001","product_id":"PR-TST-0001",` +
-	`"kind":"TST-KIND","name":"TST initiative","insight_cost":1,"effect_text":"",` +
-	`"effect":null,"is_active":true}]`
-
-// stubMessageHandler は push 受け口の配線先。常に ack (nil) を返す。
-func stubMessageHandler(context.Context, []byte) error {
-	return nil
-}
-
-// newTestRouter はスタブ repository で組んだ実 interactor / handler で router を構築する。
-func newTestRouter(t *testing.T, verifier internalauth.Verifier) *gin.Engine {
+// newTestEngine builds router.New wired to the given cardRepo / initiativeCache / pubsub
+// handlers / verifier, defaulting each to a value the router-level tests never need to exercise
+// (nil defaults to a panic-on-use stub, or an empty cache). The other four handlers (deck,
+// player-card, product, and their underlying ports) always get panic-on-use stubs: router-level
+// tests only assert whether a request reaches *some* handler and whether auth gates it, not any
+// per-endpoint response body, so those paths are never exercised here.
+func newTestEngine(t *testing.T, cardRepo port.CardRepo, initiativeCache *cache.InitiativeCache, playerOnboarded, cardPackPurchased port.MessageHandler, verifier internalauth.Verifier) *gin.Engine {
 	t.Helper()
+	if cardRepo == nil {
+		cardRepo = &stubCardRepo{}
+	}
+	if initiativeCache == nil {
+		initiativeCache = cache.NewInitiativeCache()
+	}
+	if playerOnboarded == nil {
+		playerOnboarded = func(ctx context.Context, data []byte) error {
+			panic("player-onboarded handler called unexpectedly")
+		}
+	}
+	if cardPackPurchased == nil {
+		cardPackPurchased = func(ctx context.Context, data []byte) error {
+			panic("card-pack-purchased handler called unexpectedly")
+		}
+	}
 
+	playerCardRepo := &stubPlayerCardRepo{}
+	deckRepo := &stubDeckRepo{}
+	factionClient := &stubFactionClient{}
 	cardCache := cache.NewCardCache()
 	productCache := cache.NewProductCache()
-	initiativeCache := cache.NewInitiativeCache()
-	require.NoError(t, initiativeCache.LoadFromBytes([]byte(stubInitiativeJSON)))
 
-	cardI := usecase.NewCardInteractor(stubCardRepo{}, stubPlayerCardRepo{})
-	deckI := usecase.NewDeckInteractor(
-		stubDeckRepo{}, stubPlayerCardRepo{}, cardCache, productCache, initiativeCache, stubFactionClient{},
-	)
-	playerCardI := usecase.NewPlayerCardInteractor(stubPlayerCardRepo{}, cardCache)
+	cardInteractor := usecase.NewCardInteractor(cardRepo, playerCardRepo)
+	deckInteractor := usecase.NewDeckInteractor(deckRepo, playerCardRepo, cardCache, productCache, initiativeCache, factionClient)
+	playerCardInteractor := usecase.NewPlayerCardInteractor(playerCardRepo, cardCache)
 
-	return New(
-		rest.NewCardHandler(cardI),
-		rest.NewDeckHandler(deckI),
-		rest.NewPlayerCardHandler(playerCardI),
-		rest.NewProductHandler(productCache, initiativeCache),
-		rest.NewInitiativeHandler(initiativeCache),
-		rest.NewPubSubPushHandler(stubMessageHandler, stubMessageHandler),
-		verifier,
-	)
+	cardH := rest.NewCardHandler(cardInteractor)
+	deckH := rest.NewDeckHandler(deckInteractor)
+	playerCardH := rest.NewPlayerCardHandler(playerCardInteractor)
+	productH := rest.NewProductHandler(productCache, initiativeCache)
+	initiativeH := rest.NewInitiativeHandler(initiativeCache)
+	pubsubPushH := rest.NewPubSubPushHandler(playerOnboarded, cardPackPurchased)
+
+	return router.New(cardH, deckH, playerCardH, productH, initiativeH, pubsubPushH, verifier)
 }
 
-// newPubSubPushRequest は push subscription が送る envelope を模した POST body を返す。
-func newPubSubPushRequest(path string) *http.Request {
-	body := `{"message":{"data":"` + base64.StdEncoding.EncodeToString([]byte(`{}`)) + `"}}`
-	return httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+// pubsubEnvelopeBody builds a valid Cloud Pub/Sub push envelope JSON body carrying payload,
+// base64-encoded as the wire format requires.
+func pubsubEnvelopeBody(t *testing.T, payload string) string {
+	t.Helper()
+	envelope := struct {
+		Message struct {
+			Data string `json:"data"`
+		} `json:"message"`
+	}{}
+	envelope.Message.Data = base64.StdEncoding.EncodeToString([]byte(payload))
+	encoded, err := json.Marshal(envelope)
+	require.NoError(t, err)
+	return string(encoded)
 }
 
-func TestNew(t *testing.T) {
-	t.Run("ルーターの認証配線", func(t *testing.T) {
-		t.Run("/healthはauth middlewareを通らず200を返す", func(t *testing.T) {
-			// VerifyFn 未設定: /health が verifier に到達しないことの検出を兼ねる
-			r := newTestRouter(t, &internalauth.MockVerifier{})
-			w := httptest.NewRecorder()
-			r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/health", nil))
-			assert.Equal(t, http.StatusOK, w.Code)
+func TestRouterHealth(t *testing.T) {
+	t.Run("[ルーティング] ヘルスチェック", func(t *testing.T) {
+		t.Run("GET /healthは常に200になり、レスポンスボディは{\"status\":\"ok\"}になる", func(t *testing.T) {
+			engine := newTestEngine(t, nil, nil, nil, nil, &internalauth.MockVerifier{})
+
+			req := httptest.NewRequest(http.MethodGet, "/health", nil)
+			rr := httptest.NewRecorder()
+			engine.ServeHTTP(rr, req)
+
+			require.Equal(t, http.StatusOK, rr.Code)
+			assert.JSONEq(t, `{"status":"ok"}`, rr.Body.String())
+		})
+	})
+}
+
+func TestRouterInternalV1NoAuth(t *testing.T) {
+	t.Run("[ルーティング] internal/v1配下の認証除外", func(t *testing.T) {
+		t.Run("GET /internal/v1/cardsは、X-Internal-Authヘッダが無くてもハンドラが呼び出され200になる", func(t *testing.T) {
+			engine := newTestEngine(t, &stubCardRepo{findAllFn: func(ctx context.Context) ([]*domain.Card, error) {
+				return nil, nil
+			}}, nil, nil, nil, &internalauth.MockVerifier{})
+
+			req := httptest.NewRequest(http.MethodGet, "/internal/v1/cards", nil)
+			rr := httptest.NewRecorder()
+			engine.ServeHTTP(rr, req)
+
+			assert.Equal(t, http.StatusOK, rr.Code)
 		})
 
-		t.Run("/internal/v1配下はauth headerなしでhandlerの成功応答まで到達する", func(t *testing.T) {
-			// VerifyFn 未設定: auth-free ルートが verifier に到達しないことの検出を兼ねる
-			r := newTestRouter(t, &internalauth.MockVerifier{})
+		t.Run("GET /internal/v1/initiativesは、X-Internal-Authヘッダが無くてもハンドラが呼び出され200になる", func(t *testing.T) {
+			engine := newTestEngine(t, nil, cache.NewInitiativeCache(), nil, nil, &internalauth.MockVerifier{})
 
-			cases := []struct {
-				name     string
-				path     string
-				wantBody string
-			}{
-				{
-					name:     "/internal/v1/cardsは200でカードマスターを返す",
-					path:     "/internal/v1/cards",
-					wantBody: "TST-0001",
-				},
-				{
-					name:     "/internal/v1/initiativesは200で施策マスターを返す",
-					path:     "/internal/v1/initiatives",
-					wantBody: "IN-TST-0001",
-				},
-			}
+			req := httptest.NewRequest(http.MethodGet, "/internal/v1/initiatives", nil)
+			rr := httptest.NewRecorder()
+			engine.ServeHTTP(rr, req)
 
-			for _, tc := range cases {
-				t.Run(tc.name, func(t *testing.T) {
-					w := httptest.NewRecorder()
-					r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, tc.path, nil))
-					assert.Equal(t, http.StatusOK, w.Code)
-					assert.Contains(t, w.Body.String(), tc.wantBody)
-				})
-			}
+			assert.Equal(t, http.StatusOK, rr.Code)
 		})
 
-		t.Run("/internal/v1/pubsub配下 (push受け口)はauth headerなしでhandlerの成功応答まで到達する", func(t *testing.T) {
-			r := newTestRouter(t, &internalauth.MockVerifier{})
+		t.Run("POST /internal/v1/pubsub/player-onboardedは、X-Internal-Authヘッダが無くてもハンドラが呼び出され200になる", func(t *testing.T) {
+			called := false
+			engine := newTestEngine(t, nil, nil, func(ctx context.Context, data []byte) error {
+				called = true
+				return nil
+			}, nil, &internalauth.MockVerifier{})
 
-			cases := []struct {
-				name string
-				path string
-			}{
-				{name: "/internal/v1/pubsub/player-onboardedは200を返す", path: "/internal/v1/pubsub/player-onboarded"},
-				{name: "/internal/v1/pubsub/card-pack-purchasedは200を返す", path: "/internal/v1/pubsub/card-pack-purchased"},
-			}
+			req := httptest.NewRequest(http.MethodPost, "/internal/v1/pubsub/player-onboarded", strings.NewReader(pubsubEnvelopeBody(t, "x")))
+			req.Header.Set("Content-Type", "application/json")
+			rr := httptest.NewRecorder()
+			engine.ServeHTTP(rr, req)
 
-			for _, tc := range cases {
-				t.Run(tc.name, func(t *testing.T) {
-					w := httptest.NewRecorder()
-					r.ServeHTTP(w, newPubSubPushRequest(tc.path))
-					assert.Equal(t, http.StatusOK, w.Code)
-				})
-			}
+			require.Equal(t, http.StatusOK, rr.Code)
+			assert.True(t, called)
 		})
 
-		t.Run("/api/v1/cards配下はauth header欠落で401になる", func(t *testing.T) {
-			// VerifyFn 未設定: header 欠落時は middleware が verifier に到達しないことの検出を兼ねる
-			r := newTestRouter(t, &internalauth.MockVerifier{})
+		t.Run("POST /internal/v1/pubsub/card-pack-purchasedは、X-Internal-Authヘッダが無くてもハンドラが呼び出され200になる", func(t *testing.T) {
+			called := false
+			engine := newTestEngine(t, nil, nil, nil, func(ctx context.Context, data []byte) error {
+				called = true
+				return nil
+			}, &internalauth.MockVerifier{})
 
-			cases := []struct {
-				name string
-				path string
-			}{
-				{name: "デッキ一覧の取得は401になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/decks"},
-				{name: "所持カード一覧の取得は401になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/cards"},
-				{name: "プロダクト一覧の取得は401になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/products"},
-				{name: "所持状態付きカード一覧の取得は401になり、認証ヘッダが無いことを示すエラーが応答本文に含まれる", path: "/api/v1/cards/cards/with-ownership"},
-			}
+			req := httptest.NewRequest(http.MethodPost, "/internal/v1/pubsub/card-pack-purchased", strings.NewReader(pubsubEnvelopeBody(t, "y")))
+			req.Header.Set("Content-Type", "application/json")
+			rr := httptest.NewRecorder()
+			engine.ServeHTTP(rr, req)
 
-			for _, tc := range cases {
-				t.Run(tc.name, func(t *testing.T) {
-					w := httptest.NewRecorder()
-					r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, tc.path, nil))
-					assert.Equal(t, http.StatusUnauthorized, w.Code)
-					assert.Contains(t, w.Body.String(), "header is required")
-				})
-			}
+			require.Equal(t, http.StatusOK, rr.Code)
+			assert.True(t, called)
 		})
+	})
+}
 
-		t.Run("認証トークンの検証が失敗するとき、401になり、トークンの検証に失敗したことを示すエラーが応答本文に含まれる", func(t *testing.T) {
-			r := newTestRouter(t, &internalauth.MockVerifier{
-				VerifyFn: func(string) (string, error) { return "", errors.New("invalid token") },
+func TestRouterAPIV1Auth(t *testing.T) {
+	t.Run("[ルーティング] api/v1/cards配下の認証", func(t *testing.T) {
+		cases := []struct {
+			name      string
+			verifier  internalauth.Verifier
+			setHeader bool
+		}{
+			{
+				name:      "X-Internal-Authヘッダが無いとき、401になる",
+				verifier:  &internalauth.MockVerifier{},
+				setHeader: false,
+			},
+			{
+				name: "ヘッダはあるがトークンの検証に失敗するとき、401になる",
+				verifier: &internalauth.MockVerifier{VerifyFn: func(string) (string, error) {
+					return "", errors.New("invalid token")
+				}},
+				setHeader: true,
+			},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				engine := newTestEngine(t, nil, nil, nil, nil, tc.verifier)
+
+				req := httptest.NewRequest(http.MethodGet, "/api/v1/cards/cards", nil)
+				if tc.setHeader {
+					req.Header.Set(internalauth.HeaderName, "any-token")
+				}
+				rr := httptest.NewRecorder()
+				engine.ServeHTTP(rr, req)
+
+				assert.Equal(t, http.StatusUnauthorized, rr.Code)
 			})
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, "/api/v1/cards/decks", nil)
-			req.Header.Set(internalauth.HeaderName, "any.token")
-			r.ServeHTTP(w, req)
-			assert.Equal(t, http.StatusUnauthorized, w.Code)
-			assert.Contains(t, w.Body.String(), "invalid internal auth token")
-		})
-
-		t.Run("verifierを通過したとき、handlerの成功応答まで到達する", func(t *testing.T) {
-			r := newTestRouter(t, &internalauth.MockVerifier{
-				VerifyFn: func(string) (string, error) { return "TST-PLAYER-1", nil },
-			})
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, "/api/v1/cards/cards", nil)
-			req.Header.Set(internalauth.HeaderName, "any.token")
-			r.ServeHTTP(w, req)
-			assert.Equal(t, http.StatusOK, w.Code)
-		})
+		}
 	})
 }

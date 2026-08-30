@@ -7,95 +7,206 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kenyamaneko/overload-party-card/internal/repository"
 )
 
-func TestFindAll(t *testing.T) {
-	t.Run("カード一覧の取得", func(t *testing.T) {
-		tests := []struct {
-			name    string
-			seeds   []cardSeed
-			wantIDs []string
-		}{
-			{
-				name: "activeとinactiveが混在するとき、activeのみcard_id昇順で返る",
-				seeds: []cardSeed{
-					{"SH-0002", "SHE B", "SHE", "Compute", "unlimited", true},
-					{"SH-0001", "SHE A", "SHE", "Compute", "unlimited", true},
-					{"SH-0099", "SHE Inactive", "SHE", "Compute", "unlimited", false},
-				},
-				wantIDs: []string{"SH-0001", "SH-0002"},
-			},
-			{
-				name:    "空テーブルのとき、空スライスになる",
-				seeds:   nil,
-				wantIDs: nil,
-			},
-			{
-				name: "全てinactiveのとき、空スライスになる",
-				seeds: []cardSeed{
-					{"SH-0001", "Dormant A", "SHE", "Compute", "unlimited", false},
-					{"SH-0002", "Dormant B", "SHE", "Compute", "unlimited", false},
-				},
-				wantIDs: nil,
-			},
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				sharedPg.Truncate(t)
-				seedCards(t, tt.seeds)
-
-				repo := repository.NewPgCardRepository(sharedPg.Pool)
-				got, err := repo.FindAll(context.Background())
-				require.NoError(t, err)
-
-				var gotIDs []string
-				for _, c := range got {
-					gotIDs = append(gotIDs, c.CardID)
-				}
-				assert.Equal(t, tt.wantIDs, gotIDs)
-			})
-		}
-
-		t.Run("全項目を持つカードを1行投入すると、全フィールドが投入値どおりに取得される", func(t *testing.T) {
+func TestCardRepoFindAll(t *testing.T) {
+	t.Run("[カードリポジトリ] カード定義一覧取得", func(t *testing.T) {
+		t.Run("有効なカード定義が0件のとき、空の一覧を返す", func(t *testing.T) {
 			sharedPg.Truncate(t)
-			ts := time.Now().UTC().Truncate(time.Microsecond)
-			seedFullCard(t, fullCardSeed{
-				CardID: "TST-0001", CardName: "Full Card", ResourceLabel: "vCPU", Faction: "SHE",
-				CardType: "Compute", Subtype: "VM", Resizable: true, Elastic: true,
-				Stats:       `{"throughput":10,"availability":1,"maintenance_cost":1,"sla_penalty":1}`,
-				EffectText:  "テスト効果",
-				Effects:     `{"ops":[]}`,
-				Restriction: "limited", IsActive: true, CreatedAt: ts, UpdatedAt: ts,
-			})
-
 			repo := repository.NewPgCardRepository(sharedPg.Pool)
+
 			got, err := repo.FindAll(context.Background())
+
+			require.NoError(t, err)
+			require.Empty(t, got)
+		})
+
+		t.Run("有効なカード定義があるとき、それらを返す", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedCard(t, cardSeed{CardID: "TST-0001", CardName: "テストカードA", Faction: "SHE", CardType: "Resource", Restriction: "unlimited", IsActive: true})
+			repo := repository.NewPgCardRepository(sharedPg.Pool)
+
+			got, err := repo.FindAll(context.Background())
+
 			require.NoError(t, err)
 			require.Len(t, got, 1)
+			require.Equal(t, "TST-0001", got[0].CardID)
+		})
 
+		t.Run("無効なカード定義は、返る一覧に含まれない", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedCard(t, cardSeed{CardID: "TST-0001", CardName: "テストカードA", Faction: "SHE", CardType: "Resource", Restriction: "unlimited", IsActive: false})
+			repo := repository.NewPgCardRepository(sharedPg.Pool)
+
+			got, err := repo.FindAll(context.Background())
+
+			require.NoError(t, err)
+			require.Empty(t, got)
+		})
+
+		t.Run("有効なカード定義が複数件あるとき、card_idの昇順で返る", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedCards(t, []cardSeed{
+				{CardID: "TST-0003", CardName: "テストカードC", Faction: "SHE", CardType: "Resource", Restriction: "unlimited", IsActive: true},
+				{CardID: "TST-0001", CardName: "テストカードA", Faction: "SHE", CardType: "Resource", Restriction: "unlimited", IsActive: true},
+				{CardID: "TST-0002", CardName: "テストカードB", Faction: "SHE", CardType: "Resource", Restriction: "unlimited", IsActive: true},
+			})
+			repo := repository.NewPgCardRepository(sharedPg.Pool)
+
+			got, err := repo.FindAll(context.Background())
+
+			require.NoError(t, err)
+			require.Len(t, got, 3)
+			require.Equal(t, []string{"TST-0001", "TST-0002", "TST-0003"},
+				[]string{got[0].CardID, got[1].CardID, got[2].CardID})
+		})
+
+		t.Run("保存したcard_name/resource_label/faction/card_type/resizable/elastic/restriction/is_active/created_at/updated_atの値が、そのまま返る", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			createdAt := time.Date(2026, 1, 10, 9, 0, 0, 0, time.UTC)
+			updatedAt := time.Date(2026, 1, 15, 12, 30, 0, 0, time.UTC)
+			seedFullCard(t, fullCardSeed{
+				CardID: "TST-0001", CardName: "テストカードA", ResourceLabel: "CPU",
+				Faction: "SHE", CardType: "Resource", Subtype: "VM",
+				Resizable: true, Elastic: false, Stats: `{"cpu":2}`,
+				EffectText: "テスト効果", Effects: `[{"op":"add"}]`,
+				Restriction: "limited", IsActive: true,
+				CreatedAt: createdAt, UpdatedAt: updatedAt,
+			})
+			repo := repository.NewPgCardRepository(sharedPg.Pool)
+
+			got, err := repo.FindAll(context.Background())
+
+			require.NoError(t, err)
+			require.Len(t, got, 1)
 			c := got[0]
-			assert.Equal(t, "TST-0001", c.CardID)
-			assert.Equal(t, "Full Card", c.CardName)
-			assert.Equal(t, "vCPU", c.ResourceLabel)
-			assert.Equal(t, "SHE", c.Faction)
-			assert.Equal(t, "Compute", c.CardType)
-			require.NotNil(t, c.Subtype)
-			assert.Equal(t, "VM", *c.Subtype)
-			assert.True(t, c.Resizable)
-			assert.True(t, c.Elastic)
-			assert.JSONEq(t, `{"throughput":10,"availability":1,"maintenance_cost":1,"sla_penalty":1}`, string(c.Stats))
-			require.NotNil(t, c.EffectText)
-			assert.Equal(t, "テスト効果", *c.EffectText)
-			assert.JSONEq(t, `{"ops":[]}`, string(c.Effects))
-			assert.Equal(t, "limited", c.Restriction)
-			assert.True(t, c.IsActive)
-			assert.True(t, ts.Equal(c.CreatedAt))
-			assert.True(t, ts.Equal(c.UpdatedAt))
+			require.Equal(t, "テストカードA", c.CardName)
+			require.Equal(t, "CPU", c.ResourceLabel)
+			require.Equal(t, "SHE", c.Faction)
+			require.Equal(t, "Resource", c.CardType)
+			require.True(t, c.Resizable)
+			require.False(t, c.Elastic)
+			require.Equal(t, "limited", c.Restriction)
+			require.True(t, c.IsActive)
+			require.True(t, createdAt.Equal(c.CreatedAt))
+			require.True(t, updatedAt.Equal(c.UpdatedAt))
+		})
+
+		t.Run("保存した能力値(JSON)の内容が、そのまま返る", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedFullCard(t, fullCardSeed{
+				CardID: "TST-0001", CardName: "テストカードA", ResourceLabel: "CPU",
+				Faction: "SHE", CardType: "Resource", Subtype: "VM",
+				Resizable: true, Elastic: false, Stats: `{"cpu":2,"mem":4}`,
+				EffectText: "テスト効果", Effects: `[]`,
+				Restriction: "unlimited", IsActive: true,
+				CreatedAt: time.Now(), UpdatedAt: time.Now(),
+			})
+			repo := repository.NewPgCardRepository(sharedPg.Pool)
+
+			got, err := repo.FindAll(context.Background())
+
+			require.NoError(t, err)
+			require.Len(t, got, 1)
+			require.JSONEq(t, `{"cpu":2,"mem":4}`, string(got[0].Stats))
+		})
+
+		t.Run("サブタイプが未設定のカード定義を取得すると、返り値のサブタイプも未設定になる", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedCard(t, cardSeed{CardID: "TST-0001", CardName: "テストカードA", Faction: "SHE", CardType: "Resource", Restriction: "unlimited", IsActive: true})
+			repo := repository.NewPgCardRepository(sharedPg.Pool)
+
+			got, err := repo.FindAll(context.Background())
+
+			require.NoError(t, err)
+			require.Len(t, got, 1)
+			require.Nil(t, got[0].Subtype)
+		})
+
+		t.Run("サブタイプが設定されたカード定義を取得すると、その値が返る", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedFullCard(t, fullCardSeed{
+				CardID: "TST-0001", CardName: "テストカードA", ResourceLabel: "CPU",
+				Faction: "SHE", CardType: "Resource", Subtype: "Container",
+				Resizable: false, Elastic: false, Stats: `{}`,
+				EffectText: "e", Effects: `[]`,
+				Restriction: "unlimited", IsActive: true,
+				CreatedAt: time.Now(), UpdatedAt: time.Now(),
+			})
+			repo := repository.NewPgCardRepository(sharedPg.Pool)
+
+			got, err := repo.FindAll(context.Background())
+
+			require.NoError(t, err)
+			require.Len(t, got, 1)
+			require.NotNil(t, got[0].Subtype)
+			require.Equal(t, "Container", *got[0].Subtype)
+		})
+
+		t.Run("効果テキストが未設定のカード定義を取得すると、返り値の効果テキストも未設定になる", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedCard(t, cardSeed{CardID: "TST-0001", CardName: "テストカードA", Faction: "SHE", CardType: "Resource", Restriction: "unlimited", IsActive: true})
+			repo := repository.NewPgCardRepository(sharedPg.Pool)
+
+			got, err := repo.FindAll(context.Background())
+
+			require.NoError(t, err)
+			require.Len(t, got, 1)
+			require.Nil(t, got[0].EffectText)
+		})
+
+		t.Run("効果テキストが設定されたカード定義を取得すると、その値が返る", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedFullCard(t, fullCardSeed{
+				CardID: "TST-0001", CardName: "テストカードA", ResourceLabel: "CPU",
+				Faction: "SHE", CardType: "Resource", Subtype: "VM",
+				Resizable: false, Elastic: false, Stats: `{}`,
+				EffectText: "効果テキストです", Effects: `[]`,
+				Restriction: "unlimited", IsActive: true,
+				CreatedAt: time.Now(), UpdatedAt: time.Now(),
+			})
+			repo := repository.NewPgCardRepository(sharedPg.Pool)
+
+			got, err := repo.FindAll(context.Background())
+
+			require.NoError(t, err)
+			require.Len(t, got, 1)
+			require.NotNil(t, got[0].EffectText)
+			require.Equal(t, "効果テキストです", *got[0].EffectText)
+		})
+
+		t.Run("効果(JSON)が未設定のカード定義を取得すると、返り値の効果も未設定になる", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedCard(t, cardSeed{CardID: "TST-0001", CardName: "テストカードA", Faction: "SHE", CardType: "Resource", Restriction: "unlimited", IsActive: true})
+			repo := repository.NewPgCardRepository(sharedPg.Pool)
+
+			got, err := repo.FindAll(context.Background())
+
+			require.NoError(t, err)
+			require.Len(t, got, 1)
+			require.Nil(t, got[0].Effects)
+		})
+
+		t.Run("効果(JSON)が設定されたカード定義を取得すると、その内容がそのまま返る", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedFullCard(t, fullCardSeed{
+				CardID: "TST-0001", CardName: "テストカードA", ResourceLabel: "CPU",
+				Faction: "SHE", CardType: "Resource", Subtype: "VM",
+				Resizable: false, Elastic: false, Stats: `{}`,
+				EffectText: "e", Effects: `[{"op":"draw","value":1}]`,
+				Restriction: "unlimited", IsActive: true,
+				CreatedAt: time.Now(), UpdatedAt: time.Now(),
+			})
+			repo := repository.NewPgCardRepository(sharedPg.Pool)
+
+			got, err := repo.FindAll(context.Background())
+
+			require.NoError(t, err)
+			require.Len(t, got, 1)
+			require.JSONEq(t, `[{"op":"draw","value":1}]`, string(got[0].Effects))
 		})
 	})
 }

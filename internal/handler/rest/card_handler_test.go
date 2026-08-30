@@ -1,44 +1,158 @@
-package rest
+package rest_test
 
 import (
+	"context"
 	"errors"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
-	internalauth "github.com/kenyamaneko/overload-party-gateway/packages/internalauth-go"
+	"github.com/kenyamaneko/overload-party-card/internal/domain"
+	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 )
 
-func TestCardHandler_RepositoryFailure(t *testing.T) {
-	gin.SetMode(gin.TestMode)
+func TestCardHandlerListAllRaw(t *testing.T) {
+	t.Run("[カードAPI] カードマスター全件配信", func(t *testing.T) {
+		t.Run("カード定義が取得できるとき、200になり各要素がカード定義の内容と一致する", func(t *testing.T) {
+			card := newTestCard("TST-0001", "SHE", "Compute", "unlimited")
+			engine := newTestRouter(t, withCardRepo(&fakeCardRepo{
+				FindAllFn: func(ctx context.Context) ([]*domain.Card, error) {
+					return []*domain.Card{card}, nil
+				},
+			}))
 
-	t.Run("カードマスター取得", func(t *testing.T) {
-		h, cardRepo, _ := newCardHandlerFixture()
-		cardRepo.findAllErr = errors.New("pq: connection refused")
+			rr := doRequest(t, engine, http.MethodGet, "/internal/v1/cards", nil)
 
-		cases := []struct {
-			name   string
-			invoke func(c *gin.Context)
+			require.Equal(t, http.StatusOK, rr.Code)
+			var body []apicard.CardDefinition
+			decodeJSON(t, rr, &body)
+			require.Len(t, body, 1)
+			got := body[0]
+			assert.Equal(t, card.CardID, got.CardID)
+			assert.Equal(t, card.CardName, got.CardName)
+			assert.Equal(t, card.ResourceLabel, got.ResourceLabel)
+			assert.Equal(t, card.Faction, got.Faction)
+			assert.Equal(t, card.CardType, got.CardType)
+			assert.Equal(t, card.Resizable, got.Resizable)
+			assert.Equal(t, card.Elastic, got.Elastic)
+			assert.JSONEq(t, string(card.Stats), string(got.Stats))
+			assert.Equal(t, card.Restriction, got.Restriction)
+			assert.Equal(t, card.IsActive, got.IsActive)
+			assert.True(t, card.CreatedAt.Equal(got.CreatedAt))
+			assert.True(t, card.UpdatedAt.Equal(got.UpdatedAt))
+		})
+
+		t.Run("カード定義が1件も無いとき、200になりレスポンスボディは空配列になる", func(t *testing.T) {
+			engine := newTestRouter(t, withCardRepo(&fakeCardRepo{
+				FindAllFn: func(ctx context.Context) ([]*domain.Card, error) { return []*domain.Card{}, nil },
+			}))
+
+			rr := doRequest(t, engine, http.MethodGet, "/internal/v1/cards", nil)
+
+			require.Equal(t, http.StatusOK, rr.Code)
+			assert.JSONEq(t, "[]", rr.Body.String())
+		})
+
+		t.Run("カードマスターの取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる", func(t *testing.T) {
+			engine := newTestRouter(t, withCardRepo(&fakeCardRepo{
+				FindAllFn: func(ctx context.Context) ([]*domain.Card, error) { return nil, errors.New("find all failed") },
+			}))
+
+			rr := doRequest(t, engine, http.MethodGet, "/internal/v1/cards", nil)
+
+			require.Equal(t, http.StatusInternalServerError, rr.Code)
+			assert.Equal(t, "internal server error", decodeErrorMessage(t, rr))
+		})
+	})
+}
+
+func TestCardHandlerListForPlayer(t *testing.T) {
+	t.Run("[カードAPI] 所持状態付きカード一覧取得", func(t *testing.T) {
+		t.Run("カードがプレイヤーの所持カード一覧に1件以上含まれるとき、そのカードのis_ownedはtrueになる", func(t *testing.T) {
+			card := newTestCard("TST-0001", "SHE", "Compute", "unlimited")
+			engine := newTestRouter(t,
+				withCardRepo(&fakeCardRepo{FindAllFn: func(ctx context.Context) ([]*domain.Card, error) {
+					return []*domain.Card{card}, nil
+				}}),
+				withPlayerCardRepo(&fakePlayerCardRepo{GetPlayerCardsFn: func(ctx context.Context, playerID string) ([]*domain.PlayerCard, error) {
+					return []*domain.PlayerCard{{PlayerID: playerID, CardID: "TST-0001", ArtNo: 1, Count: 1}}, nil
+				}}),
+			)
+
+			rr := doAuthedRequest(t, engine, http.MethodGet, "/api/v1/cards/cards/with-ownership", nil)
+
+			require.Equal(t, http.StatusOK, rr.Code)
+			var body []apicard.CardWithOwnership
+			decodeJSON(t, rr, &body)
+			got := findCardWithOwnership(t, body, "TST-0001")
+			assert.True(t, got.IsOwned)
+		})
+
+		t.Run("カードがプレイヤーの所持カード一覧に含まれないとき、そのカードのis_ownedはfalseになる", func(t *testing.T) {
+			card := newTestCard("TST-0002", "SHE", "Compute", "unlimited")
+			engine := newTestRouter(t,
+				withCardRepo(&fakeCardRepo{FindAllFn: func(ctx context.Context) ([]*domain.Card, error) {
+					return []*domain.Card{card}, nil
+				}}),
+				withPlayerCardRepo(&fakePlayerCardRepo{GetPlayerCardsFn: func(ctx context.Context, playerID string) ([]*domain.PlayerCard, error) {
+					return []*domain.PlayerCard{}, nil
+				}}),
+			)
+
+			rr := doAuthedRequest(t, engine, http.MethodGet, "/api/v1/cards/cards/with-ownership", nil)
+
+			require.Equal(t, http.StatusOK, rr.Code)
+			var body []apicard.CardWithOwnership
+			decodeJSON(t, rr, &body)
+			got := findCardWithOwnership(t, body, "TST-0002")
+			assert.False(t, got.IsOwned)
+		})
+
+		errorCases := []struct {
+			name           string
+			cardRepo       *fakeCardRepo
+			playerCardRepo *fakePlayerCardRepo
 		}{
-			{"カードマスター全件取得で内部エラーが起きたとき、500 になり応答本文の error が internal server error と完全に一致する", h.ListAllRaw},
-			{"プレイヤー所持状態付きカード取得で内部エラーが起きたとき、500 になり応答本文の error が internal server error と完全に一致する", h.ListForPlayer},
+			{
+				name: "カードマスターの取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる",
+				cardRepo: &fakeCardRepo{FindAllFn: func(ctx context.Context) ([]*domain.Card, error) {
+					return nil, errors.New("find all failed")
+				}},
+				playerCardRepo: &fakePlayerCardRepo{},
+			},
+			{
+				name: "カードマスターの取得は成功し、プレイヤーの所持カード取得に失敗するとき、500になりボディのerrorフィールドはinternal server errorになる",
+				cardRepo: &fakeCardRepo{FindAllFn: func(ctx context.Context) ([]*domain.Card, error) {
+					return []*domain.Card{newTestCard("TST-0001", "SHE", "Compute", "unlimited")}, nil
+				}},
+				playerCardRepo: &fakePlayerCardRepo{GetPlayerCardsFn: func(ctx context.Context, playerID string) ([]*domain.PlayerCard, error) {
+					return nil, errors.New("get player cards failed")
+				}},
+			},
 		}
-
-		for _, tc := range cases {
+		for _, tc := range errorCases {
 			t.Run(tc.name, func(t *testing.T) {
-				w := httptest.NewRecorder()
-				c, _ := gin.CreateTestContext(w)
-				c.Set(internalauth.PlayerIDContextKey, fxPlayerID)
-				c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+				engine := newTestRouter(t, withCardRepo(tc.cardRepo), withPlayerCardRepo(tc.playerCardRepo))
 
-				tc.invoke(c)
+				rr := doAuthedRequest(t, engine, http.MethodGet, "/api/v1/cards/cards/with-ownership", nil)
 
-				assert.Equal(t, http.StatusInternalServerError, w.Code)
-				assert.Equal(t, internalErrorMessage, decodeBody(t, w)["error"])
+				require.Equal(t, http.StatusInternalServerError, rr.Code)
+				assert.Equal(t, "internal server error", decodeErrorMessage(t, rr))
 			})
 		}
 	})
+}
+
+// findCardWithOwnership locates the response element for cardID, failing the test if absent.
+func findCardWithOwnership(t *testing.T, cards []apicard.CardWithOwnership, cardID string) apicard.CardWithOwnership {
+	t.Helper()
+	for _, c := range cards {
+		if c.CardID == cardID {
+			return c
+		}
+	}
+	t.Fatalf("card %s not found in response", cardID)
+	return apicard.CardWithOwnership{}
 }

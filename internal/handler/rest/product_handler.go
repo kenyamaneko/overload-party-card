@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -36,7 +37,15 @@ func (h *ProductHandler) ListAll(c *gin.Context) {
 	products := h.products.All()
 	resp := make([]productWithInitiatives, 0, len(products))
 	for _, product := range products {
-		resp = append(resp, productWithInitiatives{Product: product, Initiatives: byProduct[product.ProductID]})
+		initiatives, ok := byProduct[product.ProductID]
+		if !ok {
+			slog.Error("product has no initiatives",
+				"product_id", product.ProductID,
+			)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": internalErrorMessage})
+			return
+		}
+		resp = append(resp, productWithInitiatives{Product: product, Initiatives: initiatives})
 	}
 	c.JSON(http.StatusOK, resp)
 }

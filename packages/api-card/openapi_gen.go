@@ -275,14 +275,6 @@ type DeckCreateRequest struct {
 	SpecialID string `json:"special_id"`
 }
 
-// DeckDetailResponse GET /players/{playerId}/decks/{deckId} のレスポンス封筒。
-type DeckDetailResponse struct {
-	Cards []DeckCard `json:"cards"`
-
-	// Deck プレイヤーのデッキ (カード構成オプショナル)。
-	Deck Deck `json:"deck"`
-}
-
 // DeckUpdateRequest defines model for DeckUpdateRequest.
 type DeckUpdateRequest struct {
 	Cards    []DeckCardEntry `json:"cards"`
@@ -390,6 +382,14 @@ type Product struct {
 	ProductName string `json:"product_name"`
 }
 
+// PubSubPushEnvelope Cloud Pub/Sub push subscription が送るリクエスト本文の envelope。
+type PubSubPushEnvelope struct {
+	Message struct {
+		// Data base64 エンコードされたイベント payload。
+		Data []byte `json:"data"`
+	} `json:"message"`
+}
+
 // DeckIdPath defines model for DeckIdPath.
 type DeckIdPath = int64
 
@@ -401,6 +401,12 @@ type CreateDeckJSONRequestBody = DeckCreateRequest
 
 // UpdateDeckJSONRequestBody defines body for UpdateDeck for application/json ContentType.
 type UpdateDeckJSONRequestBody = DeckUpdateRequest
+
+// PubsubCardPackPurchasedJSONRequestBody defines body for PubsubCardPackPurchased for application/json ContentType.
+type PubsubCardPackPurchasedJSONRequestBody = PubSubPushEnvelope
+
+// PubsubPlayerOnboardedJSONRequestBody defines body for PubsubPlayerOnboarded for application/json ContentType.
+type PubsubPlayerOnboardedJSONRequestBody = PubSubPushEnvelope
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -514,6 +520,16 @@ type ClientInterface interface {
 
 	// ListInitiatives request
 	ListInitiatives(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PubsubCardPackPurchasedWithBody request with any body
+	PubsubCardPackPurchasedWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PubsubCardPackPurchased(ctx context.Context, body PubsubCardPackPurchasedJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PubsubPlayerOnboardedWithBody request with any body
+	PubsubPlayerOnboardedWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PubsubPlayerOnboarded(ctx context.Context, body PubsubPlayerOnboardedJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) ListPlayerCards(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -674,6 +690,54 @@ func (c *Client) ListCards(ctx context.Context, reqEditors ...RequestEditorFn) (
 
 func (c *Client) ListInitiatives(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListInitiativesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PubsubCardPackPurchasedWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPubsubCardPackPurchasedRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PubsubCardPackPurchased(ctx context.Context, body PubsubCardPackPurchasedJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPubsubCardPackPurchasedRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PubsubPlayerOnboardedWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPubsubPlayerOnboardedRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PubsubPlayerOnboarded(ctx context.Context, body PubsubPlayerOnboardedJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPubsubPlayerOnboardedRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1062,6 +1126,86 @@ func NewListInitiativesRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewPubsubCardPackPurchasedRequest calls the generic PubsubCardPackPurchased builder with application/json body
+func NewPubsubCardPackPurchasedRequest(server string, body PubsubCardPackPurchasedJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPubsubCardPackPurchasedRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPubsubCardPackPurchasedRequestWithBody generates requests for PubsubCardPackPurchased with any type of body
+func NewPubsubCardPackPurchasedRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/v1/pubsub/card-pack-purchased")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewPubsubPlayerOnboardedRequest calls the generic PubsubPlayerOnboarded builder with application/json body
+func NewPubsubPlayerOnboardedRequest(server string, body PubsubPlayerOnboardedJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPubsubPlayerOnboardedRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPubsubPlayerOnboardedRequestWithBody generates requests for PubsubPlayerOnboarded with any type of body
+func NewPubsubPlayerOnboardedRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/v1/pubsub/player-onboarded")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -1144,6 +1288,16 @@ type ClientWithResponsesInterface interface {
 
 	// ListInitiativesWithResponse request
 	ListInitiativesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListInitiativesResponse, error)
+
+	// PubsubCardPackPurchasedWithBodyWithResponse request with any body
+	PubsubCardPackPurchasedWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PubsubCardPackPurchasedResponse, error)
+
+	PubsubCardPackPurchasedWithResponse(ctx context.Context, body PubsubCardPackPurchasedJSONRequestBody, reqEditors ...RequestEditorFn) (*PubsubCardPackPurchasedResponse, error)
+
+	// PubsubPlayerOnboardedWithBodyWithResponse request with any body
+	PubsubPlayerOnboardedWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PubsubPlayerOnboardedResponse, error)
+
+	PubsubPlayerOnboardedWithResponse(ctx context.Context, body PubsubPlayerOnboardedJSONRequestBody, reqEditors ...RequestEditorFn) (*PubsubPlayerOnboardedResponse, error)
 }
 
 type ListPlayerCardsResponse struct {
@@ -1298,7 +1452,7 @@ func (r DeleteDeckResponse) ContentType() string {
 type GetDeckResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *DeckDetailResponse
+	JSON200      *Deck
 }
 
 // Status returns HTTPResponse.Status
@@ -1504,6 +1658,64 @@ func (r ListInitiativesResponse) ContentType() string {
 	return ""
 }
 
+type PubsubCardPackPurchasedResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r PubsubCardPackPurchasedResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PubsubCardPackPurchasedResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PubsubCardPackPurchasedResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PubsubPlayerOnboardedResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r PubsubPlayerOnboardedResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PubsubPlayerOnboardedResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PubsubPlayerOnboardedResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListPlayerCardsWithResponse request returning *ListPlayerCardsResponse
 func (c *ClientWithResponses) ListPlayerCardsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListPlayerCardsResponse, error) {
 	rsp, err := c.ListPlayerCards(ctx, reqEditors...)
@@ -1626,6 +1838,40 @@ func (c *ClientWithResponses) ListInitiativesWithResponse(ctx context.Context, r
 		return nil, err
 	}
 	return ParseListInitiativesResponse(rsp)
+}
+
+// PubsubCardPackPurchasedWithBodyWithResponse request with arbitrary body returning *PubsubCardPackPurchasedResponse
+func (c *ClientWithResponses) PubsubCardPackPurchasedWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PubsubCardPackPurchasedResponse, error) {
+	rsp, err := c.PubsubCardPackPurchasedWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePubsubCardPackPurchasedResponse(rsp)
+}
+
+func (c *ClientWithResponses) PubsubCardPackPurchasedWithResponse(ctx context.Context, body PubsubCardPackPurchasedJSONRequestBody, reqEditors ...RequestEditorFn) (*PubsubCardPackPurchasedResponse, error) {
+	rsp, err := c.PubsubCardPackPurchased(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePubsubCardPackPurchasedResponse(rsp)
+}
+
+// PubsubPlayerOnboardedWithBodyWithResponse request with arbitrary body returning *PubsubPlayerOnboardedResponse
+func (c *ClientWithResponses) PubsubPlayerOnboardedWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PubsubPlayerOnboardedResponse, error) {
+	rsp, err := c.PubsubPlayerOnboardedWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePubsubPlayerOnboardedResponse(rsp)
+}
+
+func (c *ClientWithResponses) PubsubPlayerOnboardedWithResponse(ctx context.Context, body PubsubPlayerOnboardedJSONRequestBody, reqEditors ...RequestEditorFn) (*PubsubPlayerOnboardedResponse, error) {
+	rsp, err := c.PubsubPlayerOnboarded(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePubsubPlayerOnboardedResponse(rsp)
 }
 
 // ParseListPlayerCardsResponse parses an HTTP response from a ListPlayerCardsWithResponse call
@@ -1763,7 +2009,7 @@ func ParseGetDeckResponse(rsp *http.Response) (*GetDeckResponse, error) {
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest DeckDetailResponse
+		var dest Deck
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -1915,6 +2161,38 @@ func ParseListInitiativesResponse(rsp *http.Response) (*ListInitiativesResponse,
 		}
 		response.JSON200 = &dest
 
+	}
+
+	return response, nil
+}
+
+// ParsePubsubCardPackPurchasedResponse parses an HTTP response from a PubsubCardPackPurchasedWithResponse call
+func ParsePubsubCardPackPurchasedResponse(rsp *http.Response) (*PubsubCardPackPurchasedResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PubsubCardPackPurchasedResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParsePubsubPlayerOnboardedResponse parses an HTTP response from a PubsubPlayerOnboardedWithResponse call
+func ParsePubsubPlayerOnboardedResponse(rsp *http.Response) (*PubsubPlayerOnboardedResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PubsubPlayerOnboardedResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
 	}
 
 	return response, nil

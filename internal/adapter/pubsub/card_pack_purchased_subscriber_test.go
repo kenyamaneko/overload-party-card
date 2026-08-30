@@ -1,122 +1,90 @@
-package pubsub
+package pubsub_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	apishop "github.com/kenyamaneko/overload-party-shop/packages/api-shop"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/kenyamaneko/overload-party-card/internal/adapter/pubsub"
 )
 
-// mustMarshalCardPackPurchased は apishop.CardPackPurchasedEvent の型を経由して
-// payload を組み立てる (shop が schema を変えたら本テストが compile / 実行で
-// 破綻し、乖離を CI で検知する)。EventType は契約固定値で上書きする。
-func mustMarshalCardPackPurchased(t *testing.T, ev apishop.CardPackPurchasedEvent) []byte {
+func newCardPackPurchasedPayload(t *testing.T, eventID, playerID, cardPackID string) []byte {
 	t.Helper()
-	ev.EventType = apishop.EventTypeCardPackPurchased
-	return mustMarshal(t, ev)
+	data, err := json.Marshal(apishop.CardPackPurchasedEvent{
+		EventType:  apishop.EventTypeCardPackPurchased,
+		EventID:    eventID,
+		Timestamp:  time.Now(),
+		PlayerID:   playerID,
+		CardPackID: cardPackID,
+	})
+	require.NoError(t, err)
+	return data
 }
 
-func TestCardPackPurchasedSubscriber_Handle(t *testing.T) {
-	t.Run("card_pack_purchasedイベントの処理", func(t *testing.T) {
-		validPayload := mustMarshalCardPackPurchased(t, apishop.CardPackPurchasedEvent{
-			EventID:    "evt-1",
-			PlayerID:   "player-1",
-			CardPackID: "faction_set_Tuners",
+func TestCardPackPurchasedSubscriberHandle(t *testing.T) {
+	t.Run("[カードパック購入購読] card-pack-purchased-card-subのイベント処理", func(t *testing.T) {
+		t.Run("受信したメッセージの内容がJSONとして解釈できないとき、エラーになる", func(t *testing.T) {
+			sub := pubsub.NewCardPackPurchasedSubscriber(&fakePackGranter{}, &fakeProcessedEventRepo{})
+
+			err := sub.Handle(context.Background(), []byte("not json"))
+
+			assert.ErrorContains(t, err, "bad payload")
 		})
 
-		tests := []struct {
-			name          string
-			payload       []byte
-			seedInserted  string
-			repoInsertErr error
-			granterErr    error
-			wantAck       bool
-			wantPacks     []string
-		}{
-			{
-				name:      "新規イベントのとき、pack_idをGrantPackに渡してAckする",
-				payload:   validPayload,
-				wantAck:   true,
-				wantPacks: []string{"faction_set_Tuners"},
-			},
-			{
-				name:         "重複イベント (processed_events既存)のとき、配布せずAckする",
-				payload:      validPayload,
-				seedInserted: "evt-1",
-				wantAck:      true,
-				wantPacks:    nil,
-			},
-			{
-				// processed_events への INSERT (dedup ガード) が失敗した場合、event を
-				// Ack で捨てると配布も dedup 記録もされずメッセージが失われる。Nack して
-				// Pub/Sub の at-least-once 再配送に乗せる。
-				name:          "processed_events INSERT失敗のとき、再配送に乗せるためNackする",
-				payload:       validPayload,
-				repoInsertErr: errors.New("db down"),
-				wantAck:       false,
-				wantPacks:     nil,
-			},
-			{
-				name:       "GrantPack失敗のとき、Nackして再配送に乗せる",
-				payload:    validPayload,
-				granterErr: errors.New("grant failed"),
-				wantAck:    false,
-				wantPacks:  []string{"faction_set_Tuners"},
-			},
-			{
-				name:      "malformed JSONのとき、NackしてDLQ送りになる",
-				payload:   []byte("not-json"),
-				wantAck:   false,
-				wantPacks: nil,
-			},
-			{
-				name: "未知event_typeのとき、NackしてDLQでpublisherバグを検出する",
-				payload: mustMarshal(t, apishop.CardPackPurchasedEvent{
-					EventType:  "unknown",
-					EventID:    "evt-2",
-					PlayerID:   "player-1",
-					CardPackID: "faction_set_Tuners",
-				}),
-				wantAck:   false,
-				wantPacks: nil,
-			},
-		}
+		t.Run("受け取ったイベントのevent_typeが処理対象のイベント種別と一致しないとき、エラーになる", func(t *testing.T) {
+			sub := pubsub.NewCardPackPurchasedSubscriber(&fakePackGranter{}, &fakeProcessedEventRepo{})
+			payload := []byte(`{"event_type":"unrelated_event","event_id":"evt-1","player_id":"TST-0001","card_pack_id":"TST-0002"}`)
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				granter := &fakePackGranter{err: tt.granterErr}
-				repo := newFakeProcessedEventRepo()
-				repo.insertErr = tt.repoInsertErr
-				if tt.seedInserted != "" {
-					repo.inserted[tt.seedInserted] = true
-				}
-				sub := NewCardPackPurchasedSubscriber(granter, repo)
+			err := sub.Handle(context.Background(), payload)
 
-				err := sub.Handle(context.Background(), tt.payload)
+			assert.ErrorContains(t, err, "unexpected event_type")
+		})
 
-				assert.Equal(t, tt.wantAck, err == nil, "ack 判定 (nil=ack, err=%v)", err)
-				assert.Equal(t, tt.wantPacks, granter.gotPacks)
-			})
-		}
+		t.Run("処理済みイベントの記録への保存が失敗したとき、エラーになる", func(t *testing.T) {
+			sub := pubsub.NewCardPackPurchasedSubscriber(&fakePackGranter{}, &fakeProcessedEventRepo{err: errors.New("insert failed")})
+			payload := newCardPackPurchasedPayload(t, "evt-1", "TST-0001", "TST-0002")
 
-		t.Run("同じevent_idを持つイベントを二度処理しても、2回目は配布されない", func(t *testing.T) {
-			payload := mustMarshalCardPackPurchased(t, apishop.CardPackPurchasedEvent{
-				EventID:    "evt-repeat",
-				PlayerID:   "player-1",
-				CardPackID: "faction_set_Tuners",
-			})
+			err := sub.Handle(context.Background(), payload)
+
+			assert.ErrorContains(t, err, "insert processed_events")
+		})
+
+		t.Run("当該event_idが既に処理済みとして記録されているとき、パックの配布は要求されず、正常終了になる", func(t *testing.T) {
 			granter := &fakePackGranter{}
-			repo := newFakeProcessedEventRepo()
-			sub := NewCardPackPurchasedSubscriber(granter, repo)
+			sub := pubsub.NewCardPackPurchasedSubscriber(granter, &fakeProcessedEventRepo{inserted: false})
+			payload := newCardPackPurchasedPayload(t, "evt-1", "TST-0001", "TST-0002")
 
-			firstErr := sub.Handle(context.Background(), payload)
-			secondErr := sub.Handle(context.Background(), payload)
+			err := sub.Handle(context.Background(), payload)
 
-			assert.NoError(t, firstErr)
-			assert.NoError(t, secondErr)
-			assert.Equal(t, []string{"faction_set_Tuners"}, granter.gotPacks, "GrantPack は 1 回だけ呼ばれる")
+			assert.NoError(t, err)
+			assert.Empty(t, granter.calls)
+		})
+
+		t.Run("配布処理が失敗したとき、エラーになる", func(t *testing.T) {
+			granter := &fakePackGranter{errFor: map[string]error{"TST-0002": errors.New("grant failed")}}
+			sub := pubsub.NewCardPackPurchasedSubscriber(granter, &fakeProcessedEventRepo{inserted: true})
+			payload := newCardPackPurchasedPayload(t, "evt-1", "TST-0001", "TST-0002")
+
+			err := sub.Handle(context.Background(), payload)
+
+			assert.ErrorContains(t, err, `grant "TST-0002"`)
+		})
+
+		t.Run("受け取ったイベントが未処理のevent_id・player_id・card_pack_idを含む正常な内容のとき、そのplayer_idに対しcard_pack_idのパックの配布が要求され、正常終了になる", func(t *testing.T) {
+			granter := &fakePackGranter{copiesFor: map[string]int{"TST-0002": 3}}
+			sub := pubsub.NewCardPackPurchasedSubscriber(granter, &fakeProcessedEventRepo{inserted: true})
+			payload := newCardPackPurchasedPayload(t, "evt-1", "TST-0001", "TST-0002")
+
+			err := sub.Handle(context.Background(), payload)
+
+			assert.NoError(t, err)
+			assert.Equal(t, []grantCall{{playerID: "TST-0001", packID: "TST-0002"}}, granter.calls)
 		})
 	})
 }

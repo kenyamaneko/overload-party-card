@@ -6,64 +6,73 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kenyamaneko/overload-party-card/internal/repository"
 )
 
-func TestProductFindAll(t *testing.T) {
-	t.Run("プロダクト一覧の取得", func(t *testing.T) {
-		orderingCases := []struct {
-			name      string
-			products  []productSeed
-			wantOrder []string
-		}{
-			{
-				name: "複数プロダクトのとき、product_id昇順で返る",
-				products: []productSeed{
-					{"PD-TST2", "Tenki", "P2"},
-					{"PD-TST1", "SHE", "P1"},
-				},
-				wantOrder: []string{"PD-TST1", "PD-TST2"},
-			},
-			{
-				name:      "空テーブルのとき、空スライスになる",
-				products:  nil,
-				wantOrder: nil,
-			},
-		}
-
-		for _, tt := range orderingCases {
-			t.Run(tt.name, func(t *testing.T) {
-				sharedPg.Truncate(t)
-				for _, p := range tt.products {
-					seedProduct(t, p)
-				}
-
-				repo := repository.NewPgProductRepository(sharedPg.Pool)
-				got, err := repo.FindAll(context.Background())
-				require.NoError(t, err)
-
-				var gotOrder []string
-				for _, p := range got {
-					gotOrder = append(gotOrder, p.ProductID)
-				}
-				assert.Equal(t, tt.wantOrder, gotOrder)
-			})
-		}
-
-		t.Run("is_active=falseのプロダクトがあるとき、除外される", func(t *testing.T) {
+func TestProductRepoFindAll(t *testing.T) {
+	t.Run("[プロダクトリポジトリ] プロダクト定義一覧取得", func(t *testing.T) {
+		t.Run("有効なプロダクト定義が0件のとき、空の一覧を返す", func(t *testing.T) {
 			sharedPg.Truncate(t)
-			seedProduct(t, productSeed{"PD-TST1", "SHE", "P1"})
-			seedInactiveProduct(t, productSeed{"PD-TST9", "SHE", "Retired"})
-
 			repo := repository.NewPgProductRepository(sharedPg.Pool)
-			got, err := repo.FindAll(context.Background())
-			require.NoError(t, err)
 
+			got, err := repo.FindAll(context.Background())
+
+			require.NoError(t, err)
+			require.Empty(t, got)
+		})
+
+		t.Run("有効なプロダクト定義があるとき、それらを返す", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedProduct(t, productSeed{ProductID: "PD-TST01", Faction: "SHE", ProductName: "テストプロダクトA"})
+			repo := repository.NewPgProductRepository(sharedPg.Pool)
+
+			got, err := repo.FindAll(context.Background())
+
+			require.NoError(t, err)
 			require.Len(t, got, 1)
-			assert.Equal(t, "PD-TST1", got[0].ProductID)
+			require.Equal(t, "PD-TST01", got[0].ProductID)
+		})
+
+		t.Run("無効なプロダクト定義は、返る一覧に含まれない", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedInactiveProduct(t, productSeed{ProductID: "PD-TST01", Faction: "SHE", ProductName: "テストプロダクトA"})
+			repo := repository.NewPgProductRepository(sharedPg.Pool)
+
+			got, err := repo.FindAll(context.Background())
+
+			require.NoError(t, err)
+			require.Empty(t, got)
+		})
+
+		t.Run("有効なプロダクト定義が複数件あるとき、product_idの昇順で返る", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedProduct(t, productSeed{ProductID: "PD-TST03", Faction: "SHE", ProductName: "テストプロダクトC"})
+			seedProduct(t, productSeed{ProductID: "PD-TST01", Faction: "SHE", ProductName: "テストプロダクトA"})
+			seedProduct(t, productSeed{ProductID: "PD-TST02", Faction: "SHE", ProductName: "テストプロダクトB"})
+			repo := repository.NewPgProductRepository(sharedPg.Pool)
+
+			got, err := repo.FindAll(context.Background())
+
+			require.NoError(t, err)
+			require.Len(t, got, 3)
+			require.Equal(t, []string{"PD-TST01", "PD-TST02", "PD-TST03"},
+				[]string{got[0].ProductID, got[1].ProductID, got[2].ProductID})
+		})
+
+		t.Run("保存した勢力・プロダクト名・有効フラグの値が、そのまま返る", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			seedProduct(t, productSeed{ProductID: "PD-TST01", Faction: "Tenki", ProductName: "テストプロダクトA"})
+			repo := repository.NewPgProductRepository(sharedPg.Pool)
+
+			got, err := repo.FindAll(context.Background())
+
+			require.NoError(t, err)
+			require.Len(t, got, 1)
+			require.Equal(t, "Tenki", got[0].Faction)
+			require.Equal(t, "テストプロダクトA", got[0].ProductName)
+			require.True(t, got[0].IsActive)
 		})
 	})
 }

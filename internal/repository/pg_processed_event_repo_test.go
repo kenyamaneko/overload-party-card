@@ -6,60 +6,56 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kenyamaneko/overload-party-card/internal/repository"
 )
 
-func TestInsert(t *testing.T) {
-	t.Run("processed_eventsへの冪等挿入", func(t *testing.T) {
-		// ON CONFLICT DO NOTHING RETURNING で pgx.ErrNoRows を潰し、新規は true・重複は false を返す。
-		tests := []struct {
-			name         string
-			preInsert    []string // 先に insert しておく event_id 群
-			eventID      string
-			eventType    string
-			wantInserted bool
-		}{
-			{
-				name:         "新規event_idのとき、inserted=trueになる",
-				preInsert:    nil,
-				eventID:      "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-				eventType:    "card_pack_purchased",
-				wantInserted: true,
-			},
-			{
-				name:         "既存event_idのとき、inserted=falseになる (重複適用抑止)",
-				preInsert:    []string{"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"},
-				eventID:      "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-				eventType:    "card_pack_purchased",
-				wantInserted: false,
-			},
-			{
-				name:         "他のevent_idが存在しても新規のとき、inserted=trueになる",
-				preInsert:    []string{"cccccccc-cccc-cccc-cccc-cccccccccccc"},
-				eventID:      "dddddddd-dddd-dddd-dddd-dddddddddddd",
-				eventType:    "player_onboarded",
-				wantInserted: true,
-			},
-		}
+func TestProcessedEventRepoInsert(t *testing.T) {
+	t.Run("[処理済みイベントリポジトリ] 処理済みイベント記録", func(t *testing.T) {
+		t.Run("指定したevent_idが未処理のとき、記録に成功したことを示すtrueが返る", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			repo := repository.NewPgProcessedEventRepository(sharedPg.Pool)
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				sharedPg.Truncate(t)
-				repo := repository.NewPgProcessedEventRepository(sharedPg.Pool)
-				ctx := context.Background()
+			inserted, err := repo.Insert(context.Background(), "44444444-4444-4444-4444-444444444444", "card_pack_purchased")
 
-				for _, id := range tt.preInsert {
-					_, err := repo.Insert(ctx, id, "card_pack_purchased")
-					require.NoError(t, err)
-				}
+			require.NoError(t, err)
+			require.True(t, inserted)
+		})
 
-				got, err := repo.Insert(ctx, tt.eventID, tt.eventType)
-				require.NoError(t, err)
-				assert.Equal(t, tt.wantInserted, got)
-			})
-		}
+		t.Run("指定したevent_idが既に処理済みのとき、記録が行われなかったことを示すfalseが返る", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			repo := repository.NewPgProcessedEventRepository(sharedPg.Pool)
+			eventID := "44444444-4444-4444-4444-444444444444"
+			_, err := repo.Insert(context.Background(), eventID, "card_pack_purchased")
+			require.NoError(t, err)
+
+			inserted, err := repo.Insert(context.Background(), eventID, "card_pack_purchased")
+
+			require.NoError(t, err)
+			require.False(t, inserted)
+		})
+
+		t.Run("既に処理済みのevent_idに対して、異なるevent_typeを指定して記録しようとしても、DBに保存されているevent_typeは最初に登録した値のまま変わらない", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			repo := repository.NewPgProcessedEventRepository(sharedPg.Pool)
+			eventID := "44444444-4444-4444-4444-444444444444"
+			_, err := repo.Insert(context.Background(), eventID, "card_pack_purchased")
+			require.NoError(t, err)
+
+			_, err = repo.Insert(context.Background(), eventID, "player_onboarded")
+			require.NoError(t, err)
+
+			require.Equal(t, "card_pack_purchased", fetchProcessedEventType(t, eventID))
+		})
+
+		t.Run("event_idがUUID形式でない文字列のとき、エラーを返す", func(t *testing.T) {
+			sharedPg.Truncate(t)
+			repo := repository.NewPgProcessedEventRepository(sharedPg.Pool)
+
+			_, err := repo.Insert(context.Background(), "not-a-uuid", "card_pack_purchased")
+
+			require.Error(t, err)
+		})
 	})
 }

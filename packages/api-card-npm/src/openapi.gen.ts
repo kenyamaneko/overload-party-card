@@ -55,6 +55,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/v1/pubsub/player-onboarded": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** player-onboarded-card-sub の Cloud Pub/Sub push 配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM) */
+        post: operations["pubsubPlayerOnboarded"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/pubsub/card-pack-purchased": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** card-pack-purchased-card-sub の Cloud Pub/Sub push 配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM) */
+        post: operations["pubsubCardPackPurchased"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cards/products": {
         parameters: {
             query?: never;
@@ -167,6 +201,16 @@ export interface components {
         HealthResponse: {
             /** @example ok */
             status: string;
+        };
+        /** @description Cloud Pub/Sub push subscription が送るリクエスト本文の envelope。 */
+        PubSubPushEnvelope: {
+            message: {
+                /**
+                 * Format: byte
+                 * @description base64 エンコードされたイベント payload。
+                 */
+                data: string;
+            };
         };
         CardDefinition: {
             card_id: string;
@@ -428,11 +472,6 @@ export interface components {
             /** Format: int64 */
             sleeve_no?: number;
         };
-        /** @description GET /players/{playerId}/decks/{deckId} のレスポンス封筒。 */
-        DeckDetailResponse: {
-            deck: components["schemas"]["Deck"];
-            cards: components["schemas"]["DeckCard"][];
-        };
         /**
          * @description パッシブエフェクトの種別。
          * @enum {string}
@@ -523,6 +562,78 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Initiative"][];
                 };
+            };
+        };
+    };
+    pubsubPlayerOnboarded: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PubSubPushEnvelope"];
+            };
+        };
+        responses: {
+            /** @description 処理完了 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description envelope または base64 データが不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description イベント処理に失敗 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    pubsubCardPackPurchased: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PubSubPushEnvelope"];
+            };
+        };
+        responses: {
+            /** @description 処理完了 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description envelope または base64 データが不正 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description イベント処理に失敗 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -725,13 +836,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description デッキ詳細 */
+            /** @description デッキ詳細 (カード構成は deck.deck_cards に含まれる) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeckDetailResponse"];
+                    "application/json": components["schemas"]["Deck"];
                 };
             };
             /** @description deckId が不正 */
