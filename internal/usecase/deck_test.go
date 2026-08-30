@@ -826,7 +826,7 @@ func TestGetDeck(t *testing.T) {
 			assert.True(t, resp.IsValid)
 		})
 
-		t.Run("取得したデッキの構成カード枚数の合計がデッキ上限枚数と一致しないとき、返るデッキのis_validはfalseになる", func(t *testing.T) {
+		t.Run("取得したデッキがデッキ内容検証・施策整合検証をともに満たすが、構成カード枚数の合計がデッキ上限枚数と一致しないとき、返るデッキのis_validはfalseになる", func(t *testing.T) {
 			interactor, deckRepo, playerCardRepo, _ := newDeckFixture(t)
 			cards := baselineDeckCards(fxPlayerID, 1)
 			cards[0].Count = 2 // 合計を 29 に減らし、デッキ上限枚数と不一致にする
