@@ -1,9 +1,9 @@
 name: Publish
 
-# api-card (Go module) / api-card-npm (Cloudsmith npm) / api-card-dotnet (Cloudsmith NuGet)
-# を手動でタグ付け・公開する。
+# api-card (Go モジュール) / api-card-npm (Cloudsmith の npm) / api-card-dotnet (Cloudsmith の NuGet)
+# を手動でタグ付けして公開する。
 # バージョンを上げるタイミングは人が判断して workflow_dispatch で実行する。
-# タグの手動打ちは禁止 — このワークフローがモジュールタグの唯一の発行元。
+# モジュールタグの発行元は本ワークフローだけなので、タグを手動で打たない。
 
 on:
   workflow_dispatch:

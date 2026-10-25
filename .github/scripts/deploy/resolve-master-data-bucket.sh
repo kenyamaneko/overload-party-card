@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# resolve-master-data-bucket.sh — publish 先のバケットを決め、対象の指定に漏れが無いか確かめる。
+# 公開先のバケットを決め、対象の指定に漏れが無いか確かめる。
 set -euo pipefail
 
 : "${ENVIRONMENT:?ENVIRONMENT env required}"
@@ -14,7 +14,7 @@ case "${ENVIRONMENT}" in
     ;;
 esac
 
-# 未設定のまま進むと publish 先を誤るため、空なら止める
+# 未設定のまま進むと公開先を誤るため、空なら止める
 if [ -z "${bucket}" ]; then
   echo "::error::master data bucket variable is not set for ${ENVIRONMENT}"
   exit 1

@@ -1,7 +1,7 @@
 name: Publish master data
 
 # battle は起動時にこのバケットからカード定義を読む。battle が新しいリビジョンになる
-# タイミングは card のデプロイと独立しているため、publish もデプロイから切り離して
+# タイミングは card のデプロイと独立しているため、公開もデプロイから切り離して
 # 単独で実行できるようにする。
 on:
   push:
@@ -10,12 +10,13 @@ on:
       - "data/**"
       - "scripts/generate_cards.py"
       - "scripts/generate_products.py"
+      - "scripts/generation_io.py"
       - ".github/actions/publish-master-data/**"
       - ".github/scripts/deploy/generate-master-data.sh"
       - ".github/scripts/deploy/upload-master-data.sh"
       - ".github/scripts/deploy/resolve-master-data-bucket.sh"
       - ".github/scripts/ci/check-codegen-drift.sh"
-      - ".github/scripts/ci/checkout-common.sh"
+      - ".github/scripts/ci/checkout-repo.sh"
       - ".github/workflows/publish-master-data.yaml"
   workflow_dispatch:
     inputs:
@@ -62,7 +63,7 @@ jobs:
         with:
           ref: ${{ inputs.version || github.ref }}
 
-      # マスターデータの生成器が common のゲーム定数を読むため、private リポジトリを取得できるようにする
+      # マスターデータの生成器が common のゲーム定数と battle のゲームロジック定数を読むため、非公開リポジトリを取得できるようにする
       - name: Configure private repo auth
         uses: kenyamaneko/overload-party-common/.github/actions/setup-go-private-modules@main
         with:
