@@ -1,70 +1,76 @@
 package rest
 
 import (
+	"context"
 	"encoding/base64"
-	"log/slog"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/kenyamaneko/overload-party-card/internal/port"
+	"github.com/kenyamaneko/overload-party-card/internal/handler/pubsub"
+	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 )
 
-// pubsubPushEnvelope は Cloud Pub/Sub push subscription が送るリクエスト本文。
-// data は binding:"required" で空文字も bind エラー扱いにし、message 自体の
-// 欠落・data の欠落・data の空文字を同じ envelope 不正として一本化する。
-type pubsubPushEnvelope struct {
-	Message struct {
-		Data string `json:"data" binding:"required"`
-	} `json:"message" binding:"required"`
-}
+var (
+	errMalformedEnvelope   = errors.New(malformedEnvelopeMessage)
+	errMalformedBase64Data = errors.New(malformedBase64DataMessage)
+)
 
-// PubSubPushHandler は Cloud Pub/Sub push subscription からの配信を受け取り、
-// デコードした payload を対応する port.MessageHandler へ渡します。
+// PubSubPushHandler は Cloud Pub/Sub push subscription からの配信を受け取り、対応する購読へ渡します。
 type PubSubPushHandler struct {
-	playerOnboarded   port.MessageHandler
-	cardPackPurchased port.MessageHandler
+	playerOnboardedSubscriber   *pubsub.PlayerOnboardedSubscriber
+	cardPackPurchasedSubscriber *pubsub.CardPackPurchasedSubscriber
 }
 
 // NewPubSubPushHandler は PubSubPushHandler を生成します。
-func NewPubSubPushHandler(playerOnboarded, cardPackPurchased port.MessageHandler) *PubSubPushHandler {
+func NewPubSubPushHandler(
+	playerOnboardedSubscriber *pubsub.PlayerOnboardedSubscriber,
+	cardPackPurchasedSubscriber *pubsub.CardPackPurchasedSubscriber,
+) *PubSubPushHandler {
 	return &PubSubPushHandler{
-		playerOnboarded:   playerOnboarded,
-		cardPackPurchased: cardPackPurchased,
+		playerOnboardedSubscriber:   playerOnboardedSubscriber,
+		cardPackPurchasedSubscriber: cardPackPurchasedSubscriber,
 	}
 }
 
-// HandlePlayerOnboarded は player-onboarded-card-sub の push 配信を受け取ります。
-func (h *PubSubPushHandler) HandlePlayerOnboarded(c *gin.Context) {
-	handlePubSubPush(c, h.playerOnboarded)
+// ReceivePlayerOnboarded は player-onboarded-card-sub の push 配信を受け取ります。
+func (h *PubSubPushHandler) ReceivePlayerOnboarded(c *gin.Context) {
+	receivePush(c, h.playerOnboardedSubscriber.GrantInitialCards)
 }
 
-// HandleCardPackPurchased は card-pack-purchased-card-sub の push 配信を受け取ります。
-func (h *PubSubPushHandler) HandleCardPackPurchased(c *gin.Context) {
-	handlePubSubPush(c, h.cardPackPurchased)
+// ReceiveCardPackPurchased は card-pack-purchased-card-sub の push 配信を受け取ります。
+func (h *PubSubPushHandler) ReceiveCardPackPurchased(c *gin.Context) {
+	receivePush(c, h.cardPackPurchasedSubscriber.GrantPurchasedCards)
 }
 
-// handlePubSubPush は push envelope をデコードして handler に渡し、結果を応答へ変換する。
-func handlePubSubPush(c *gin.Context, handler port.MessageHandler) {
-	var envelope pubsubPushEnvelope
-	if err := c.ShouldBindJSON(&envelope); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "pubsub push: malformed envelope"})
-		return
-	}
-
-	data, err := base64.StdEncoding.DecodeString(envelope.Message.Data)
+// receivePush は push 配信のメッセージを購読に渡し、成否を応答にします。
+func receivePush(c *gin.Context, subscribe func(ctx context.Context, payload []byte) error) {
+	payload, err := readPushedPayload(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "pubsub push: malformed base64 data"})
+		respondBadRequest(c, err.Error())
 		return
 	}
-
-	if err := handler(c.Request.Context(), data); err != nil {
-		slog.Error("pubsub push handler failed",
-			"path", c.Request.URL.Path,
-			"error", err,
-		)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": internalErrorMessage})
+	if err := subscribe(c.Request.Context(), payload); err != nil {
+		respondInternalError(c, err)
 		return
 	}
 	c.Status(http.StatusOK)
+}
+
+// readPushedPayload は push 配信の本文から、イベントの内容を取り出します。
+// message・data の欠落と空の data は同じ不正な本文として扱います。
+func readPushedPayload(c *gin.Context) ([]byte, error) {
+	var envelope apicard.PubSubPushEnvelope
+	if err := c.ShouldBindJSON(&envelope); err != nil {
+		var corruptInputError base64.CorruptInputError
+		if errors.As(err, &corruptInputError) {
+			return nil, errMalformedBase64Data
+		}
+		return nil, errMalformedEnvelope
+	}
+	if len(envelope.Message.Data) == 0 {
+		return nil, errMalformedEnvelope
+	}
+	return envelope.Message.Data, nil
 }

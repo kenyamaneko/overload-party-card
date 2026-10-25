@@ -6,59 +6,68 @@ import (
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
 )
 
-// CardRepo はカード定義の永続化を抽象化するインターフェースです。
-type CardRepo interface {
+// CardRepository はカード定義の永続化を抽象化するインターフェースです。
+type CardRepository interface {
+	// FindAll は有効な全カード定義をカード ID の昇順で返します。
 	FindAll(ctx context.Context) ([]*domain.Card, error)
 }
 
-// ProductRepo はプロダクト定義の永続化を抽象化するインターフェースです。
-type ProductRepo interface {
+// ProductRepository はプロダクトの永続化を抽象化するインターフェースです。
+type ProductRepository interface {
+	// FindAll は有効な全プロダクトをプロダクト ID の昇順で返します。
 	FindAll(ctx context.Context) ([]*domain.Product, error)
 }
 
-// InitiativeRepo は施策定義の永続化を抽象化するインターフェースです。
-type InitiativeRepo interface {
+// InitiativeRepository は施策の永続化を抽象化するインターフェースです。
+type InitiativeRepository interface {
+	// FindAll は有効な全施策を施策 ID の昇順で返します。
 	FindAll(ctx context.Context) ([]*domain.Initiative, error)
 }
 
-// FactionClient はプレイヤーの所持ファクションを所有サービス (account) から取得します。
+// FactionClient はプレイヤーの所持陣営を所有サービス (account) から取得します。
 type FactionClient interface {
+	// ListPlayerFactions は指定プレイヤーが所持する陣営の一覧を返します。
 	ListPlayerFactions(ctx context.Context, playerID string) ([]string, error)
 }
 
-// PlayerCardRepo はプレイヤー所持カードの永続化を抽象化するインターフェースです。
-type PlayerCardRepo interface {
+// PlayerCardRepository はプレイヤーの所持カードの永続化を抽象化するインターフェースです。
+type PlayerCardRepository interface {
+	// GetPlayerCards は指定プレイヤーの所持カードをカード ID・アート番号の昇順で返します。
 	GetPlayerCards(ctx context.Context, playerID string) ([]*domain.PlayerCard, error)
-	// AddCards は UPSERT-with-add セマンティクスで所持カードを追加します。
-	// 各 CardPackCard.Copies が個別に加算されます。戻り値は加算したコピー総数です。
-	AddCards(ctx context.Context, playerID string, cards []domain.CardPackCard) (int, error)
+	// AddCards は指定の所持カードを、プレイヤー・カード・アート番号ごとに所持枚数へ加算します。
+	// 所持していないカードは新たに所持カードに加えます。
+	AddCards(ctx context.Context, cards []domain.PlayerCard) error
 }
 
-// CardPackRepo は配布パックマスター (card.card_pack) の永続化を抽象化するインターフェースです。
-// 実装は配布リクエストごとに DB を引く前提でキャッシュは行いません
-// (起動時キャッシュを使わない設計、common の ADR に記録)。
-type CardPackRepo interface {
-	// GetPack は pack_id に対応するパック定義を返します。
-	// 行が存在しない場合 ErrNotFound を返します。運用停止や内包カード 0 件の判定は
-	// 呼び出し元が行います。
+// CardPackRepository は配布パックの永続化を抽象化するインターフェースです。
+type CardPackRepository interface {
+	// GetPack はパック ID に対応する配布パックを返します。
+	// パックが存在しない場合は ErrNotFound を返します。
 	GetPack(ctx context.Context, packID string) (*domain.CardPack, error)
 }
 
-// ProcessedEventRepo は処理済み Pub/Sub イベントを追跡するインターフェースです。
-type ProcessedEventRepo interface {
-	// Insert は新規行が挿入された場合 true を返します（冪等性ガード）。
-	Insert(ctx context.Context, eventID, eventType string) (bool, error)
+// ProcessedEventRepository は処理済みの Pub/Sub イベントの記録を抽象化するインターフェースです。
+type ProcessedEventRepository interface {
+	// Insert はイベントを処理済みとして記録します。
+	// 初めて記録したときは isInserted が true、記録済みのイベントのときは false になります。
+	Insert(ctx context.Context, eventID, eventType string) (isInserted bool, err error)
 }
 
-// DeckRepo はデッキの永続化を抽象化するインターフェースです。
-type DeckRepo interface {
-	// Create は decks 行と deck_cards 行を 1 トランザクションで挿入し、
-	// 採番された deck_id を返します。入力は mutation しません。
+// DeckRepository はデッキの永続化を抽象化するインターフェースです。
+type DeckRepository interface {
+	// Create はデッキとそのカード構成を同時に作成し、採番したデッキ ID を返します。
 	Create(ctx context.Context, deck domain.Deck, deckCardEntries []domain.DeckCardEntry) (int64, error)
+	// FindByPlayerID は指定プレイヤーの全デッキを更新日時の降順で返します。
 	FindByPlayerID(ctx context.Context, playerID string) ([]*domain.Deck, error)
+	// FindByID は指定プレイヤーの指定デッキを返します。
+	// 該当するデッキが無い場合は ErrNotFound を返します。
 	FindByID(ctx context.Context, playerID string, deckID int64) (*domain.Deck, error)
+	// GetDeckCards は指定デッキのカード構成を返します。
 	GetDeckCards(ctx context.Context, playerID string, deckID int64) ([]domain.DeckCard, error)
-	// Update はデッキを更新し deck_cards を差し替えます。入力は mutation しません。
+	// Update はデッキを更新し、カード構成を指定の内容に差し替えます。
+	// 該当するデッキが無い場合は ErrNotFound を返します。
 	Update(ctx context.Context, deck domain.Deck, deckCardEntries []domain.DeckCardEntry) error
+	// Delete は指定デッキとそのカード構成を削除します。
+	// 該当するデッキが無い場合は ErrNotFound を返します。
 	Delete(ctx context.Context, playerID string, deckID int64) error
 }

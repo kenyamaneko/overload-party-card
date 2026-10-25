@@ -1,2 +1,2 @@
-// Package presenter は domain ↔ wire DTO の境界変換を集約する層です。
+// Package presenter は domain の型と API 契約の型を相互に変換する。
 package presenter

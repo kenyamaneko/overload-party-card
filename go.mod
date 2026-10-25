@@ -5,7 +5,9 @@ go 1.25.13
 require (
 	cloud.google.com/go/cloudsqlconn v1.23.0
 	github.com/gin-gonic/gin v1.11.0
+	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/jackc/pgx/v5 v5.10.0
+	github.com/kenyamaneko/overload-party-account/packages/api-account v0.3.0
 	github.com/kenyamaneko/overload-party-card/packages/api-card v0.0.0
 	github.com/kenyamaneko/overload-party-common/packages/game-design-constants v0.1.5
 	github.com/kenyamaneko/overload-party-gateway/packages/internalauth-go v0.3.0
@@ -15,7 +17,6 @@ require (
 	github.com/testcontainers/testcontainers-go v0.42.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.42.0
 	golang.org/x/sync v0.22.0
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 // api-card lives inside this repo; publish/tag happens via CI (no manual tag).
@@ -56,7 +57,6 @@ require (
 	github.com/go-playground/validator/v10 v10.30.1 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
-	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -115,4 +115,5 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260720211330-0afa2a65878a // indirect
 	google.golang.org/grpc v1.82.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

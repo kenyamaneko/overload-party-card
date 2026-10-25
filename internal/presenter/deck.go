@@ -5,58 +5,91 @@ import (
 	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 )
 
-// ToDeck は domain.Deck と構成カード・有効性フラグから wire の Deck を組み立てます。
-// isValid は usecase 側で算出された派生値です。
-func ToDeck(d *domain.Deck, cards []domain.DeckCard, isValid bool) *apicard.Deck {
-	return &apicard.Deck{
-		PlayerID:  d.PlayerID,
-		DeckID:    d.DeckID,
-		DeckName:  d.DeckName,
-		Faction:   d.Faction,
-		ProductID: d.ProductID,
-		RoutineID: d.RoutineID,
-		SpecialID: d.SpecialID,
-		IsValid:   isValid,
-		PlaymatNo: d.PlaymatNo,
-		SleeveNo:  d.SleeveNo,
-		CreatedAt: d.CreatedAt,
-		UpdatedAt: d.UpdatedAt,
-		DeckCards: normalizeDeckCards(ToDeckCards(cards)),
+// ToDeck はデッキを API の応答の型に変換します。カード構成が空のときは、応答にカード構成の項目を含めません。
+func ToDeck(detail domain.DeckDetail) *apicard.Deck {
+	deck := toDeckWithoutCards(detail)
+	if len(detail.Cards) > 0 {
+		deckCards := ToDeckCards(detail.Cards)
+		deck.DeckCards = &deckCards
 	}
+	return deck
 }
 
-// normalizeDeckCards は空 slice を nil ポインタに正規化し omitempty を機能させます。
-func normalizeDeckCards(cards []apicard.DeckCard) *[]apicard.DeckCard {
-	if len(cards) == 0 {
-		return nil
-	}
-	return &cards
+// ToDeckWithCards はデッキを API の応答の型に変換します。カード構成が空のときも、応答にカード構成の項目を含めます。
+func ToDeckWithCards(detail domain.DeckDetail) *apicard.Deck {
+	deck := toDeckWithoutCards(detail)
+	deckCards := ToDeckCards(detail.Cards)
+	deck.DeckCards = &deckCards
+	return deck
 }
 
-// ToDeckCards は domain.DeckCard slice を wire の DeckCard slice に詰め替えます。
+// ToDecks はデッキの一覧を API の応答の型に変換します。
+func ToDecks(details []domain.DeckDetail) []*apicard.Deck {
+	decks := make([]*apicard.Deck, len(details))
+	for i, detail := range details {
+		decks[i] = ToDeck(detail)
+	}
+	return decks
+}
+
+// ToDeckCards はデッキのカード構成を API の応答の型に変換します。
 func ToDeckCards(cards []domain.DeckCard) []apicard.DeckCard {
 	result := make([]apicard.DeckCard, len(cards))
-	for i, c := range cards {
+	for i, card := range cards {
 		result[i] = apicard.DeckCard{
-			PlayerID: c.PlayerID,
-			DeckID:   c.DeckID,
-			CardID:   c.CardID,
-			ArtNo:    c.ArtNo,
-			Count:    c.Count,
+			PlayerID: card.PlayerID,
+			DeckID:   card.DeckID,
+			CardID:   card.CardID,
+			ArtNo:    card.ArtNo,
+			Count:    card.Count,
 		}
 	}
 	return result
 }
 
-// DeckCardEntriesFromRequest はデッキ作成・更新リクエストの wire 入力を
-// domain.DeckCardEntry slice に変換します。
-func DeckCardEntriesFromRequest(reqEntries []apicard.DeckCardEntry) []domain.DeckCardEntry {
-	result := make([]domain.DeckCardEntry, len(reqEntries))
-	for i, e := range reqEntries {
+// ToDeckDraftFromCreateRequest はデッキ作成リクエストを、デッキの作成・更新で指定する内容に変換します。
+func ToDeckDraftFromCreateRequest(request apicard.DeckCreateRequest) domain.DeckDraft {
+	return domain.DeckDraft{
+		DeckName:  request.DeckName,
+		Faction:   request.Faction,
+		ProductID: request.ProductID,
+		RoutineID: request.RoutineID,
+		SpecialID: request.SpecialID,
+		PlaymatNo: request.PlaymatNo,
+		SleeveNo:  request.SleeveNo,
+		Cards:     toDeckCardEntries(request.Cards),
+	}
+}
+
+// ToDeckDraftFromUpdateRequest はデッキ更新リクエストを、デッキの作成・更新で指定する内容に変換します。
+func ToDeckDraftFromUpdateRequest(request apicard.DeckUpdateRequest) domain.DeckDraft {
+	return ToDeckDraftFromCreateRequest(apicard.DeckCreateRequest(request))
+}
+
+func toDeckWithoutCards(detail domain.DeckDetail) *apicard.Deck {
+	return &apicard.Deck{
+		PlayerID:  detail.Deck.PlayerID,
+		DeckID:    detail.Deck.DeckID,
+		DeckName:  detail.Deck.DeckName,
+		Faction:   detail.Deck.Faction,
+		ProductID: detail.Deck.ProductID,
+		RoutineID: detail.Deck.RoutineID,
+		SpecialID: detail.Deck.SpecialID,
+		IsValid:   detail.IsValid,
+		PlaymatNo: detail.Deck.PlaymatNo,
+		SleeveNo:  detail.Deck.SleeveNo,
+		CreatedAt: detail.Deck.CreatedAt,
+		UpdatedAt: detail.Deck.UpdatedAt,
+	}
+}
+
+func toDeckCardEntries(entries []apicard.DeckCardEntry) []domain.DeckCardEntry {
+	result := make([]domain.DeckCardEntry, len(entries))
+	for i, entry := range entries {
 		result[i] = domain.DeckCardEntry{
-			CardID: e.CardID,
-			ArtNo:  e.ArtNo,
-			Count:  e.Count,
+			CardID: entry.CardID,
+			ArtNo:  entry.ArtNo,
+			Count:  entry.Count,
 		}
 	}
 	return result

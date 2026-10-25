@@ -1,9 +1,15 @@
 package domain
 
-// Product は陣営に紐づくプロダクト定義。
+// Product は陣営に紐づくプロダクトです。
 type Product struct {
-	ProductID   string `json:"product_id" db:"product_id"`
-	Faction     string `json:"faction" db:"faction"`
-	ProductName string `json:"product_name" db:"product_name"`
-	IsActive    bool   `json:"is_active" db:"is_active"`
+	ProductID   string
+	Faction     string
+	ProductName string
+	IsActive    bool
+}
+
+// ProductWithInitiatives はプロダクトと、そのプロダクトに属する施策の組です。
+type ProductWithInitiatives struct {
+	Product     Product
+	Initiatives []Initiative
 }

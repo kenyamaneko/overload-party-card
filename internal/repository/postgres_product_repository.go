@@ -10,20 +10,20 @@ import (
 	"github.com/kenyamaneko/overload-party-card/internal/port"
 )
 
-var _ port.ProductRepo = (*PgProductRepository)(nil)
+var _ port.ProductRepository = (*PostgresProductRepository)(nil)
 
-// PgProductRepository は PostgreSQL を使用した ProductRepo の実装です。
-type PgProductRepository struct {
+// PostgresProductRepository は PostgreSQL を使用した ProductRepository の実装です。
+type PostgresProductRepository struct {
 	pool *pgxpool.Pool
 }
 
-// NewPgProductRepository は PgProductRepository を生成します。
-func NewPgProductRepository(pool *pgxpool.Pool) *PgProductRepository {
-	return &PgProductRepository{pool: pool}
+// NewPostgresProductRepository は PostgresProductRepository を生成します。
+func NewPostgresProductRepository(pool *pgxpool.Pool) *PostgresProductRepository {
+	return &PostgresProductRepository{pool: pool}
 }
 
-// FindAll は有効な全プロダクト定義を返します。
-func (r *PgProductRepository) FindAll(ctx context.Context) ([]*domain.Product, error) {
+// FindAll は有効な全プロダクトをプロダクト ID の昇順で返します。
+func (r *PostgresProductRepository) FindAll(ctx context.Context) ([]*domain.Product, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT product_id, faction, product_name, is_active
 		 FROM card.products WHERE is_active = true ORDER BY product_id`,
