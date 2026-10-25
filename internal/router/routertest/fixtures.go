@@ -230,7 +230,7 @@ type DeckRequestBody struct {
 func ToDeckRequestCards(composition []CardCount) []DeckRequestCard {
 	cards := make([]DeckRequestCard, 0, len(composition))
 	for _, entry := range composition {
-		cards = append(cards, DeckRequestCard{CardID: entry.CardID, ArtNo: entry.ArtNo, Count: entry.Count})
+		cards = append(cards, DeckRequestCard(entry))
 	}
 	return cards
 }
