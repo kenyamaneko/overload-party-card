@@ -26,24 +26,24 @@ type Config struct {
 	Env          Env
 	DatabaseConn string
 
-	// DatabaseIAMAuthEnabled は Cloud SQL への接続を Cloud SQL Go Connector 経由の
+	// IsDatabaseIAMAuthEnabled は Cloud SQL への接続を Cloud SQL Go Connector 経由の
 	// 自動 IAM データベース認証で行うかどうかを表す。
-	DatabaseIAMAuthEnabled bool
+	IsDatabaseIAMAuthEnabled bool
 
 	// CloudSQLConnectionName は Cloud SQL インスタンスの接続名 (project:region:instance)。
-	// DatabaseIAMAuthEnabled が true のときのみ必須。
+	// IsDatabaseIAMAuthEnabled が true のときのみ必須。
 	CloudSQLConnectionName string
 
 	// InternalAuthPublicKey は内部サービス間 JWT (RS256) を検証する gateway の公開鍵。PEM 形式。
 	InternalAuthPublicKey string
 
-	// AccountServiceURL はデッキ検証時に faction 所持を照会する account サービスの URL。
+	// AccountServiceURL はデッキ検証時に陣営の所持を照会する account サービスの URL。
 	AccountServiceURL string
 }
 
-// FromEnv は環境変数から Config を構築します。
-// 未設定の必須環境変数があれば即エラーで返し、デフォルトへの暗黙 fallback は行いません。
-func FromEnv() (*Config, error) {
+// LoadFromEnv は環境変数から Config を構築します。
+// 未設定の必須環境変数があるときはエラーを返します。
+func LoadFromEnv() (*Config, error) {
 	cfg := &Config{
 		DatabaseConn:          os.Getenv("DATABASE_CONN"),
 		InternalAuthPublicKey: os.Getenv("INTERNAL_AUTH_PUBLIC_KEY"),
@@ -78,13 +78,13 @@ func FromEnv() (*Config, error) {
 	rawIAMAuth := os.Getenv("DATABASE_IAM_AUTH_ENABLED")
 	switch rawIAMAuth {
 	case "true":
-		cfg.DatabaseIAMAuthEnabled = true
+		cfg.IsDatabaseIAMAuthEnabled = true
 	case "false":
-		cfg.DatabaseIAMAuthEnabled = false
+		cfg.IsDatabaseIAMAuthEnabled = false
 	default:
 		return nil, fmt.Errorf("config: DATABASE_IAM_AUTH_ENABLED must be %q or %q, got %q", "true", "false", rawIAMAuth)
 	}
-	if cfg.DatabaseIAMAuthEnabled {
+	if cfg.IsDatabaseIAMAuthEnabled {
 		cfg.CloudSQLConnectionName = os.Getenv("CLOUDSQL_CONNECTION_NAME")
 		if cfg.CloudSQLConnectionName == "" {
 			return nil, fmt.Errorf("config: CLOUDSQL_CONNECTION_NAME is required when DATABASE_IAM_AUTH_ENABLED is true")

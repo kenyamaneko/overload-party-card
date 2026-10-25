@@ -1,6 +1,6 @@
-# Product master data (SSoT).
+# プロダクトのマスターデータ (SSoT)。
 #
-# 施策 (Initiative) は data/initiatives.yaml で別管理する。
+# 施策は data/initiatives.yaml で別に管理する。
 
 products:
   - product_id: PD-0001

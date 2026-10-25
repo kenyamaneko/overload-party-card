@@ -1,57 +1,49 @@
 #!/usr/bin/env python3
-"""Generate card data outputs from YAML card definitions.
+"""YAML のカード定義から、配布用 JSON・カード一覧文書・初期投入 SQL を生成する。
 
-Outputs:
-  - data/cache/cards_gen.json                     (Go embedded via data/cache/embed.go)
-  - docs/CARDS.md                                 (human-readable card list)
-  - db/seed/cards_seed.sql                        (PostgreSQL UPSERT seed)
+実行には、ゲーム定数を持つ overload-party-common の場所を環境変数 COMMON_REPO で、
+ゲームロジック定数を持つ overload-party-battle の場所を環境変数 BATTLE_REPO で渡す。
 
-Usage:
-    python3 scripts/generate_cards.py
+    COMMON_REPO=../overload-party-common BATTLE_REPO=../overload-party-battle \\
+        python3 scripts/generate_cards.py
 """
 
-import json
 import os
 import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:
-    print("ERROR: pyyaml is required. Install with: pip install pyyaml", file=sys.stderr)
-    sys.exit(1)
+from generation_io import (
+    exit_with_error,
+    exit_with_validation_errors,
+    format_sql_boolean,
+    load_yaml_file,
+    quote_sql_jsonb,
+    quote_sql_string,
+    write_json_file,
+    write_lines_file,
+)
 
-# ─── Paths ──────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parent.parent
 YAML_DIR = ROOT / "data" / "cards"
 MD_OUT = ROOT / "docs" / "CARDS.md"
 SEED_OUT = ROOT / "db" / "seed" / "cards_seed.sql"
 GO_JSON_OUT = ROOT / "data" / "cache" / "cards_gen.json"
-STARTER_DECKS_YAML = ROOT / "data" / "mock" / "starter_decks.yaml"
-STARTER_DECKS_JSON_OUT = ROOT / "data" / "cache" / "starter_decks_gen.json"
 
-# CI では common を兄弟ディレクトリに置けないため、場所を環境変数で差し替えられるようにする
 COMMON_REPO_ENV = "COMMON_REPO"
-DEFAULT_COMMON_REPO = ROOT.parent / "overload-party-common"
+COMMON_REPO_NAME = "overload-party-common"
 GAME_DESIGN_CONSTANTS_RELPATH = Path("data") / "game_design_constants.yaml"
+GAME_DESIGN_CONSTANTS_NAME = "game design constants"
+BATTLE_REPO_ENV = "BATTLE_REPO"
+BATTLE_REPO_NAME = "overload-party-battle"
+GAME_LOGIC_CONSTANTS_RELPATH = Path("data") / "game_logic_constants.yaml"
+GAME_LOGIC_CONSTANTS_NAME = "game logic constants"
 
-# ─── Constants ──────────────────────────────────────────
-# 3階層分類（Zone / CardType / Subtype）。Phase 2b で導入。
-# 参考: overload-party-battle/memory/project_card_taxonomy.md
 CARD_TYPE_COMPUTE = "Compute"
 CARD_TYPE_DATA = "DataResource"
+# ログカードは用語集にあるカード種別だが、共通のゲーム定数の card_types に無いため、カード定義の種別としてここで加える
 CARD_TYPE_LOG = "Log"
-RESOURCE_CARD_TYPES = {CARD_TYPE_COMPUTE, CARD_TYPE_DATA}
-SUPPORT_CARD_TYPES = {"Platform", "Attachment", "Strategy", "Reactive", "Incident"}
-ALL_CARD_TYPES = RESOURCE_CARD_TYPES | SUPPORT_CARD_TYPES | {CARD_TYPE_LOG}
-
-# Subtype を持つ CardType と、その許容 Subtype 集合。
-SUBTYPES_BY_CARD_TYPE = {
-    CARD_TYPE_COMPUTE: {"VM", "Container", "Orchestrator", "Serverless", "AI/ML"},
-    CARD_TYPE_DATA:    {"Database", "ObjectStorage", "CacheDB"},
-}
 
 EFFECT_GROUP_KEY = "group"
 EFFECT_CARD_TYPE_KEY = "card_type"
@@ -59,18 +51,55 @@ EFFECT_SUBTYPE_KEY = "subtype"
 SUBTYPES_KEY = "subtypes"
 RESOURCE_GROUPS_KEY = "resource_groups"
 CARD_TYPES_KEY = "card_types"
+TRIGGER_TYPES_KEY = "trigger_types"
+EFFECT_OPS_KEY = "effect_ops"
+BUFF_TYPES_KEY = "buff_types"
+EFFECT_DURATIONS_KEY = "effect_durations"
+SELECTOR_KEYWORDS_KEY = "selector_keywords"
+PLAYER_REFS_KEY = "player_refs"
+
+EFFECT_TRIGGER_KEY = "trigger"
+EFFECT_OP_LIST_KEY = "ops"
+EFFECT_CHOICE_KEY = "choice"
+CHOICE_USE_KEY = "use"
+OP_ITEM = "op"
+OP_BUFF_KEY = "buff"
+OP_DURATION_KEY = "duration"
+OP_SELECTOR_KEY = "selector"
+SELECTOR_OWNER_KEY = "owner"
 
 VALID_RESTRICTION = {"unlimited", "limited", "semi_limited", "forbidden"}
-VALID_FACTIONS = {"SHE", "Tenki", "Sugar", "Tuners", "Neutral"}
+FACTION_ORDER = ["SHE", "Tenki", "Sugar", "Tuners", "Neutral"]
+VALID_FACTIONS = frozenset(FACTION_ORDER)
+FACTION_FILE_MAP = {"SHE": "sd"}
+FACTION_FILE_REQUIRED_KEYS = ("faction", "display_name", "cards")
 
+REQUIRED_CARD_FIELDS = [
+    "card_no", "card_id", "card_name", "const_name", "card_type",
+    "resizable", "elastic", "restriction", "is_active", "stats",
+]
+REQUIRED_LOG_CARD_FIELDS = [
+    "card_no", "card_id", "card_name", "const_name", "card_type", "restriction", "is_active",
+]
+VALID_DEPLOY_TURNS = (0, 1, 2)
 COMPUTE_STAT_KEYS = {"throughput", "availability", "maintenance_cost", "sla_penalty"}
 DATA_STAT_KEYS = {"yield", "availability", "maintenance_cost", "sla_penalty"}
+ALLOWED_STAT_KEYS = frozenset({
+    "throughput", "throughput_max", "yield", "yield_max",
+    "availability", "maintenance_cost", "sla_penalty",
+})
 
-FACTION_ORDER = ["SHE", "Tenki", "Sugar", "Tuners", "Neutral"]
-FACTION_FILE_MAP = {"SHE": "sd"}
+OPTIONAL_CARD_FIELD_DEFAULTS = {
+    "deploy_turns": 0,
+    "resource_label": "",
+    "elastic_increment": 0,
+    "free_tier": 0,
+    "cost_per_request": 0,
+    "resizable": False,
+    "elastic": False,
+}
+NO_EFFECT_TEXT_MARK = "—"
 
-# 各表示カテゴリのフィルタ条件: (by_field, allowed_values, table_kind)
-# table_kind: "compute" | "data" | "support" — Markdown 表のフォーマットを決める
 CATEGORY_ORDER = [
     ("コンピュート系リソース", "subtype",   {"VM", "Container", "Orchestrator", "Serverless"}, "compute"),
     ("AI/ML系リソース",        "subtype",   {"AI/ML"},                                          "compute"),
@@ -81,118 +110,177 @@ CATEGORY_ORDER = [
     ("ストラテジー",            "card_type", {"Strategy"},                                       "support"),
     ("インシデント",            "card_type", {"Incident"},                                       "support"),
     ("リアクティブ",            "card_type", {"Reactive"},                                       "support"),
-    ("ログ",                   "card_type", {"Log"},                                            "support"),
+    ("ログカード",             "card_type",{CARD_TYPE_LOG},                                    "support"),
 ]
 
 
-# ─── Load ───────────────────────────────────────────────
+class CardGenerationError(Exception):
+    """入力が誤っていて、カードの生成を続けられないことを表す。"""
+
+
+@dataclass(frozen=True)
+class EffectTaxonomy:
+    """効果に書ける値と、リソースの括り。"""
+
+    card_types: frozenset
+    subtypes_by_card_type: dict
+    resource_groups: dict
+    triggers: frozenset
+    ops: frozenset
+    buffs: frozenset
+    durations: frozenset
+    selector_keywords: frozenset
+    selector_owners: frozenset
+
+    @property
+    def subtypes(self):
+        """全カードタイプの subtype をまとめた集合。"""
+        return frozenset(
+            subtype for subtypes in self.subtypes_by_card_type.values() for subtype in subtypes
+        )
+
+
 def load_all_cards():
-    """Load all YAML files and return (all_cards, faction_data)."""
+    """陣営ごとの定義ファイルを読み込み、全カードと陣営ごとの情報を返す。
+
+    Returns:
+        全カードのリストと、陣営名から表示名とカードのリストへの辞書の組。
+
+    Raises:
+        CardGenerationError: 陣営の定義ファイルが無い、必須項目が無い、
+            または項目の陣営がファイルの陣営と合わないとき。
+    """
     all_cards = []
     faction_data = {}
 
     for faction in FACTION_ORDER:
-        file_stem = FACTION_FILE_MAP.get(faction, faction.lower())
-        filepath = YAML_DIR / f"{file_stem}.yaml"
-        if not filepath.exists():
-            print(f"WARNING: {filepath} not found, skipping", file=sys.stderr)
-            continue
-
-        with open(filepath, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-
-        faction_name = data.get("faction", faction)
-        display_name = data.get("display_name", faction_name)
-        cards = data.get("cards", [])
-
+        data = _load_faction_file(faction)
+        cards = data["cards"]
         for card in cards:
-            card.setdefault("faction", faction_name)
-
-        faction_data[faction_name] = {
-            "display_name": display_name,
-            "cards": cards,
-            "restriction_cards": data.get("restriction_cards", []),
-        }
+            card.setdefault("faction", faction)
+        faction_data[faction] = {"display_name": data["display_name"], "cards": cards}
         all_cards.extend(cards)
 
     return all_cards, faction_data
 
 
-# ─── Game design constants (common SSoT) ───────────────
-class CardGenerationError(Exception):
-    """Raised when card generation cannot proceed because its inputs are malformed."""
+def _load_faction_file(faction):
+    path = YAML_DIR / f"{FACTION_FILE_MAP.get(faction, faction.lower())}.yaml"
+    if not path.exists():
+        raise CardGenerationError(f"faction definition file not found: {path}")
 
-
-@dataclass(frozen=True)
-class EffectTaxonomy:
-    """Canonical card_type / subtype values and the resource groups that expand into them."""
-
-    card_types: frozenset
-    subtypes: frozenset
-    resource_groups: dict
+    data = load_yaml_file(path)
+    for key in FACTION_FILE_REQUIRED_KEYS:
+        if key not in data:
+            raise CardGenerationError(f"{path}: missing required field '{key}'")
+    if data["faction"] != faction:
+        raise CardGenerationError(
+            f"{path}: faction '{data['faction']}' does not match the faction '{faction}' of this file"
+        )
+    return data
 
 
 def resolve_common_constants_path():
-    """Locate the game design constants owned by common.
-
-    Returns:
-        Path to game_design_constants.yaml, taken from the COMMON_REPO environment
-        variable when set and from the sibling checkout of common otherwise.
-    """
-    repo_root = os.environ.get(COMMON_REPO_ENV)
-    base = Path(repo_root) if repo_root else DEFAULT_COMMON_REPO
-    return base / GAME_DESIGN_CONSTANTS_RELPATH
-
-
-def load_effect_taxonomy(constants_path):
-    """Load the canonical card_type / subtype values and the resource groups from common.
-
-    Args:
-        constants_path: Path to common's game_design_constants.yaml.
-
-    Returns:
-        EffectTaxonomy built from the file.
+    """common が持つゲーム定数のファイルの場所を返す。
 
     Raises:
-        CardGenerationError: When the file is missing or lacks a required key.
+        CardGenerationError: 環境変数 COMMON_REPO が設定されていないとき。
     """
-    path = Path(constants_path)
-    if not path.exists():
+    return _resolve_constants_path(COMMON_REPO_ENV, COMMON_REPO_NAME, GAME_DESIGN_CONSTANTS_RELPATH)
+
+
+def resolve_battle_constants_path():
+    """battle が持つゲームロジック定数のファイルの場所を返す。
+
+    Raises:
+        CardGenerationError: 環境変数 BATTLE_REPO が設定されていないとき。
+    """
+    return _resolve_constants_path(BATTLE_REPO_ENV, BATTLE_REPO_NAME, GAME_LOGIC_CONSTANTS_RELPATH)
+
+
+def _resolve_constants_path(repo_env, repo_name, relpath):
+    repo_root = os.environ.get(repo_env)
+    if not repo_root:
         raise CardGenerationError(
-            f"game design constants not found at {path}. "
-            f"Set {COMMON_REPO_ENV} to the overload-party-common checkout."
+            f"{repo_env} is not set. Set {repo_env} to the {repo_name} checkout."
         )
+    return Path(repo_root) / relpath
 
-    with open(path, "r", encoding="utf-8") as f:
-        constants = yaml.safe_load(f)
 
-    for key in (CARD_TYPES_KEY, SUBTYPES_KEY, RESOURCE_GROUPS_KEY):
-        if key not in constants:
-            raise CardGenerationError(f"game design constants at {path} is missing '{key}'")
+def load_effect_taxonomy(design_constants_path, logic_constants_path):
+    """ゲーム定数とゲームロジック定数から、効果に書ける値とリソースの括りを読み込む。
 
-    subtypes = frozenset(s for values in constants[SUBTYPES_KEY].values() for s in values)
+    Args:
+        design_constants_path: common の game_design_constants.yaml の場所。
+        logic_constants_path: battle の game_logic_constants.yaml の場所。
+
+    Raises:
+        CardGenerationError: ファイルが無い、または必須の項目が無いとき。
+    """
+    design = _load_constants_file(
+        design_constants_path,
+        GAME_DESIGN_CONSTANTS_NAME,
+        COMMON_REPO_ENV,
+        COMMON_REPO_NAME,
+        (CARD_TYPES_KEY, SUBTYPES_KEY, RESOURCE_GROUPS_KEY),
+    )
+    logic = _load_constants_file(
+        logic_constants_path,
+        GAME_LOGIC_CONSTANTS_NAME,
+        BATTLE_REPO_ENV,
+        BATTLE_REPO_NAME,
+        (
+            TRIGGER_TYPES_KEY,
+            EFFECT_OPS_KEY,
+            BUFF_TYPES_KEY,
+            EFFECT_DURATIONS_KEY,
+            SELECTOR_KEYWORDS_KEY,
+            PLAYER_REFS_KEY,
+        ),
+    )
+
     return EffectTaxonomy(
-        card_types=frozenset(constants[CARD_TYPES_KEY]),
-        subtypes=subtypes,
-        resource_groups=constants[RESOURCE_GROUPS_KEY],
+        card_types=frozenset(design[CARD_TYPES_KEY]),
+        subtypes_by_card_type={
+            card_type: frozenset(subtypes)
+            for card_type, subtypes in design[SUBTYPES_KEY].items()
+        },
+        resource_groups=design[RESOURCE_GROUPS_KEY],
+        triggers=frozenset(logic[TRIGGER_TYPES_KEY]),
+        ops=frozenset(logic[EFFECT_OPS_KEY]),
+        buffs=frozenset(logic[BUFF_TYPES_KEY]),
+        durations=frozenset(logic[EFFECT_DURATIONS_KEY]),
+        selector_keywords=frozenset(logic[SELECTOR_KEYWORDS_KEY]),
+        selector_owners=frozenset(logic[PLAYER_REFS_KEY]),
     )
 
 
-# ─── Expand resource groups ────────────────────────────
-def expand_card_resource_groups(cards, resource_groups):
-    """Replace every card's effects with a tree whose resource groups are expanded.
+def _load_constants_file(constants_path, name, repo_env, repo_name, required_keys):
+    path = Path(constants_path)
+    if not path.exists():
+        raise CardGenerationError(
+            f"{name} not found at {path}. Set {repo_env} to the {repo_name} checkout."
+        )
 
-    Cards reference resource groups by name instead of card_type / subtype directly,
-    so a change to the group definitions in common propagates to every card without
-    editing each card's YAML.
+    constants = load_yaml_file(path)
+
+    for key in required_keys:
+        if key not in constants:
+            raise CardGenerationError(f"{name} at {path} is missing '{key}'")
+
+    return constants
+
+
+def expand_card_resource_groups(cards, resource_groups):
+    """カードの効果に書かれたリソースの括りを、card_type または subtype に展開する。
 
     Args:
-        cards: Cards to rewrite in place.
-        resource_groups: Group name to its card_type / subtypes definition.
+        cards: 展開するカード。effects を直接書き換える。
+        resource_groups: 括り名から card_type または subtypes の定義への辞書。
 
     Raises:
-        CardGenerationError: When a card names an undefined group, combines a group
-            with card_type / subtype, or the group definition is malformed.
+        CardGenerationError: 未定義の括り、card_type や subtype との併記、
+            または括りの定義の誤りがあるとき。
     """
     for card in cards:
         if not card.get("effects"):
@@ -239,22 +327,19 @@ def _resolve_resource_group(name, resource_groups, node, label):
     return {EFFECT_SUBTYPE_KEY: list(definition[SUBTYPES_KEY])}
 
 
-# ─── Validate ──────────────────────────────────────────
-def _validate_required_fields(card, label, errors):
-    is_log = card.get("card_type") == CARD_TYPE_LOG
-    if is_log:
-        required = ["card_no", "card_id", "card_name", "const_name", "card_type", "restriction", "is_active"]
-    else:
-        required = ["card_no", "card_id", "card_name", "const_name", "card_type", "resizable", "elastic", "restriction", "is_active", "stats"]
-    for field in required:
-        if field not in card:
-            errors.append(f"{label}: missing required field '{field}'")
-    # subtype は Compute/Data カテゴリで必須、それ以外は禁止
+def _validate_required_fields(card, label, taxonomy, errors):
     card_type = card.get("card_type")
+    required_fields = REQUIRED_LOG_CARD_FIELDS if card_type == CARD_TYPE_LOG else REQUIRED_CARD_FIELDS
+    for field_name in required_fields:
+        if field_name not in card:
+            errors.append(f"{label}: missing required field '{field_name}'")
+
+
     has_subtype = "subtype" in card
-    if card_type in SUBTYPES_BY_CARD_TYPE and not has_subtype:
+    takes_subtype = card_type in taxonomy.subtypes_by_card_type
+    if takes_subtype and not has_subtype:
         errors.append(f"{label}: card_type '{card_type}' requires 'subtype' field")
-    if card_type not in SUBTYPES_BY_CARD_TYPE and has_subtype:
+    if not takes_subtype and has_subtype:
         errors.append(f"{label}: card_type '{card_type}' must not have 'subtype' field")
 
 
@@ -286,20 +371,20 @@ def _validate_uniqueness(card, label, seen_nos, seen_consts, seen_card_ids, erro
             errors.append(f"{label}: const_name '{const_name}' is not a valid Go identifier (must be ASCII PascalCase)")
 
 
-def _validate_types_and_values(card, label, errors):
+def _validate_types_and_values(card, label, taxonomy, errors):
     card_type = card.get("card_type", "")
-    if card_type and card_type not in ALL_CARD_TYPES:
+    if card_type and card_type not in taxonomy.card_types | {CARD_TYPE_LOG}:
         errors.append(f"{label}: invalid card_type '{card_type}'")
     subtype = card.get("subtype")
     if subtype is not None:
-        allowed = SUBTYPES_BY_CARD_TYPE.get(card_type, set())
+        allowed = taxonomy.subtypes_by_card_type.get(card_type, frozenset())
         if subtype not in allowed:
             errors.append(f"{label}: invalid subtype '{subtype}' for card_type '{card_type}'")
 
-    for bf in ("resizable", "elastic"):
-        val = card.get(bf)
-        if val is not None and not isinstance(val, bool):
-            errors.append(f"{label}: '{bf}' must be a boolean, got {type(val).__name__}")
+    for field_name in ("resizable", "elastic"):
+        value = card.get(field_name)
+        if value is not None and not isinstance(value, bool):
+            errors.append(f"{label}: '{field_name}' must be a boolean, got {type(value).__name__}")
 
     restriction = card.get("restriction", "")
     if restriction and restriction not in VALID_RESTRICTION:
@@ -320,15 +405,16 @@ def _validate_types_and_values(card, label, errors):
 
     deploy_turns = card.get("deploy_turns")
     if deploy_turns is not None:
-        if not isinstance(deploy_turns, int) or deploy_turns not in (0, 1, 2):
+        if not isinstance(deploy_turns, int) or deploy_turns not in VALID_DEPLOY_TURNS:
             errors.append(f"{label}: deploy_turns must be 0, 1, or 2, got {deploy_turns}")
 
 
 def _validate_stats(card, label, errors):
-    card_type = card.get("card_type", "")
-    stats = card.get("stats", {})
-    if not (card_type and stats):
+    if "stats" not in card:
         return
+
+    card_type = card.get("card_type", "")
+    stats = card["stats"] or {}
 
     if card_type == CARD_TYPE_COMPUTE:
         missing = COMPUTE_STAT_KEYS - set(stats.keys())
@@ -339,29 +425,36 @@ def _validate_stats(card, label, errors):
         if missing:
             errors.append(f"{label}: data card missing stats: {missing}")
 
-    for stat_key, stat_val in stats.items():
-        if not isinstance(stat_val, (int, float)):
-            errors.append(f"{label}: stat '{stat_key}' must be a number, got {type(stat_val).__name__}")
-        elif stat_val < 0:
-            errors.append(f"{label}: stat '{stat_key}' must be non-negative, got {stat_val}")
+    for stat_key, stat_value in stats.items():
+        if stat_key not in ALLOWED_STAT_KEYS:
+            errors.append(f"{label}: stat '{stat_key}' is unknown")
+        if not isinstance(stat_value, (int, float)):
+            errors.append(f"{label}: stat '{stat_key}' must be a number, got {type(stat_value).__name__}")
+        elif stat_value < 0:
+            errors.append(f"{label}: stat '{stat_key}' must be non-negative, got {stat_value}")
 
 
 def _validate_elastic(card, label, errors):
     if not card.get("elastic"):
         return
 
-    for ef in ("free_tier", "cost_per_request"):
-        if ef not in card:
-            errors.append(f"{label}: elastic card missing required field '{ef}'")
+    for field_name in ("free_tier", "cost_per_request"):
+        if field_name not in card:
+            errors.append(f"{label}: elastic card missing required field '{field_name}'")
 
-    for ef in ("elastic_increment", "free_tier", "cost_per_request"):
-        val = card.get(ef)
-        if val is not None and (not isinstance(val, (int, float)) or val < 0):
-            errors.append(f"{label}: '{ef}' must be a non-negative number, got {val}")
+    for field_name in ("elastic_increment", "free_tier", "cost_per_request"):
+        value = card.get(field_name)
+        if value is not None and (not isinstance(value, (int, float)) or value < 0):
+            errors.append(f"{label}: '{field_name}' must be a non-negative number, got {value}")
 
 
-def validate(cards):
-    """Run all validation checks. Returns list of error strings."""
+def validate_cards(cards, taxonomy):
+    """カード定義を検証し、誤りの文字列のリストを返す。
+
+    Args:
+        cards: 検証するカード定義。
+        taxonomy: カードタイプと subtype の正しい値。
+    """
     errors = []
     seen_nos = {}
     seen_consts = {}
@@ -372,11 +465,11 @@ def validate(cards):
         card_name = card.get("card_name", "???")
         label = f"#{card_no} {card_name}"
 
-        _validate_required_fields(card, label, errors)
+        _validate_required_fields(card, label, taxonomy, errors)
         if card_no is None:
             continue
         _validate_uniqueness(card, label, seen_nos, seen_consts, seen_card_ids, errors)
-        _validate_types_and_values(card, label, errors)
+        _validate_types_and_values(card, label, taxonomy, errors)
         _validate_stats(card, label, errors)
         _validate_elastic(card, label, errors)
 
@@ -384,14 +477,14 @@ def validate(cards):
 
 
 def validate_effect_taxonomy(cards, taxonomy):
-    """Check that effect definitions only name canonical card_type / subtype values.
+    """効果に書かれた card_type・subtype・trigger・op・buff・selector・owner・duration が、定義された値かを検証する。
 
     Args:
-        cards: Cards whose resource groups are already expanded.
-        taxonomy: Canonical values owned by common.
+        cards: リソースの括りを展開済みのカード。
+        taxonomy: 効果に書ける値。
 
     Returns:
-        List of error strings, each naming the card and the offending value.
+        カードと誤った値を示す誤りの文字列のリスト。
     """
     errors = []
     allowed = {EFFECT_CARD_TYPE_KEY: taxonomy.card_types, EFFECT_SUBTYPE_KEY: taxonomy.subtypes}
@@ -400,7 +493,41 @@ def validate_effect_taxonomy(cards, taxonomy):
             continue
         label = f"{card.get('card_id', '???')} {card.get('card_name', '???')}"
         _collect_effect_taxonomy_errors(card["effects"], allowed, label, errors)
+        for effect in card["effects"]:
+            _collect_effect_logic_errors(effect, taxonomy, label, errors)
     return errors
+
+
+def _collect_effect_logic_errors(effect, taxonomy, label, errors):
+    if EFFECT_TRIGGER_KEY in effect:
+        _validate_defined_value(
+            label, EFFECT_TRIGGER_KEY, effect[EFFECT_TRIGGER_KEY], taxonomy.triggers, errors
+        )
+
+    ops = list(effect.get(EFFECT_OP_LIST_KEY, []))
+    ops += effect.get(EFFECT_CHOICE_KEY, {}).get(CHOICE_USE_KEY, [])
+    for op in ops:
+        for op_name, params in op.items():
+            _validate_defined_value(label, OP_ITEM, op_name, taxonomy.ops, errors)
+            if isinstance(params, dict):
+                _collect_op_parameter_errors(params, taxonomy, label, errors)
+
+
+def _collect_op_parameter_errors(params, taxonomy, label, errors):
+    if OP_BUFF_KEY in params:
+        _validate_defined_value(label, OP_BUFF_KEY, params[OP_BUFF_KEY], taxonomy.buffs, errors)
+    if OP_DURATION_KEY in params:
+        _validate_defined_value(
+            label, OP_DURATION_KEY, params[OP_DURATION_KEY], taxonomy.durations, errors
+        )
+
+    selector = params.get(OP_SELECTOR_KEY)
+    if isinstance(selector, str):
+        _validate_defined_value(label, OP_SELECTOR_KEY, selector, taxonomy.selector_keywords, errors)
+    elif isinstance(selector, dict) and SELECTOR_OWNER_KEY in selector:
+        _validate_defined_value(
+            label, SELECTOR_OWNER_KEY, selector[SELECTOR_OWNER_KEY], taxonomy.selector_owners, errors
+        )
 
 
 def _collect_effect_taxonomy_errors(node, allowed, label, errors):
@@ -413,36 +540,55 @@ def _collect_effect_taxonomy_errors(node, allowed, label, errors):
 
     for key, value in node.items():
         if key in allowed:
-            # 空で書くと engine が絞り込みなしとして扱い、効果が黙って全てのカードに及ぶ
+            # 空で書くと絞り込みなしとして扱われ、効果が黙って全てのカードに及ぶため、誤りにする
             if isinstance(value, list) and not value:
                 errors.append(f"{label}: effect '{key}' is empty")
             for name in value if isinstance(value, list) else [value]:
-                if name not in allowed[key]:
-                    errors.append(f"{label}: effect '{key}' has invalid value '{name}'")
+                _validate_defined_value(label, key, name, allowed[key], errors)
         _collect_effect_taxonomy_errors(value, allowed, label, errors)
 
 
-# ─── Generate JSON ─────────────────────────────────────
-def generate_json(cards, *, out_path):
-    """Generate cards_gen.json."""
-    json_out = Path(out_path)
+def _validate_defined_value(label, key, value, defined_values, errors):
+    if value not in defined_values:
+        errors.append(
+            f"{label}: effect '{key}' has value '{value}' "
+            "that is not defined in the game constants"
+        )
+
+
+def _read_optional_card_field(card, field_name):
+    return card.get(field_name, OPTIONAL_CARD_FIELD_DEFAULTS[field_name])
+
+
+def _sort_cards_by_id(cards):
+    return sorted(cards, key=lambda card: card["card_id"])
+
+
+def generate_cards_json(cards, *, out_path):
+    """カードの配布用 JSON を card_id の順に書き出す。
+
+    Args:
+        cards: 検証済みのカード定義。
+        out_path: 書き出す場所。
+
+    Returns:
+        書き出したカードの枚数。
+    """
     output = []
-    for card in sorted(cards, key=lambda c: c["card_id"]):
-        stats = dict(card["stats"].items()) if card.get("stats") else {}
-        deploy_turns = card.get("deploy_turns", 0)
+    for card in _sort_cards_by_id(cards):
         entry = {
             "card_id": card["card_id"],
             "card_name": card["card_name"],
-            "resource_label": card.get("resource_label", ""),
+            "resource_label": _read_optional_card_field(card, "resource_label"),
             "faction": card["faction"],
             "card_type": card["card_type"],
-            "deploy_turns": deploy_turns,
-            "resizable": card.get("resizable", False),
-            "elastic": card.get("elastic", False),
-            "elastic_increment": card.get("elastic_increment", 0),
-            "free_tier": card.get("free_tier", 0),
-            "cost_per_request": card.get("cost_per_request", 0),
-            "stats": stats,
+            "deploy_turns": _read_optional_card_field(card, "deploy_turns"),
+            "resizable": _read_optional_card_field(card, "resizable"),
+            "elastic": _read_optional_card_field(card, "elastic"),
+            "elastic_increment": _read_optional_card_field(card, "elastic_increment"),
+            "free_tier": _read_optional_card_field(card, "free_tier"),
+            "cost_per_request": _read_optional_card_field(card, "cost_per_request"),
+            "stats": card.get("stats") or {},
             "restriction": card["restriction"],
             "is_active": card["is_active"],
         }
@@ -454,26 +600,21 @@ def generate_json(cards, *, out_path):
             entry["effects"] = card["effects"]
         output.append(entry)
 
-    json_out.parent.mkdir(parents=True, exist_ok=True)
-    with open(json_out, "w", encoding="utf-8") as f:
-        json.dump(output, f, ensure_ascii=False, indent=2)
-        f.write("\n")
-
+    write_json_file(out_path, output)
     return len(output)
 
 
-# ─── Generate Seed SQL ─────────────────────────────────
-def _sql_escape(s):
-    """Escape a string for PostgreSQL single-quoted literal."""
-    if s is None:
-        return "NULL"
-    return "'" + s.replace("'", "''") + "'"
+def generate_cards_seed_sql(cards, *, out_path):
+    """カードの初期投入 SQL を card_id の順に書き出す。
 
+    Args:
+        cards: 検証済みのカード定義。
+        out_path: 書き出す場所。
 
-def generate_seed_sql(cards, *, out_path):
-    """Generate db/seed/cards_seed.sql with UPSERT statements."""
-    sql_out = Path(out_path)
-    sorted_cards = sorted(cards, key=lambda c: c["card_id"])
+    Returns:
+        書き出したカードの枚数。
+    """
+    sorted_cards = _sort_cards_by_id(cards)
 
     lines = []
     lines.append("-- Auto-generated by scripts/generate_cards.py. DO NOT EDIT.")
@@ -485,34 +626,33 @@ def generate_seed_sql(cards, *, out_path):
 
     value_rows = []
     for card in sorted_cards:
-        card_id = _sql_escape(card["card_id"])
-        card_name = _sql_escape(card["card_name"])
-        resource_label = _sql_escape(card.get("resource_label", ""))
-        faction = _sql_escape(card["faction"])
-        card_type = _sql_escape(card["card_type"])
-        subtype = _sql_escape(card["subtype"]) if card.get("subtype") is not None else "NULL"
-        resizable = "true" if card.get("resizable", False) else "false"
-        elastic = "true" if card.get("elastic", False) else "false"
+        card_id = quote_sql_string(card["card_id"])
+        card_name = quote_sql_string(card["card_name"])
+        resource_label = quote_sql_string(_read_optional_card_field(card, "resource_label"))
+        faction = quote_sql_string(card["faction"])
+        card_type = quote_sql_string(card["card_type"])
+        subtype = quote_sql_string(card["subtype"]) if card.get("subtype") is not None else "NULL"
+        resizable = format_sql_boolean(_read_optional_card_field(card, "resizable"))
+        elastic = format_sql_boolean(_read_optional_card_field(card, "elastic"))
+        stats = quote_sql_jsonb(card.get("stats") or {})
 
-        stats = card.get("stats")
-        stats_json = _sql_escape(json.dumps(stats, ensure_ascii=False)) + "::jsonb" if stats else "'{}'::jsonb"
-
-        effect_text = _sql_escape(card.get("effect_text")) if card.get("effect_text") and card["effect_text"] != "—" else "NULL"
+        effect_text = card.get("effect_text")
+        has_effect_text = effect_text and effect_text != NO_EFFECT_TEXT_MARK
+        effect_text_sql = quote_sql_string(effect_text) if has_effect_text else "NULL"
 
         effects = card.get("effects")
-        effects_json = _sql_escape(json.dumps(effects, ensure_ascii=False)) + "::jsonb" if effects else "NULL"
+        effects_sql = quote_sql_jsonb(effects) if effects else "NULL"
 
-        restriction = _sql_escape(card["restriction"])
-        is_active = "true" if card["is_active"] else "false"
+        restriction = quote_sql_string(card["restriction"])
+        is_active = format_sql_boolean(card["is_active"])
 
-        row = (
+        value_rows.append(
             f"  ({card_id}, {card_name}, {resource_label}, {faction}, {card_type}, {subtype},\n"
-            f"   {resizable}, {elastic}, {stats_json},\n"
-            f"   {effect_text},\n"
-            f"   {effects_json},\n"
+            f"   {resizable}, {elastic}, {stats},\n"
+            f"   {effect_text_sql},\n"
+            f"   {effects_sql},\n"
             f"   {restriction}, {is_active})"
         )
-        value_rows.append(row)
 
     lines.append(",\n\n".join(value_rows))
     lines.append("")
@@ -532,76 +672,63 @@ def generate_seed_sql(cards, *, out_path):
     lines.append("  updated_at     = now();")
     lines.append("")
 
-    sql_out.parent.mkdir(parents=True, exist_ok=True)
-    with open(sql_out, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines))
-        f.write("\n")
-
+    write_lines_file(out_path, lines)
     return len(sorted_cards)
 
 
-# ─── Generate CARDS.md ─────────────────────────────────
-def _scalability_display(card):
-    # Subtype がある場合（Compute/Data 配下）は subtype を、なければ card_type を表示
+def _format_type_cell(card):
     label = card.get("subtype") or card["card_type"]
     display_type = {"ObjectStorage": "Object Storage", "CacheDB": "Cache DB"}.get(label, label)
-    r = card.get("resizable", False)
-    e = card.get("elastic", False)
-    if r and e:
+    if card["resizable"] and card["elastic"]:
         return f"{display_type} (R+E)"
-    elif r:
+    if card["resizable"]:
         return f"{display_type} (R)"
-    elif e:
+    if card["elastic"]:
         return f"{display_type} (E)"
     return display_type
 
 
-def _effect_display(card):
+def _format_effect_cell(card):
     text = card.get("effect_text", "")
     if not text:
-        return "—"
+        return NO_EFFECT_TEXT_MARK
     return text.replace("\n", "<br>")
 
 
-def _md_resource_table(cards, primary_stat_label, primary_stat_key):
-    """Generate a Markdown table for compute or data resource cards."""
+def _build_resource_table_lines(cards, primary_stat_label, primary_stat_key):
     lines = []
-    lines.append(f"| ID | カード名 | タイプ | {primary_stat_label} | 可用性 | 維持コスト | デプロイT | SLAペナルティ | 効果 |")
+    lines.append(f"| ID | カード名 | タイプ | {primary_stat_label} | 可用性 | 維持コスト | デプロイターン | SLAペナルティ | 効果 |")
     lines.append("|------|---------|-------|-----|-----|-----|-----|-----|------|")
-    for c in cards:
-        dt = c.get("deploy_turns", 0)
+    for card in cards:
         lines.append(
-            f"| {c['card_id']} | {c['card_name']} | {_scalability_display(c)} "
-            f"| {c['stats'].get(primary_stat_key, 0)} | {c['stats']['availability']} "
-            f"| {c['stats']['maintenance_cost']} | {dt} "
-            f"| {c['stats']['sla_penalty']} | {_effect_display(c)} |"
+            f"| {card['card_id']} | {card['card_name']} | {_format_type_cell(card)} "
+            f"| {card['stats'][primary_stat_key]} | {card['stats']['availability']} "
+            f"| {card['stats']['maintenance_cost']} | {_read_optional_card_field(card, 'deploy_turns')} "
+            f"| {card['stats']['sla_penalty']} | {_format_effect_cell(card)} |"
         )
     return lines
 
 
-def _md_support_table(cards):
-    """Generate a Markdown table for support/log cards."""
+def _build_support_table_lines(cards):
     lines = []
     lines.append("| ID | カード名 | 効果 |")
     lines.append("|------|---------|------|")
-    for c in cards:
-        lines.append(f"| {c['card_id']} | {c['card_name']} | {_effect_display(c)} |")
+    for card in cards:
+        lines.append(f"| {card['card_id']} | {card['card_name']} | {_format_effect_cell(card)} |")
     return lines
 
 
-def _md_restriction_section(faction_data, lines):
-    """Append restriction card tables (limited / semi-limited)."""
+def _append_restriction_section(faction_data, lines):
     limited = []
     semi_limited = []
-    for f in FACTION_ORDER:
-        if f not in faction_data:
+    for faction in FACTION_ORDER:
+        if faction not in faction_data:
             continue
-        fd = faction_data[f]
-        for c in fd["cards"]:
-            if c.get("restriction") == "limited":
-                limited.append(c)
-            elif c.get("restriction") == "semi_limited":
-                semi_limited.append(c)
+        for card in faction_data[faction]["cards"]:
+            if card.get("restriction") == "limited":
+                limited.append(card)
+            elif card.get("restriction") == "semi_limited":
+                semi_limited.append(card)
 
     if limited:
         lines.append("### 制限カード（1枚制限）")
@@ -627,40 +754,38 @@ def _md_restriction_section(faction_data, lines):
     lines.append("")
 
 
-def _md_faction_sections(faction_data, lines):
-    """Append per-faction card tables. Returns summary dict for the summary table."""
+def _append_faction_sections(faction_data, lines):
+    """陣営ごとのカード表を lines に追加し、陣営とカテゴリごとの枚数を返す。"""
     summary = {}
 
     for faction in FACTION_ORDER:
         if faction not in faction_data:
             continue
-        fd = faction_data[faction]
-        faction_cards = fd["cards"]
-        display = fd["display_name"]
+        faction_cards = faction_data[faction]["cards"]
+        display_name = faction_data[faction]["display_name"]
 
-        lines.append(f"## {display}— {len(faction_cards)}枚")
+        lines.append(f"## {display_name}（{len(faction_cards)}枚）")
         lines.append("")
 
         summary[faction] = {}
 
-        for cat_name, by_field, allowed_values, table_kind in CATEGORY_ORDER:
-            cat_cards = sorted(
-                [c for c in faction_cards if c.get(by_field) in allowed_values],
-                key=lambda c: c["card_id"]
+        for category_name, by_field, allowed_values, table_kind in CATEGORY_ORDER:
+            category_cards = _sort_cards_by_id(
+                [card for card in faction_cards if card.get(by_field) in allowed_values]
             )
-            summary[faction][cat_name] = len(cat_cards)
-            if not cat_cards:
+            summary[faction][category_name] = len(category_cards)
+            if not category_cards:
                 continue
 
-            lines.append(f"### {cat_name}（{len(cat_cards)}枚）")
+            lines.append(f"### {category_name}（{len(category_cards)}枚）")
             lines.append("")
 
             if table_kind == "compute":
-                lines.extend(_md_resource_table(cat_cards, "スループット", "throughput"))
+                lines.extend(_build_resource_table_lines(category_cards, "スループット", "throughput"))
             elif table_kind == "data":
-                lines.extend(_md_resource_table(cat_cards, "Yield", "yield"))
+                lines.extend(_build_resource_table_lines(category_cards, "イールド", "yield"))
             else:
-                lines.extend(_md_support_table(cat_cards))
+                lines.extend(_build_support_table_lines(category_cards))
 
             lines.append("")
 
@@ -670,24 +795,26 @@ def _md_faction_sections(faction_data, lines):
     return summary
 
 
-def _md_summary_table(faction_data, summary, lines):
-    """Append the card count summary table."""
+def _append_summary_table(faction_data, summary, lines):
     lines.append("## カード総数サマリ")
     lines.append("")
-    header_names = [faction_data[f]["display_name"] if f in faction_data else f for f in FACTION_ORDER]
+    header_names = [
+        faction_data[faction]["display_name"] if faction in faction_data else faction
+        for faction in FACTION_ORDER
+    ]
     lines.append("| カテゴリ | " + " | ".join(header_names) + " | 合計 |")
     lines.append("|---------|" + "|".join(["------" for _ in FACTION_ORDER]) + "|------|")
 
-    grand_total = {f: 0 for f in FACTION_ORDER}
-    for cat_name, *_ in CATEGORY_ORDER:
-        row = f"| {cat_name} "
-        cat_total = 0
+    grand_total = {faction: 0 for faction in FACTION_ORDER}
+    for category_name, *_ in CATEGORY_ORDER:
+        row = f"| {category_name} "
+        category_total = 0
         for faction in FACTION_ORDER:
-            count = summary.get(faction, {}).get(cat_name, 0)
+            count = summary.get(faction, {}).get(category_name, 0)
             grand_total[faction] += count
-            cat_total += count
+            category_total += count
             row += f"| {count} "
-        row += f"| {cat_total} |"
+        row += f"| {category_total} |"
         lines.append(row)
 
     row = "| **合計** "
@@ -700,124 +827,69 @@ def _md_summary_table(faction_data, summary, lines):
     lines.append("")
 
 
-def generate_md(cards, faction_data, *, out_path):
-    """Generate docs/CARDS.md."""
-    md_out = Path(out_path)
+def generate_cards_md(cards, faction_data, *, out_path):
+    """カード一覧文書を書き出す。
+
+    Args:
+        cards: 検証済みのカード定義。
+        faction_data: 陣営名から表示名とカードのリストへの辞書。
+        out_path: 書き出す場所。
+
+    Returns:
+        文書の冒頭に書いたカードの総数。
+    """
     total = len(cards)
     lines = []
 
     lines.append("<!-- This file is auto-generated by scripts/generate_cards.py. DO NOT EDIT. -->")
     lines.append("")
-    lines.append("# Overload Party — Card List")
+    lines.append("# Overload Party Card List")
     lines.append("")
     lines.append(f"**全 {total} 枚**")
     lines.append("")
     lines.append("---")
     lines.append("")
 
-    _md_restriction_section(faction_data, lines)
-    summary = _md_faction_sections(faction_data, lines)
-    _md_summary_table(faction_data, summary, lines)
+    _append_restriction_section(faction_data, lines)
+    summary = _append_faction_sections(faction_data, lines)
+    _append_summary_table(faction_data, summary, lines)
 
-    md_out.parent.mkdir(parents=True, exist_ok=True)
-    with open(md_out, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines))
-        f.write("\n")
-
+    write_lines_file(out_path, lines)
     return total
 
 
-# ─── Starter Decks ────────────────────────────────────
-def load_starter_decks():
-    if not STARTER_DECKS_YAML.exists():
-        return None
-    with open(STARTER_DECKS_YAML, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-    return data.get("starter_decks", [])
-
-
-def validate_starter_decks(decks, valid_card_ids):
-    errors = []
-    for deck in decks:
-        name = deck.get("deck_name", "???")
-        cards = deck.get("cards", [])
-        total = sum(c.get("copies", 1) for c in cards)
-        if total != 30:
-            errors.append(f"deck '{name}': has {total} cards, expected 30")
-        for entry in cards:
-            cid = entry.get("card_id", "")
-            if cid not in valid_card_ids:
-                errors.append(f"deck '{name}': unknown card_id '{cid}'")
-    return errors
-
-
-def generate_starter_decks_json(decks, *, out_path):
-    output = []
-    for deck in decks:
-        cards = []
-        for entry in deck["cards"]:
-            for _ in range(entry.get("copies", 1)):
-                cards.append(entry["card_id"])
-        output.append({"deck_name": deck["deck_name"], "cards": cards})
-
-    out = Path(out_path)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    with open(out, "w", encoding="utf-8") as f:
-        json.dump(output, f, ensure_ascii=False, indent=2)
-        f.write("\n")
-    return len(output)
-
-
-# ─── Main ──────────────────────────────────────────────
 def main():
+    """カード定義を検証し、配布用 JSON・カード一覧文書・初期投入 SQL を生成する。"""
     if not YAML_DIR.exists():
-        print(f"ERROR: YAML directory not found: {YAML_DIR}", file=sys.stderr)
-        sys.exit(1)
-
-    cards, faction_data = load_all_cards()
-    if not cards:
-        print("ERROR: No cards loaded from YAML files", file=sys.stderr)
-        sys.exit(1)
+        exit_with_error(f"YAML directory not found: {YAML_DIR}")
 
     try:
-        taxonomy = load_effect_taxonomy(resolve_common_constants_path())
+        cards, faction_data = load_all_cards()
+    except CardGenerationError as err:
+        exit_with_error(err)
+    if not cards:
+        exit_with_error("No cards loaded from YAML files")
+
+    try:
+        taxonomy = load_effect_taxonomy(
+            resolve_common_constants_path(), resolve_battle_constants_path()
+        )
         expand_card_resource_groups(cards, taxonomy.resource_groups)
     except CardGenerationError as err:
-        print(f"ERROR: {err}", file=sys.stderr)
-        sys.exit(1)
+        exit_with_error(err)
 
-    errors = validate(cards) + validate_effect_taxonomy(cards, taxonomy)
+    errors = validate_cards(cards, taxonomy) + validate_effect_taxonomy(cards, taxonomy)
     if errors:
-        print(f"Validation failed with {len(errors)} error(s):", file=sys.stderr)
-        for err in errors:
-            print(f"  - {err}", file=sys.stderr)
-        sys.exit(1)
+        exit_with_validation_errors(errors)
 
-    # cards_gen.json (Go embedded)
-    go_count = generate_json(cards, out_path=GO_JSON_OUT)
-    print(f"Generated {go_count} cards → {GO_JSON_OUT.relative_to(ROOT)}", file=sys.stderr)
+    json_count = generate_cards_json(cards, out_path=GO_JSON_OUT)
+    print(f"Generated {json_count} cards → {GO_JSON_OUT.relative_to(ROOT)}", file=sys.stderr)
 
-    # CARDS.md
-    md_count = generate_md(cards, faction_data, out_path=MD_OUT)
+    md_count = generate_cards_md(cards, faction_data, out_path=MD_OUT)
     print(f"Generated {md_count} cards → {MD_OUT.relative_to(ROOT)}", file=sys.stderr)
 
-    # Seed SQL
-    seed_count = generate_seed_sql(cards, out_path=SEED_OUT)
+    seed_count = generate_cards_seed_sql(cards, out_path=SEED_OUT)
     print(f"Generated {seed_count} cards → {SEED_OUT.relative_to(ROOT)}", file=sys.stderr)
-
-    # Starter Decks
-    starter_decks = load_starter_decks()
-    if starter_decks:
-        valid_card_ids = {c["card_id"] for c in cards}
-        deck_errors = validate_starter_decks(starter_decks, valid_card_ids)
-        if deck_errors:
-            print(f"Starter deck validation failed with {len(deck_errors)} error(s):", file=sys.stderr)
-            for err in deck_errors:
-                print(f"  - {err}", file=sys.stderr)
-            sys.exit(1)
-
-        deck_count = generate_starter_decks_json(starter_decks, out_path=STARTER_DECKS_JSON_OUT)
-        print(f"Generated {deck_count} starter decks → {STARTER_DECKS_JSON_OUT.relative_to(ROOT)}", file=sys.stderr)
 
 
 if __name__ == "__main__":

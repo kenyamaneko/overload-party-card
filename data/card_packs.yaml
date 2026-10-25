@@ -1,10 +1,10 @@
-# Card pack master (SSoT for `card.card_pack` and `card.card_pack_cards`).
+# カードパックのマスターデータ (card.card_pack と card.card_pack_cards の SSoT)。
 #
-# 各 pack は配布対象カードと配布枚数の組。subscriber 側で複数 pack を順次配布
-# することで合成的な配布 (basic + 選択 faction 等) を表現する。
+# 各パックは配布対象カードと配布枚数の組。購読処理が複数のパックを順に配布することで、
+# 基本パックと選択した陣営のパックを合わせた配布を表現する。
 #
 # 直接編集してよいのは本ファイルのみ。db/seed/card_packs_seed.sql は
-# scripts/generate_card_packs.py で生成される。
+# scripts/generate_card_packs.py が生成する。
 
 packs:
   - pack_id: basic

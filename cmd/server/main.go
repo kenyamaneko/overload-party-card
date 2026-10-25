@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -13,15 +14,21 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	accountadapter "github.com/kenyamaneko/overload-party-card/internal/adapter/account"
-	pubsubadapter "github.com/kenyamaneko/overload-party-card/internal/adapter/pubsub"
+	"github.com/kenyamaneko/overload-party-card/internal/adapter/clock"
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
 	"github.com/kenyamaneko/overload-party-card/internal/config"
+	"github.com/kenyamaneko/overload-party-card/internal/handler/pubsub"
 	"github.com/kenyamaneko/overload-party-card/internal/handler/rest"
 	"github.com/kenyamaneko/overload-party-card/internal/repository"
 	"github.com/kenyamaneko/overload-party-card/internal/router"
 	"github.com/kenyamaneko/overload-party-card/internal/usecase"
 
 	internalauth "github.com/kenyamaneko/overload-party-gateway/packages/internalauth-go"
+)
+
+const (
+	httpReadHeaderTimeout = 10 * time.Second
+	httpShutdownTimeout   = 10 * time.Second
 )
 
 func main() {
@@ -31,8 +38,8 @@ func main() {
 	}
 }
 
-func run() error {
-	cfg, err := config.FromEnv()
+func run() (err error) {
+	cfg, err := config.LoadFromEnv()
 	if err != nil {
 		return err
 	}
@@ -44,48 +51,54 @@ func run() error {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	pool, closeDatabasePool, err := newDatabasePool(ctx, cfg)
+	pool, releaseDatabaseResources, err := newDatabasePool(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("new database pool: %w", err)
 	}
-	defer closeDatabasePool()
-	defer pool.Close()
+	defer func() {
+		pool.Close()
+		if releaseErr := releaseDatabaseResources(); releaseErr != nil {
+			err = errors.Join(err, fmt.Errorf("release database resources: %w", releaseErr))
+		}
+	}()
 
-	cardRepo := repository.NewPgCardRepository(pool)
-	cardPackRepo := repository.NewPgCardPackRepository(pool)
-	playerCardRepo := repository.NewPgPlayerCardRepository(pool)
-	deckRepo := repository.NewPgDeckRepository(pool)
-	productRepo := repository.NewPgProductRepository(pool)
-	initiativeRepo := repository.NewPgInitiativeRepository(pool)
-	eventRepo := repository.NewPgProcessedEventRepository(pool)
+	cardRepository := repository.NewPostgresCardRepository(pool)
+	playerCardRepository := repository.NewPostgresPlayerCardRepository(pool)
+	deckRepository := repository.NewPostgresDeckRepository(pool)
+	productRepository := repository.NewPostgresProductRepository(pool)
+	initiativeRepository := repository.NewPostgresInitiativeRepository(pool)
+	grantTransactionRunner := repository.NewPostgresGrantTransactionRunner(pool)
 
 	cardCache := cache.NewCardCache()
-	if err := cardCache.Load(ctx, cardRepo); err != nil {
+	if err := cardCache.Load(ctx, cardRepository); err != nil {
 		return fmt.Errorf("load card cache: %w", err)
 	}
 
 	productCache := cache.NewProductCache()
-	if err := productCache.Load(ctx, productRepo); err != nil {
+	if err := productCache.Load(ctx, productRepository); err != nil {
 		return fmt.Errorf("load product cache: %w", err)
 	}
 
 	initiativeCache := cache.NewInitiativeCache()
-	if err := initiativeCache.Load(ctx, initiativeRepo); err != nil {
+	if err := initiativeCache.Load(ctx, initiativeRepository); err != nil {
 		return fmt.Errorf("load initiative cache: %w", err)
 	}
 
-	accountClient := accountadapter.NewClient(cfg.AccountServiceURL)
+	accountClient, err := accountadapter.NewClient(cfg.AccountServiceURL)
+	if err != nil {
+		return fmt.Errorf("new account client: %w", err)
+	}
 
-	cardInteractor := usecase.NewCardInteractor(cardRepo, playerCardRepo)
-	deckInteractor := usecase.NewDeckInteractor(deckRepo, playerCardRepo, cardCache, productCache, initiativeCache, accountClient)
-	playerCardInteractor := usecase.NewPlayerCardInteractor(playerCardRepo, cardCache)
-	grantInteractor := usecase.NewGrantInteractor(cardPackRepo, playerCardRepo)
+	cardInteractor := usecase.NewCardInteractor(cardRepository, playerCardRepository)
+	deckInteractor := usecase.NewDeckInteractor(deckRepository, playerCardRepository, cardCache, productCache, initiativeCache, accountClient, clock.NewSystemClock())
+	playerCardInteractor := usecase.NewPlayerCardInteractor(playerCardRepository, cardCache)
+	productInteractor := usecase.NewProductInteractor(productCache, initiativeCache)
+	grantInteractor := usecase.NewGrantInteractor(grantTransactionRunner)
 
-	cardH := rest.NewCardHandler(cardInteractor)
-	deckH := rest.NewDeckHandler(deckInteractor)
-	playerCardH := rest.NewPlayerCardHandler(playerCardInteractor)
-	productH := rest.NewProductHandler(productCache, initiativeCache)
-	initiativeH := rest.NewInitiativeHandler(initiativeCache)
+	cardHandler := rest.NewCardHandler(cardInteractor)
+	deckHandler := rest.NewDeckHandler(deckInteractor)
+	playerCardHandler := rest.NewPlayerCardHandler(playerCardInteractor)
+	productHandler := rest.NewProductHandler(productInteractor)
 
 	internalAuthKey, err := internalauth.ParsePublicKeyPEM([]byte(cfg.InternalAuthPublicKey))
 	if err != nil {
@@ -95,16 +108,17 @@ func run() error {
 		internalauth.StaticPublicKeyResolver(internalAuthKey, internalauth.DefaultKeyID),
 	)
 
-	onboardedSub := pubsubadapter.NewPlayerOnboardedSubscriber(grantInteractor, eventRepo)
-	cardPackPurchasedSub := pubsubadapter.NewCardPackPurchasedSubscriber(grantInteractor, eventRepo)
-	pubsubPushH := rest.NewPubSubPushHandler(onboardedSub.Handle, cardPackPurchasedSub.Handle)
+	pubSubPushHandler := rest.NewPubSubPushHandler(
+		pubsub.NewPlayerOnboardedSubscriber(grantInteractor),
+		pubsub.NewCardPackPurchasedSubscriber(grantInteractor),
+	)
 
-	r := router.New(cardH, deckH, playerCardH, productH, initiativeH, pubsubPushH, authVerifier)
+	r := router.New(cardHandler, deckHandler, playerCardHandler, productHandler, pubSubPushHandler, authVerifier)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
 		Handler:           r,
-		ReadHeaderTimeout: 10 * time.Second,
+		ReadHeaderTimeout: httpReadHeaderTimeout,
 	}
 
 	slog.Info("card starting",
@@ -117,12 +131,12 @@ func run() error {
 	return runHTTP(ctx, srv)
 }
 
-// runHTTP は HTTP server を起動し、ctx キャンセル (シグナル到来) で graceful に停止する。
+// runHTTP は HTTP サーバーを起動し、ctx のキャンセル (シグナルの到来) で、処理中のリクエストの完了を待って停止する。
 func runHTTP(ctx context.Context, srv *http.Server) error {
 	g, gCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return fmt.Errorf("http server: %w", err)
 		}
 		return nil
@@ -131,7 +145,7 @@ func runHTTP(ctx context.Context, srv *http.Server) error {
 	g.Go(func() error {
 		<-gCtx.Done()
 		slog.Info("card shutdown requested")
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), httpShutdownTimeout)
 		defer shutdownCancel()
 		if err := srv.Shutdown(shutdownCtx); err != nil {
 			return fmt.Errorf("http shutdown: %w", err)

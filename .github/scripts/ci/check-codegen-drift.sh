@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-codegen-drift.sh — codegen 後に差分や未追跡ファイルがないか検証する。
+# コード生成の後に、差分や未追跡ファイルが無いかを検証する。
 set -euo pipefail
 
 if ! git diff --exit-code; then

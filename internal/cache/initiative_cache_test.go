@@ -2,156 +2,136 @@ package cache_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kenyamaneko/overload-party-card/internal/cache"
+	"github.com/kenyamaneko/overload-party-card/internal/cache/cachetest"
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
 )
 
-type fakeInitiativeRepo struct {
-	initiatives []*domain.Initiative
-	err         error
+func loadInitiativeCache(t *testing.T, initiativeIDs ...string) *cache.InitiativeCache {
+	t.Helper()
+	initiativeCache := cache.NewInitiativeCache()
+	require.NoError(t, initiativeCache.Load(context.Background(), cachetest.NewFakeInitiativeRepository(initiativeIDs...)))
+	return initiativeCache
 }
 
-func (f *fakeInitiativeRepo) FindAll(ctx context.Context) ([]*domain.Initiative, error) {
-	return f.initiatives, f.err
+func listInitiativeIDs(initiatives []domain.Initiative) []string {
+	initiativeIDs := make([]string, 0, len(initiatives))
+	for _, initiative := range initiatives {
+		initiativeIDs = append(initiativeIDs, initiative.InitiativeID)
+	}
+	return initiativeIDs
 }
 
-func TestInitiativeCacheFindByID(t *testing.T) {
-	t.Run("[施策キャッシュ] 施策定義の取得", func(t *testing.T) {
-		t.Run("複数件の施策定義を読み込んだあと、読み込み済みのinitiative_id TST-0001を指定して取得すると、そのinitiative_idに対応する施策定義が返る", func(t *testing.T) {
-			c := cache.NewInitiativeCache()
-			repo := &fakeInitiativeRepo{initiatives: []*domain.Initiative{
-				{InitiativeID: "TST-0001"},
-				{InitiativeID: "TST-0002"},
-			}}
-			require.NoError(t, c.Load(context.Background(), repo))
+func TestInitiativeCache(t *testing.T) {
+	t.Run("[施策定義キャッシュ]施策定義の読み込み", func(t *testing.T) {
+		t.Run("正常系", func(t *testing.T) {
+			t.Run("施策定義がTST-0001の1件のとき、読み込むと", func(t *testing.T) {
+				t.Run("TST-0001で参照した施策定義の施策IDがTST-0001になる", func(t *testing.T) {
+					initiativeCache := loadInitiativeCache(t, "TST-0001")
 
-			got := c.FindByID("TST-0001")
+					initiative := initiativeCache.FindByID("TST-0001")
 
-			require.NotNil(t, got)
-			assert.Equal(t, "TST-0001", got.InitiativeID)
-		})
+					require.NotNil(t, initiative)
+					assert.Equal(t, "TST-0001", initiative.InitiativeID)
+				})
 
-		t.Run("複数件の施策定義を読み込んだあと、読み込んでいないinitiative_id TST-9999を指定して取得すると、見つからない", func(t *testing.T) {
-			c := cache.NewInitiativeCache()
-			repo := &fakeInitiativeRepo{initiatives: []*domain.Initiative{
-				{InitiativeID: "TST-0001"},
-				{InitiativeID: "TST-0002"},
-			}}
-			require.NoError(t, c.Load(context.Background(), repo))
+				t.Run("保持件数が1件になる", func(t *testing.T) {
+					initiativeCache := loadInitiativeCache(t, "TST-0001")
 
-			got := c.FindByID("TST-9999")
-
-			assert.Nil(t, got)
-		})
-	})
-}
-
-func TestInitiativeCacheLoad(t *testing.T) {
-	t.Run("[施策キャッシュ] 施策定義の読み込み", func(t *testing.T) {
-		cases := []struct {
-			name           string
-			repo           *fakeInitiativeRepo
-			wantErrContain string
-		}{
-			{
-				name:           "施策定義の取得元が0件を返したとき、読み込みはエラーになる",
-				repo:           &fakeInitiativeRepo{initiatives: nil},
-				wantErrContain: "0 initiatives loaded",
-			},
-			{
-				name:           "施策定義の取得元がエラーを返したとき、読み込みはエラーになる",
-				repo:           &fakeInitiativeRepo{err: errors.New("fetch failed")},
-				wantErrContain: "load initiative cache",
-			},
-		}
-		for _, tc := range cases {
-			t.Run(tc.name, func(t *testing.T) {
-				c := cache.NewInitiativeCache()
-
-				err := c.Load(context.Background(), tc.repo)
-
-				assert.ErrorContains(t, err, tc.wantErrContain)
+					assert.Equal(t, 1, initiativeCache.Count())
+				})
 			})
-		}
-	})
-}
 
-func TestInitiativeCacheAll(t *testing.T) {
-	t.Run("[施策キャッシュ] 施策定義の全件取得", func(t *testing.T) {
-		t.Run("initiative_idがTST-0002、TST-0001の順で読み込まれても、全件取得するとinitiative_idの昇順で返る", func(t *testing.T) {
-			c := cache.NewInitiativeCache()
-			repo := &fakeInitiativeRepo{initiatives: []*domain.Initiative{
-				{InitiativeID: "TST-0002"},
-				{InitiativeID: "TST-0001"},
-			}}
-			require.NoError(t, c.Load(context.Background(), repo))
+			t.Run("施策定義がTST-0001からTST-0003の3件のとき、読み込むと", func(t *testing.T) {
+				t.Run("TST-0002で参照した施策定義の施策IDがTST-0002になる", func(t *testing.T) {
+					initiativeCache := loadInitiativeCache(t, "TST-0001", "TST-0002", "TST-0003")
 
-			got := c.All()
+					initiative := initiativeCache.FindByID("TST-0002")
 
-			require.Len(t, got, 2)
-			assert.Equal(t, "TST-0001", got[0].InitiativeID)
-			assert.Equal(t, "TST-0002", got[1].InitiativeID)
-		})
-	})
-}
+					require.NotNil(t, initiative)
+					assert.Equal(t, "TST-0002", initiative.InitiativeID)
+				})
 
-func TestInitiativeCacheCount(t *testing.T) {
-	t.Run("[施策キャッシュ] 施策定義の件数", func(t *testing.T) {
-		t.Run("読み込み前の件数は0になる", func(t *testing.T) {
-			c := cache.NewInitiativeCache()
+				t.Run("TST-0004では施策定義が見つからない", func(t *testing.T) {
+					initiativeCache := loadInitiativeCache(t, "TST-0001", "TST-0002", "TST-0003")
 
-			assert.Equal(t, 0, c.Count())
-		})
+					assert.Nil(t, initiativeCache.FindByID("TST-0004"))
+				})
 
-		t.Run("施策定義を読み込んだあと、件数は読み込んだ件数になる", func(t *testing.T) {
-			c := cache.NewInitiativeCache()
-			repo := &fakeInitiativeRepo{initiatives: []*domain.Initiative{
-				{InitiativeID: "TST-0001"},
-				{InitiativeID: "TST-0002"},
-				{InitiativeID: "TST-0003"},
-			}}
-			require.NoError(t, c.Load(context.Background(), repo))
+				t.Run("保持件数が3件になる", func(t *testing.T) {
+					initiativeCache := loadInitiativeCache(t, "TST-0001", "TST-0002", "TST-0003")
 
-			assert.Equal(t, 3, c.Count())
-		})
-	})
-}
-
-func TestInitiativeCacheLoadFromBytes(t *testing.T) {
-	t.Run("[施策キャッシュ] JSONからの施策定義読み込み", func(t *testing.T) {
-		t.Run("施策定義1件以上を含むJSONデータから読み込むと、その施策定義が取得できるようになる", func(t *testing.T) {
-			c := cache.NewInitiativeCache()
-
-			err := c.LoadFromBytes([]byte(`[{"initiative_id":"TST-0001"}]`))
-			require.NoError(t, err)
-
-			got := c.FindByID("TST-0001")
-			require.NotNil(t, got)
-			assert.Equal(t, "TST-0001", got.InitiativeID)
-		})
-
-		cases := []struct {
-			name           string
-			data           []byte
-			wantErrContain string
-		}{
-			{"要素0件のJSON配列から読み込むと、エラーになる", []byte(`[]`), "0 initiatives loaded"},
-			{"JSONとして解釈できないデータから読み込むと、エラーになる", []byte(`not json`), "parse initiative data"},
-		}
-		for _, tc := range cases {
-			t.Run(tc.name, func(t *testing.T) {
-				c := cache.NewInitiativeCache()
-
-				err := c.LoadFromBytes(tc.data)
-
-				assert.ErrorContains(t, err, tc.wantErrContain)
+					assert.Equal(t, 3, initiativeCache.Count())
+				})
 			})
-		}
+
+			t.Run("施策定義がTST-0003、TST-0001、TST-0002の順で取得できるとき、読み込むと一覧の施策IDの並びがTST-0001、TST-0002、TST-0003になる", func(t *testing.T) {
+				initiativeCache := loadInitiativeCache(t, "TST-0003", "TST-0001", "TST-0002")
+
+				assert.Equal(t, []string{"TST-0001", "TST-0002", "TST-0003"}, listInitiativeIDs(initiativeCache.FindAll()))
+			})
+
+			t.Run("TST-0001とTST-0002を読み込み済みで、保管先がTST-0004の1件だけを返すとき、再度読み込むと", func(t *testing.T) {
+				t.Run("一覧の施策IDがTST-0004だけになる", func(t *testing.T) {
+					initiativeCache := loadInitiativeCache(t, "TST-0001", "TST-0002")
+					require.NoError(t, initiativeCache.Load(context.Background(), cachetest.NewFakeInitiativeRepository("TST-0004")))
+
+					assert.Equal(t, []string{"TST-0004"}, listInitiativeIDs(initiativeCache.FindAll()))
+				})
+
+				t.Run("TST-0001でもTST-0002でも施策定義が見つからない", func(t *testing.T) {
+					initiativeCache := loadInitiativeCache(t, "TST-0001", "TST-0002")
+					require.NoError(t, initiativeCache.Load(context.Background(), cachetest.NewFakeInitiativeRepository("TST-0004")))
+
+					assert.Nil(t, initiativeCache.FindByID("TST-0001"))
+					assert.Nil(t, initiativeCache.FindByID("TST-0002"))
+				})
+			})
+		})
+
+		t.Run("異常系", func(t *testing.T) {
+			t.Run("施策定義の保管先がstore-unreachableというエラーを返したとき、読み込みのエラーの原因にstore-unreachableが含まれる", func(t *testing.T) {
+				repository := &cachetest.FakeInitiativeRepository{Err: cachetest.ErrStoreUnreachable}
+
+				err := cache.NewInitiativeCache().Load(context.Background(), repository)
+
+				assert.ErrorIs(t, err, cachetest.ErrStoreUnreachable)
+			})
+
+			t.Run("施策定義の保管先が0件を返したとき、読み込みは施策定義が0件であることを示すエラーを返す", func(t *testing.T) {
+				err := cache.NewInitiativeCache().Load(context.Background(), cachetest.NewFakeInitiativeRepository())
+
+				assert.ErrorIs(t, err, cache.ErrNoInitiativeDefinitions)
+			})
+
+			t.Run("TST-0001とTST-0002を読み込み済みのキャッシュに再度読み込んで失敗したとき", func(t *testing.T) {
+				tests := []struct {
+					name       string
+					repository *cachetest.FakeInitiativeRepository
+				}{
+					{
+						name:       "保管先が取得に失敗したとき、一覧の施策IDの並びがTST-0001、TST-0002になる",
+						repository: &cachetest.FakeInitiativeRepository{Err: cachetest.ErrStoreUnreachable},
+					},
+					{
+						name:       "保管先が0件を返したとき、一覧の施策IDの並びがTST-0001、TST-0002になる",
+						repository: cachetest.NewFakeInitiativeRepository(),
+					},
+				}
+				for _, tt := range tests {
+					t.Run(tt.name, func(t *testing.T) {
+						initiativeCache := loadInitiativeCache(t, "TST-0001", "TST-0002")
+						require.Error(t, initiativeCache.Load(context.Background(), tt.repository))
+
+						assert.Equal(t, []string{"TST-0001", "TST-0002"}, listInitiativeIDs(initiativeCache.FindAll()))
+					})
+				}
+			})
+		})
 	})
 }

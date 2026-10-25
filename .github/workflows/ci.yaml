@@ -11,7 +11,7 @@ on:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  # main の run は GitHub Pages への deploy に繋がるため、後続の push で打ち切らない
+  # main の実行は GitHub Pages へのデプロイに繋がるため、後続のプッシュで打ち切らない
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# 算出済みタグから npm パッケージを build し package.json に version を反映する。
-# 入力: TAG (env、prefix `packages/api-card-npm/v` を含む完全タグ名)、PWD は packages/api-card-npm/。
+# 算出済みタグから npm パッケージをビルドし、package.json のバージョンに反映する。
+# 入力: TAG (環境変数。接頭辞 `packages/api-card-npm/v` を含む完全なタグ名)、カレントディレクトリは packages/api-card-npm/。
 set -euo pipefail
 
 : "${TAG:?TAG env required}"

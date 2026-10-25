@@ -1,5 +1,5 @@
-// Package apicardclient は consumer から wire 詳細 (REST path / HTTP status code) を
-// 隠蔽するため、生成 client を sentinel error 変換でラップする。
+// Package apicardclient は card サービスの REST API を呼び出すクライアントを提供する。
+// 利用側にパスやステータスコードを意識させないため、ステータスコードをエラー値に変換して返す。
 package apicardclient
 
 import (
@@ -11,34 +11,37 @@ import (
 	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 )
 
-// Sentinel errors. wire 契約 (OpenAPI spec) で定義された status code の意味を sentinel として export する。
 var (
-	// ErrNotFound は status 404。
+	// ErrNotFound は対象が存在しないこと (ステータス 404) を示す。
 	ErrNotFound = errors.New("apicardclient: not found")
 
-	// ErrUnauthorized は status 401。X-Internal-Auth 不正等。
+	// ErrUnauthorized は認証に失敗したこと (ステータス 401。X-Internal-Auth の不正など) を示す。
 	ErrUnauthorized = errors.New("apicardclient: unauthorized")
 
-	// ErrForbidden は status 403。未所持カード等のアクセス権限エラー。
+	// ErrForbidden はアクセス権限が無いこと (ステータス 403。未所持のカードなど) を示す。
 	ErrForbidden = errors.New("apicardclient: forbidden")
 
-	// ErrBadRequest は status 400 の generic 形 (validate-for-battle を除く)。
+	// ErrBadRequest は要求内容が不正なこと (ステータス 400。ValidateDeckForBattle を除く) を示す。
 	ErrBadRequest = errors.New("apicardclient: bad request")
 
-	// ErrDeckInvalid は ValidateDeckForBattle の status 400。
-	// wire 契約上「デッキバリデーション失敗 / 制限枚数超過」を意味する。
+	// ErrDeckInvalid はデッキがバトルで使えないこと (ValidateDeckForBattle のステータス 400) を示す。
+	// 契約上、デッキの検証失敗と制限枚数超過がこれに当たる。
 	ErrDeckInvalid = errors.New("apicardclient: deck invalid")
 
-	// ErrInternalServer は status 5xx。
+	// ErrInternalServer はサービスの内部エラー (ステータス 5xx) を示す。
 	ErrInternalServer = errors.New("apicardclient: internal server error")
+
+	// ErrUnexpectedResponse は契約に無い応答を受け取ったことを示す。
+	// 分類のないステータスや、成功のステータスなのに本文を読み取れない応答がこれに当たる。
+	ErrUnexpectedResponse = errors.New("apicardclient: unexpected response")
 )
 
-// Client は overload-party-card REST API の sentinel-error converted client。
+// Client は card サービスの REST API クライアントです。
 type Client struct {
 	api *apicard.ClientWithResponses
 }
 
-// Option は Client 構築時の設定。
+// Option は Client の設定です。
 type Option func(*config)
 
 type config struct {
@@ -46,13 +49,13 @@ type config struct {
 	editors    []apicard.RequestEditorFn
 }
 
-// WithHTTPClient は基底 HTTP doer を差し替える。デフォルトは http.DefaultClient。
+// WithHTTPClient は HTTP リクエストの送信に使うクライアントを差し替える。
 func WithHTTPClient(doer apicard.HttpRequestDoer) Option {
 	return func(c *config) { c.httpClient = doer }
 }
 
-// WithRequestEditorFn は全リクエストに適用する RequestEditor を追加する。
-// X-Internal-Auth ヘッダ注入等に使用する。
+// WithRequestEditorFn は全リクエストに適用する編集関数を追加する。
+// X-Internal-Auth ヘッダの付与などに使う。
 func WithRequestEditorFn(fn apicard.RequestEditorFn) Option {
 	return func(c *config) { c.editors = append(c.editors, fn) }
 }
@@ -60,19 +63,19 @@ func WithRequestEditorFn(fn apicard.RequestEditorFn) Option {
 // New は baseURL に接続する Client を生成する。
 func New(baseURL string, opts ...Option) (*Client, error) {
 	cfg := &config{}
-	for _, opt := range opts {
-		opt(cfg)
+	for _, option := range opts {
+		option(cfg)
 	}
 
-	apiOpts := make([]apicard.ClientOption, 0, 1+len(cfg.editors))
+	apiOptions := make([]apicard.ClientOption, 0)
 	if cfg.httpClient != nil {
-		apiOpts = append(apiOpts, apicard.WithHTTPClient(cfg.httpClient))
+		apiOptions = append(apiOptions, apicard.WithHTTPClient(cfg.httpClient))
 	}
-	for _, ed := range cfg.editors {
-		apiOpts = append(apiOpts, apicard.WithRequestEditorFn(ed))
+	for _, editor := range cfg.editors {
+		apiOptions = append(apiOptions, apicard.WithRequestEditorFn(editor))
 	}
 
-	api, err := apicard.NewClientWithResponses(baseURL, apiOpts...)
+	api, err := apicard.NewClientWithResponses(baseURL, apiOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("apicardclient: new: %w", err)
 	}
@@ -89,18 +92,6 @@ func (c *Client) GetHealth(ctx context.Context) (*apicard.HealthResponse, error)
 		return resp.JSON200, nil
 	}
 	return nil, newStatusError("GetHealth", resp.StatusCode())
-}
-
-// ListCards は全カード定義 (master データ) を返す。
-func (c *Client) ListCards(ctx context.Context) ([]apicard.CardDefinition, error) {
-	resp, err := c.api.ListCardsWithResponse(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("apicardclient: ListCards: %w", err)
-	}
-	if resp.JSON200 != nil {
-		return *resp.JSON200, nil
-	}
-	return nil, newStatusError("ListCards", resp.StatusCode())
 }
 
 // ListPlayerCards はプレイヤーの所持カード一覧を返す。
@@ -187,24 +178,24 @@ func (c *Client) DeleteDeck(ctx context.Context, deckID int64) error {
 	return newStatusError("DeleteDeck", resp.StatusCode())
 }
 
-// ValidateDeckForBattle はデッキがバトル使用可能か検証する。
-// 400 は wire 契約上「デッキ不正」を意味するため ErrDeckInvalid を返す。
+// ValidateDeckForBattle はデッキがバトルで使えるか検証する。
+// ステータス 400 は契約上デッキの不正を意味するため、ErrDeckInvalid を返す。
 func (c *Client) ValidateDeckForBattle(ctx context.Context, deckID int64) error {
 	resp, err := c.api.ValidateDeckForBattleWithResponse(ctx, deckID)
 	if err != nil {
 		return fmt.Errorf("apicardclient: ValidateDeckForBattle: %w", err)
 	}
-	switch resp.StatusCode() {
+	switch code := resp.StatusCode(); code {
 	case http.StatusOK:
 		return nil
 	case http.StatusBadRequest:
 		return fmt.Errorf("apicardclient: ValidateDeckForBattle: %w: %s", ErrDeckInvalid, string(resp.Body))
+	default:
+		return newStatusError("ValidateDeckForBattle", code)
 	}
-	return newStatusError("ValidateDeckForBattle", resp.StatusCode())
 }
 
-// newStatusError は HTTP status code を sentinel error (errors.Is 分岐可能) に変換する。
-// validate-for-battle の 400 は呼出側で先に ErrDeckInvalid に変換するため、ここでは ErrBadRequest にフォールバックする。
+// newStatusError はステータスコードを、errors.Is で区別できるエラーに変換する。
 func newStatusError(op string, code int) error {
 	var sentinel error
 	switch {
@@ -219,7 +210,7 @@ func newStatusError(op string, code int) error {
 	case code >= http.StatusInternalServerError:
 		sentinel = ErrInternalServer
 	default:
-		return fmt.Errorf("apicardclient: %s: unexpected status %d", op, code)
+		return fmt.Errorf("apicardclient: %s: %w: status %d", op, ErrUnexpectedResponse, code)
 	}
 	return fmt.Errorf("apicardclient: %s: %w", op, sentinel)
 }

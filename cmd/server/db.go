@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log/slog"
 	"net"
 
 	"cloud.google.com/go/cloudsqlconn"
@@ -13,18 +13,19 @@ import (
 )
 
 // newDatabasePool は設定に応じた接続方式で DB 接続プールを構築する。
-func newDatabasePool(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, func(), error) {
-	if !cfg.DatabaseIAMAuthEnabled {
+// 戻り値の関数は、接続プールの利用が終わったあとに呼んで、接続方式が持つ資源を解放する。
+func newDatabasePool(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, func() error, error) {
+	if !cfg.IsDatabaseIAMAuthEnabled {
 		pool, err := pgxpool.New(ctx, cfg.DatabaseConn)
 		if err != nil {
 			return nil, nil, fmt.Errorf("pgxpool new: %w", err)
 		}
-		return pool, func() {}, nil
+		return pool, func() error { return nil }, nil
 	}
 	return newDatabasePoolWithIAMAuth(ctx, cfg)
 }
 
-func newDatabasePoolWithIAMAuth(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, func(), error) {
+func newDatabasePoolWithIAMAuth(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, func() error, error) {
 	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseConn)
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse database conn: %w", err)
@@ -45,16 +46,8 @@ func newDatabasePoolWithIAMAuth(ctx context.Context, cfg *config.Config) (*pgxpo
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
-		closeDialer(dialer)
-		return nil, nil, fmt.Errorf("pgxpool new with config: %w", err)
+		return nil, nil, errors.Join(fmt.Errorf("pgxpool new with config: %w", err), dialer.Close())
 	}
 
-	return pool, func() { closeDialer(dialer) }, nil
-}
-
-func closeDialer(dialer *cloudsqlconn.Dialer) {
-	// 呼び出し元がプロセス終了処理の中で呼ぶため、失敗をログにとどめて処理を続行する。
-	if err := dialer.Close(); err != nil {
-		slog.Error("cloudsqlconn dialer close failed", "error", err)
-	}
+	return pool, dialer.Close, nil
 }

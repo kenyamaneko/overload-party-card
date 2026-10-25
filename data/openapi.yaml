@@ -3,11 +3,11 @@ info:
   title: overload-party-card
   version: 0.1.0
   description: |
-    Card service の REST 契約。`packages/api-card` (Go) と `packages/api-card-npm` (TypeScript) を本ファイルから生成する。
+    card サービスの REST 契約。`packages/api-card` (Go)・`packages/api-card-npm` (TypeScript)・`packages/api-card-dotnet` (C#) を本ファイルから生成する。
 
     エンドポイント分類:
-    - `/internal/v1/cards`: master データ配信。battle / gateway 起動時のキャッシュロード用。アプリ層認証はなく、到達制御は呼び出し元の Cloud Run 呼び出し IAM に委ねる
-    - `/api/v1/cards/...`: gateway 経由の player-scoped 操作。`X-Internal-Auth` (RS256 JWT) で認証し、player_id は sub クレームから解決する
+    - `/internal/v1/pubsub/...`: Cloud Pub/Sub のプッシュ配信の受け口。アプリ層の認証はなく、到達制御は呼び出し元の Cloud Run 呼び出し IAM に委ねる
+    - `/api/v1/cards/...`: gateway 経由のプレイヤー単位の操作。`X-Internal-Auth` (RS256 JWT) で認証し、player_id は sub クレームから解決する
 
 paths:
   /health:
@@ -22,40 +22,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
 
-  /internal/v1/cards:
-    get:
-      operationId: listCards
-      summary: 全カード定義を返す (battle / gateway 起動時キャッシュロード用)
-      responses:
-        "200":
-          description: カード定義一覧
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/CardDefinition"
-        "500":
-          description: DB 接続エラー
-
-  /internal/v1/initiatives:
-    get:
-      operationId: listInitiatives
-      summary: 全施策定義を返す (battle 起動時キャッシュロード用)
-      responses:
-        "200":
-          description: 施策定義一覧
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Initiative"
-
   /internal/v1/pubsub/player-onboarded:
     post:
       operationId: pubsubPlayerOnboarded
-      summary: player-onboarded-card-sub の Cloud Pub/Sub push 配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM)
+      summary: player-onboarded-card-sub の Cloud Pub/Sub のプッシュ配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM)
       requestBody:
         required: true
         content:
@@ -66,14 +36,14 @@ paths:
         "200":
           description: 処理完了
         "400":
-          description: envelope または base64 データが不正
+          description: リクエストボディまたは base64 データが不正
         "500":
           description: イベント処理に失敗
 
   /internal/v1/pubsub/card-pack-purchased:
     post:
       operationId: pubsubCardPackPurchased
-      summary: card-pack-purchased-card-sub の Cloud Pub/Sub push 配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM)
+      summary: card-pack-purchased-card-sub の Cloud Pub/Sub のプッシュ配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM)
       requestBody:
         required: true
         content:
@@ -84,7 +54,7 @@ paths:
         "200":
           description: 処理完了
         "400":
-          description: envelope または base64 データが不正
+          description: リクエストボディまたは base64 データが不正
         "500":
           description: イベント処理に失敗
 
@@ -306,7 +276,6 @@ components:
         format: int64
 
   schemas:
-    # ─── Health ────────────────────────────────────────────────────────
     HealthResponse:
       type: object
       required: [status]
@@ -315,10 +284,9 @@ components:
           type: string
           example: ok
 
-    # ─── Pub/Sub push ──────────────────────────────────────────────────
     PubSubPushEnvelope:
       type: object
-      description: Cloud Pub/Sub push subscription が送るリクエスト本文の envelope。
+      description: Cloud Pub/Sub のプッシュサブスクリプションが送るリクエスト本文。
       required: [message]
       properties:
         message:
@@ -328,11 +296,11 @@ components:
             data:
               type: string
               format: byte
-              description: base64 エンコードされたイベント payload。
+              description: base64 エンコードされたイベントのペイロード。
 
-    # ─── Card ──────────────────────────────────────────────────────────
     CardDefinition:
       type: object
+      description: マスターデータの JSON (cards.json) の 1 件分。どのエンドポイントからも参照されないが、battle がバケット上の JSON を読み込む型として使うため残す。
       required:
         - card_id
         - card_name
@@ -357,7 +325,7 @@ components:
           type: string
         faction:
           type: string
-          description: ファクション (`SHE` / `Tenki` / `Sugar` / `Tuners` / `Neutral`)
+          description: 陣営 (`SHE` / `Tenki` / `Sugar` / `Tuners` / `Neutral`)
         card_type:
           type: string
           description: カード種別
@@ -370,10 +338,10 @@ components:
           description: デプロイターン数 (0=即時)
         resizable:
           type: boolean
-          description: 手動スケール可能か
+          description: リサイザブル属性か (手動でランクアップできる)
         elastic:
           type: boolean
-          description: 自動スケール対応か
+          description: エラスティック属性か (自動でスケーリングする)
         elastic_increment:
           type: integer
           format: int64
@@ -384,16 +352,18 @@ components:
           type: integer
           format: int64
         stats:
-          description: スタッツ (ComputeStats または DataStats)
+          description: ステータス (ComputeStats または DataStats)
           type: object
           additionalProperties: true
           x-go-type: json.RawMessage
         effect_text:
           type: string
         effects:
-          description: エフェクト定義 JSON
-          type: object
-          additionalProperties: true
+          description: 効果定義 JSON
+          type: array
+          items:
+            type: object
+            additionalProperties: true
           x-go-type: json.RawMessage
         passive_effects:
           type: array
@@ -474,8 +444,10 @@ components:
         effect_text:
           type: string
         effects:
-          type: object
-          additionalProperties: true
+          type: array
+          items:
+            type: object
+            additionalProperties: true
           x-go-type: json.RawMessage
         passive_effects:
           type: array
@@ -504,7 +476,7 @@ components:
 
     PlayerCardWithDef:
       type: object
-      description: プレイヤー所持カードにカード定義フィールドを付加した API レスポンス型。
+      description: プレイヤー所持カードにカード定義の項目を付加した、API の応答の型。
       required:
         - card_id
         - art_no
@@ -554,10 +526,9 @@ components:
         restriction:
           type: string
 
-    # ─── Card Stats (sub-schemas, embedded in stats JSON) ──────────────
     ComputeStats:
       type: object
-      description: Compute / Container / Orchestrator / Serverless / AI/ML カード用スタッツ。
+      description: Compute / Container / Orchestrator / Serverless / AI/ML のカード用ステータス。
       required: [throughput, availability, maintenance_cost, sla_penalty]
       properties:
         throughput:
@@ -579,7 +550,7 @@ components:
 
     DataStats:
       type: object
-      description: Database / ObjectStorage / CacheDB カード用スタッツ。
+      description: Database / ObjectStorage / CacheDB のカード用ステータス。
       required: [yield, availability, maintenance_cost, sla_penalty]
       properties:
         yield:
@@ -599,7 +570,6 @@ components:
           format: int64
           x-go-name: SLAPenalty
 
-    # ─── Effects ───────────────────────────────────────────────────────
     PassiveEffect:
       type: object
       required: [type, params]
@@ -630,7 +600,6 @@ components:
           type: object
           additionalProperties: true
 
-    # ─── Product ───────────────────────────────────────────────────────
     Product:
       type: object
       description: プロダクト定義 (陣営に N:1)。デッキのメタ情報で、施策を規定する。
@@ -691,10 +660,9 @@ components:
         - routine
         - special
 
-    # ─── Deck ──────────────────────────────────────────────────────────
     Deck:
       type: object
-      description: プレイヤーのデッキ (カード構成オプショナル)。
+      description: プレイヤーのデッキ。カード構成は含まれないことがある。
       required:
         - player_id
         - deck_id
@@ -751,7 +719,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DeckCard"
-          description: デッキのカード構成 (API レスポンス時に populate)
+          description: デッキのカード構成 (API の応答を組み立てるときに設定する)
 
     DeckCard:
       type: object
@@ -851,10 +819,9 @@ components:
           type: integer
           format: int64
 
-    # ─── Enums (流出するもの) ──────────────────────────────────────────
     PassiveEffectType:
       type: string
-      description: パッシブエフェクトの種別。
+      description: パッシブ効果の種別。
       enum:
         - tp_per_backend_db
         - tp_per_backend_data
@@ -866,7 +833,7 @@ components:
 
     PlatformEffectType:
       type: string
-      description: プラットフォームエフェクトの種別。
+      description: プラットフォームの効果の種別。
       enum:
         - tp_bonus
         - yield_bonus
@@ -874,6 +841,6 @@ components:
 
     AttachmentEffectType:
       type: string
-      description: アタッチメントエフェクトの種別。
+      description: アタッチメントの効果の種別。
       enum:
         - stat_bonus

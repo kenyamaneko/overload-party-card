@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/kenyamaneko/overload-party-card/internal/presenter"
 	"github.com/kenyamaneko/overload-party-card/internal/usecase"
 
 	internalauth "github.com/kenyamaneko/overload-party-gateway/packages/internalauth-go"
@@ -28,5 +29,10 @@ func (h *PlayerCardHandler) GetPlayerCards(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, cards)
+	response, err := presenter.ToPlayerCardsWithDefinition(cards)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, response)
 }

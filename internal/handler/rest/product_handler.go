@@ -1,51 +1,30 @@
 package rest
 
 import (
-	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/kenyamaneko/overload-party-card/internal/cache"
-	"github.com/kenyamaneko/overload-party-card/internal/domain"
+	"github.com/kenyamaneko/overload-party-card/internal/presenter"
+	"github.com/kenyamaneko/overload-party-card/internal/usecase"
 )
 
 // ProductHandler はプロダクトマスター配信の REST エンドポイントを処理します。
 type ProductHandler struct {
-	products    *cache.ProductCache
-	initiatives *cache.InitiativeCache
+	productInteractor *usecase.ProductInteractor
 }
 
 // NewProductHandler は ProductHandler を生成します。
-func NewProductHandler(products *cache.ProductCache, initiatives *cache.InitiativeCache) *ProductHandler {
-	return &ProductHandler{products: products, initiatives: initiatives}
-}
-
-// productWithInitiatives はプロダクトに施策を合成した表現です。
-type productWithInitiatives struct {
-	domain.Product
-	Initiatives []domain.Initiative `json:"initiatives"`
+func NewProductHandler(productInteractor *usecase.ProductInteractor) *ProductHandler {
+	return &ProductHandler{productInteractor: productInteractor}
 }
 
 // ListAll はプロダクト定義に施策を合成して全件返します。
 func (h *ProductHandler) ListAll(c *gin.Context) {
-	byProduct := make(map[string][]domain.Initiative)
-	for _, initiative := range h.initiatives.All() {
-		byProduct[initiative.ProductID] = append(byProduct[initiative.ProductID], initiative)
+	products, err := h.productInteractor.ListProducts()
+	if err != nil {
+		respondError(c, err)
+		return
 	}
-
-	products := h.products.All()
-	resp := make([]productWithInitiatives, 0, len(products))
-	for _, product := range products {
-		initiatives, ok := byProduct[product.ProductID]
-		if !ok {
-			slog.Error("product has no initiatives",
-				"product_id", product.ProductID,
-			)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": internalErrorMessage})
-			return
-		}
-		resp = append(resp, productWithInitiatives{Product: product, Initiatives: initiatives})
-	}
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, presenter.ToProducts(products))
 }

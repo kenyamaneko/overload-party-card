@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# upload-master-data.sh — マスターデータを、サービスから読むバケットへ反映する。
+# マスターデータを、サービスから読むバケットへ反映する。
 set -euo pipefail
 
 : "${MASTER_DATA_BUCKET:?MASTER_DATA_BUCKET env required}"

@@ -1,173 +1,152 @@
-package usecase
+package usecase_test
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
-	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
-	gamedesign "github.com/kenyamaneko/overload-party-common/packages/game-design-constants"
+	"github.com/kenyamaneko/overload-party-card/internal/usecase"
+	"github.com/kenyamaneko/overload-party-card/internal/usecase/usecasetest"
 )
 
-// newCardFixture は fakeCardRepo / fakePlayerCardRepo を差し替え可能な CardInteractor を返す。
-func newCardFixture() (*CardInteractor, *fakeCardRepo, *fakePlayerCardRepo) {
-	cardRepo := &fakeCardRepo{}
-	playerCardRepo := newFakePlayerCardRepo()
-	return NewCardInteractor(cardRepo, playerCardRepo), cardRepo, playerCardRepo
+type cardHarness struct {
+	interactor  *usecase.CardInteractor
+	cardRepo    *usecasetest.FakeCardRepository
+	playerCards *usecasetest.FakePlayerCardRepository
 }
 
-func TestListCardsWithOwnership(t *testing.T) {
-	t.Run("[カード]カード一覧への所持状態付与", func(t *testing.T) {
-		t.Run("カード定義の取得元がエラーを返すとき、そのエラーを返す", func(t *testing.T) {
-			interactor, cardRepo, _ := newCardFixture()
-			injected := errors.New("card repo unavailable")
-			cardRepo.findAllErr = injected
-
-			_, err := interactor.ListCardsWithOwnership(context.Background(), fxPlayerID)
-
-			require.Error(t, err)
-			assert.ErrorIs(t, err, injected)
-		})
-
-		t.Run("カード定義の取得が成功し、プレイヤー所持カードの取得元がエラーを返すとき、そのエラーを返す", func(t *testing.T) {
-			interactor, cardRepo, playerCardRepo := newCardFixture()
-			cardRepo.cards = []*domain.Card{{CardID: "TST-0001", Faction: fxFaction, Restriction: gamedesign.RestrictionUnlimited, Stats: json.RawMessage(`{}`)}}
-			injected := errors.New("player card repo unavailable")
-			playerCardRepo.getErr = injected
-
-			_, err := interactor.ListCardsWithOwnership(context.Background(), fxPlayerID)
-
-			require.Error(t, err)
-			assert.ErrorIs(t, err, injected)
-		})
-
-		t.Run("カード定義が0件のとき、空の一覧を返す", func(t *testing.T) {
-			interactor, _, _ := newCardFixture()
-
-			result, err := interactor.ListCardsWithOwnership(context.Background(), fxPlayerID)
-
-			require.NoError(t, err)
-			assert.Empty(t, result)
-		})
-
-		t.Run("カードTST-0001をプレイヤーがどのアート番号変体も所持していないとき、返る一覧のTST-0001はis_ownedがfalseになる", func(t *testing.T) {
-			interactor, cardRepo, _ := newCardFixture()
-			cardRepo.cards = []*domain.Card{{CardID: "TST-0001", Faction: fxFaction, Restriction: gamedesign.RestrictionUnlimited, Stats: json.RawMessage(`{}`)}}
-
-			result, err := interactor.ListCardsWithOwnership(context.Background(), fxPlayerID)
-
-			require.NoError(t, err)
-			require.Len(t, result, 1)
-			assert.False(t, result[0].IsOwned)
-		})
-
-		t.Run("カードTST-0001のいずれかのアート番号変体をプレイヤーが1件以上所持しているとき、返る一覧のTST-0001はis_ownedがtrueになる", func(t *testing.T) {
-			interactor, cardRepo, playerCardRepo := newCardFixture()
-			cardRepo.cards = []*domain.Card{{CardID: "TST-0001", Faction: fxFaction, Restriction: gamedesign.RestrictionUnlimited, Stats: json.RawMessage(`{}`)}}
-			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 2, Count: 1})
-
-			result, err := interactor.ListCardsWithOwnership(context.Background(), fxPlayerID)
-
-			require.NoError(t, err)
-			require.Len(t, result, 1)
-			assert.True(t, result[0].IsOwned)
-		})
-
-		t.Run("カード定義取得元がカード定義を返すとき、返る一覧の各カードの内容(is_owned以外)は、その内容とそのまま一致する", func(t *testing.T) {
-			interactor, cardRepo, _ := newCardFixture()
-			subtype := "VM"
-			effectText := "draw a card"
-			cardRepo.cards = []*domain.Card{{
-				CardID:        "TST-0001",
-				CardName:      "Test Compute",
-				ResourceLabel: "vCPU",
-				Faction:       fxFaction,
-				CardType:      gamedesign.CardTypeCompute,
-				Subtype:       &subtype,
-				Resizable:     true,
-				Elastic:       true,
-				Stats:         json.RawMessage(`{"tp":1}`),
-				EffectText:    &effectText,
-				Restriction:   gamedesign.RestrictionUnlimited,
-				IsActive:      true,
-			}}
-
-			result, err := interactor.ListCardsWithOwnership(context.Background(), fxPlayerID)
-
-			require.NoError(t, err)
-			require.Len(t, result, 1)
-			got := result[0]
-			assert.Equal(t, "TST-0001", got.CardID)
-			assert.Equal(t, "Test Compute", got.CardName)
-			assert.Equal(t, "vCPU", got.ResourceLabel)
-			assert.Equal(t, fxFaction, got.Faction)
-			assert.Equal(t, gamedesign.CardTypeCompute, got.CardType)
-			assert.Equal(t, &subtype, got.Subtype)
-			assert.True(t, got.Resizable)
-			assert.True(t, got.Elastic)
-			assert.Equal(t, json.RawMessage(`{"tp":1}`), got.Stats)
-			assert.Equal(t, &effectText, got.EffectText)
-			assert.Equal(t, gamedesign.RestrictionUnlimited, got.Restriction)
-			assert.True(t, got.IsActive)
-		})
-	})
+func newCardHarness(cards []*domain.Card) *cardHarness {
+	cardRepo := &usecasetest.FakeCardRepository{Cards: cards}
+	playerCards := usecasetest.NewFakePlayerCardRepository()
+	return &cardHarness{
+		interactor:  usecase.NewCardInteractor(cardRepo, playerCards),
+		cardRepo:    cardRepo,
+		playerCards: playerCards,
+	}
 }
 
-func TestListCards(t *testing.T) {
-	t.Run("[カード]カード定義一覧取得", func(t *testing.T) {
-		t.Run("カード定義の取得元がエラーを返すとき、そのエラーを返す", func(t *testing.T) {
-			interactor, cardRepo, _ := newCardFixture()
-			injected := errors.New("card repo unavailable")
-			cardRepo.findAllErr = injected
+func collectOwnershipByCardID(cards []domain.CardWithOwnership) map[string]bool {
+	ownership := map[string]bool{}
+	for _, c := range cards {
+		ownership[c.Card.CardID] = c.IsOwned
+	}
+	return ownership
+}
 
-			_, err := interactor.ListCards(context.Background())
+func countCardsByCardID(cards []domain.CardWithOwnership, cardID string) int {
+	matched := slices.DeleteFunc(slices.Clone(cards), func(c domain.CardWithOwnership) bool { return c.Card.CardID != cardID })
+	return len(matched)
+}
 
-			require.Error(t, err)
-			assert.ErrorIs(t, err, injected)
-		})
+func TestCardListWithOwnership(t *testing.T) {
+	t.Run("[カード]所持状況つきカード一覧", func(t *testing.T) {
+		t.Run("プレイヤーの所持状況つきでカード一覧を取得する", func(t *testing.T) {
+			t.Run("正常系", func(t *testing.T) {
+				t.Run("カードマスターにTST-0001とTST-0002があり、プレイヤーがTST-0001だけを所持しているとき", func(t *testing.T) {
+					t.Run("一覧のTST-0001のis_ownedがtrueになる", func(t *testing.T) {
+						h := newCardHarness(usecasetest.NewUnlimitedSheCards(2))
+						h.playerCards.SetCount(usecasetest.PlayerA, "TST-0001", 1, 1)
 
-		t.Run("カード定義が0件のとき、空の一覧を返す", func(t *testing.T) {
-			interactor, _, _ := newCardFixture()
+						cards, err := h.interactor.ListCardsWithOwnership(t.Context(), usecasetest.PlayerA)
 
-			result, err := interactor.ListCards(context.Background())
+						assert.NoError(t, err)
+						ownership := collectOwnershipByCardID(cards)
+						assert.Contains(t, ownership, "TST-0001")
+						assert.True(t, ownership["TST-0001"])
+					})
 
-			require.NoError(t, err)
-			assert.Empty(t, result)
-		})
+					t.Run("一覧のTST-0002のis_ownedがfalseになる", func(t *testing.T) {
+						h := newCardHarness(usecasetest.NewUnlimitedSheCards(2))
+						h.playerCards.SetCount(usecasetest.PlayerA, "TST-0001", 1, 1)
 
-		t.Run("返る一覧の内容は、カード定義取得元が返した内容と一致する", func(t *testing.T) {
-			interactor, cardRepo, _ := newCardFixture()
-			cardRepo.cards = []*domain.Card{{
-				CardID:        "TST-0001",
-				CardName:      "Test Compute",
-				ResourceLabel: "vCPU",
-				Faction:       fxFaction,
-				CardType:      gamedesign.CardTypeCompute,
-				Restriction:   gamedesign.RestrictionUnlimited,
-				IsActive:      true,
-				Stats:         json.RawMessage(`{}`),
-			}}
+						cards, err := h.interactor.ListCardsWithOwnership(t.Context(), usecasetest.PlayerA)
 
-			result, err := interactor.ListCards(context.Background())
+						assert.NoError(t, err)
+						ownership := collectOwnershipByCardID(cards)
+						assert.Contains(t, ownership, "TST-0002")
+						assert.False(t, ownership["TST-0002"])
+					})
+				})
 
-			require.NoError(t, err)
-			require.Len(t, result, 1)
-			want := &apicard.CardDefinition{
-				CardID:        "TST-0001",
-				CardName:      "Test Compute",
-				ResourceLabel: "vCPU",
-				Faction:       fxFaction,
-				CardType:      gamedesign.CardTypeCompute,
-				Restriction:   gamedesign.RestrictionUnlimited,
-				IsActive:      true,
-				Stats:         json.RawMessage(`{}`),
-			}
-			assert.Equal(t, want, result[0])
+				t.Run("カードマスターにTST-0001があり、プレイヤーがTST-0001のアート1とアート2を所持しているとき", func(t *testing.T) {
+					t.Run("一覧にTST-0001が1件だけ含まれる", func(t *testing.T) {
+						h := newCardHarness(usecasetest.NewUnlimitedSheCards(1))
+						h.playerCards.SetCount(usecasetest.PlayerA, "TST-0001", 1, 1)
+						h.playerCards.SetCount(usecasetest.PlayerA, "TST-0001", 2, 1)
+
+						cards, err := h.interactor.ListCardsWithOwnership(t.Context(), usecasetest.PlayerA)
+
+						assert.NoError(t, err)
+						assert.Equal(t, 1, countCardsByCardID(cards, "TST-0001"))
+					})
+
+					t.Run("一覧のTST-0001のis_ownedがtrueになる", func(t *testing.T) {
+						h := newCardHarness(usecasetest.NewUnlimitedSheCards(1))
+						h.playerCards.SetCount(usecasetest.PlayerA, "TST-0001", 1, 1)
+						h.playerCards.SetCount(usecasetest.PlayerA, "TST-0001", 2, 1)
+
+						cards, err := h.interactor.ListCardsWithOwnership(t.Context(), usecasetest.PlayerA)
+
+						assert.NoError(t, err)
+						ownership := collectOwnershipByCardID(cards)
+						assert.Contains(t, ownership, "TST-0001")
+						assert.True(t, ownership["TST-0001"])
+					})
+				})
+
+				t.Run("カードマスターにTST-0001とTST-0002があり、プレイヤーの所持カードが0件のとき、一覧のTST-0001とTST-0002のis_ownedがどちらもfalseになる", func(t *testing.T) {
+					h := newCardHarness(usecasetest.NewUnlimitedSheCards(2))
+
+					cards, err := h.interactor.ListCardsWithOwnership(t.Context(), usecasetest.PlayerA)
+
+					assert.NoError(t, err)
+					assert.Equal(t, map[string]bool{"TST-0001": false, "TST-0002": false}, collectOwnershipByCardID(cards))
+				})
+
+				t.Run("カードマスターが0件のとき、空の一覧が返る", func(t *testing.T) {
+					h := newCardHarness(nil)
+
+					cards, err := h.interactor.ListCardsWithOwnership(t.Context(), usecasetest.PlayerA)
+
+					assert.NoError(t, err)
+					assert.NotNil(t, cards)
+					assert.Empty(t, cards)
+				})
+			})
+
+			t.Run("異常系", func(t *testing.T) {
+				t.Run("依存先がエラーを返したとき", func(t *testing.T) {
+					tests := []struct {
+						name    string
+						failure error
+						inject  func(h *cardHarness, failure error)
+					}{
+						{
+							name:    "カードマスターのデータベースが「所持状況つき一覧時のカードマスター取得の失敗」のエラーを返したとき、エラーの原因が「所持状況つき一覧時のカードマスター取得の失敗」のエラーになる",
+							failure: errors.New("所持状況つき一覧時のカードマスター取得の失敗"),
+							inject:  func(h *cardHarness, failure error) { h.cardRepo.Err = failure },
+						},
+						{
+							name:    "所持カードのデータベースが「所持状況つき一覧時の所持カード取得の失敗」のエラーを返したとき、エラーの原因が「所持状況つき一覧時の所持カード取得の失敗」のエラーになる",
+							failure: errors.New("所持状況つき一覧時の所持カード取得の失敗"),
+							inject:  func(h *cardHarness, failure error) { h.playerCards.GetErr = failure },
+						},
+					}
+					for _, tt := range tests {
+						t.Run(tt.name, func(t *testing.T) {
+							h := newCardHarness(usecasetest.NewUnlimitedSheCards(1))
+							tt.inject(h, tt.failure)
+
+							_, err := h.interactor.ListCardsWithOwnership(t.Context(), usecasetest.PlayerA)
+
+							assert.ErrorIs(t, err, tt.failure)
+						})
+					}
+				})
+			})
 		})
 	})
 }

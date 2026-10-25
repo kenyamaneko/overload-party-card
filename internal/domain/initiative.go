@@ -1,15 +1,20 @@
 package domain
 
-import "encoding/json"
+const (
+	// InitiativeKindRoutine はルーチン (1 ターン 1 回使用できる施策) の区分です。
+	InitiativeKindRoutine = "routine"
+	// InitiativeKindSpecial はスペシャル (1 ゲーム 1 回使用できる施策) の区分です。
+	InitiativeKindSpecial = "special"
+)
 
-// Initiative はプロダクトに属する施策 1 件分。
+// Initiative はプロダクトに属する施策です。
 type Initiative struct {
-	InitiativeID string          `json:"initiative_id"`
-	ProductID    string          `json:"product_id"`
-	Kind         string          `json:"kind"`
-	Name         string          `json:"name"`
-	InsightCost  int64           `json:"insight_cost"`
-	EffectText   string          `json:"effect_text"`
-	Effect       json.RawMessage `json:"effect"`
-	IsActive     bool            `json:"is_active"`
+	InitiativeID string
+	ProductID    string
+	Kind         string
+	Name         string
+	InsightCost  int64
+	EffectText   string
+	Effect       map[string]any
+	IsActive     bool
 }
