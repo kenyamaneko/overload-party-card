@@ -1,16 +1,13 @@
-# NOTE: origin fields are for internal development reference only.
-# These values MUST NOT be displayed to end users.
+# origin 項目は開発内部の参照用であり、エンドユーザーに表示してはならない。
 
 faction: Sugar
 display_name: "しゅがーらぼ"
 cards:
-  # === Compute (5 cards) ===
-
   - card_no: 47
     card_id: "SL-0001"
     card_name: "ジューシィ・いちご"
     resource_label: "Compute"
-    # const_name は旧 card_name 由来。変更は全消費リポで破壊的変更となるため据え置き
+    # const_name を変えると全ての利用側リポジトリで破壊的変更になるため、カード名を変えても据え置く
     const_name: SugarComputeConfettiito
     card_type: Compute
     subtype: VM
@@ -140,8 +137,6 @@ cards:
       maintenance_cost: 0
     effect_text: "—"
 
-  # === AI/ML (2 cards) ===
-
   - card_no: 51
     card_id: "SL-0006"
     card_name: "バター君"
@@ -195,8 +190,6 @@ cards:
               selector: { owner: myself, zone: backend }
               amount: 400
           - destroy_check: { target: myself }
-
-  # === Database / Data (5 cards) ===
 
   - card_no: 54
     card_id: "SL-0008"
@@ -332,8 +325,6 @@ cards:
                 amount: 200
                 duration: permanent
 
-  # === Object Storage (1 card) ===
-
   - card_no: 56
     card_id: "SL-0013"
     card_name: "シュトレーンジ"
@@ -353,8 +344,6 @@ cards:
       sla_penalty: 200
       maintenance_cost: 50
     effect_text: "—"
-
-  # === Platform (3 cards) ===
 
   - card_no: 59
     card_id: "SL-0014"
@@ -417,8 +406,6 @@ cards:
       - trigger: on_end_phase
         ops:
           - absorb_insight: { amount: 300 }
-
-  # === Attachment (4 cards) ===
 
   - card_no: 62
     card_id: "SL-0017"
@@ -518,8 +505,6 @@ cards:
           categories: [utility]
           target: myself
 
-  # === Strategy (3 cards) ===
-
   - card_no: 65
     card_id: "SL-0021"
     card_name: "しゅがーらぼ Deployment"
@@ -586,8 +571,6 @@ cards:
                   count: { owner: myself, zone: backend }
                   value: 200
                 max: 600
-
-  # === Reactive (1 card) ===
 
   - card_no: 68
     card_id: "SL-0024"
