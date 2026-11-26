@@ -10,10 +10,10 @@ GitHub Ruleset で `main` に以下を設定している。
 
 - 直 push 禁止、PR マージのみ
 - force push 禁止、削除禁止
-- 必須ステータスチェック: `ci / lint`, `ci / test-unit`, `ci / test-integration`, `ci / image-scan`, `ci / codegen-sync`, `ci / test-python`
+- 必須ステータスチェック: `ci / lint`, `ci / test-unit`, `ci / test-integration`, `ci / image-scan`, `ci / codegen-sync`
 - required reviews: 0 (一人開発のため。複数人化する際に 1 へ引き上げる)
 
-チェック名の `ci` は `ci.yaml` の呼び出し側ジョブ名で、続く名前は common の `go-service-ci.yaml` のジョブ名 (`test-python` はカードデータ生成スクリプトのテスト)。
+チェック名の `ci` は `ci.yaml` の呼び出し側ジョブ名で、続く名前は common の `go-service-ci.yaml` のジョブ名。
 
 ## CI/CD パイプライン
 
