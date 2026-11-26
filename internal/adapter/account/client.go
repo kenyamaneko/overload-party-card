@@ -1,59 +1,48 @@
-// Package account は account サービスの内部 API を叩く HTTP クライアントを提供します。
+// Package account は account サービスの内部 API を呼び出すクライアントを提供します。
 package account
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
-	"strings"
 	"time"
+
+	apiaccount "github.com/kenyamaneko/overload-party-account/packages/api-account"
 
 	"github.com/kenyamaneko/overload-party-card/internal/port"
 )
+
+const requestTimeout = 5 * time.Second
 
 var _ port.FactionClient = (*Client)(nil)
 
 // Client は account サービスの内部 API クライアントです。
 type Client struct {
-	baseURL string
-	http    *http.Client
+	api *apiaccount.ClientWithResponses
 }
 
-// NewClient は account サービスの Client を生成します。
-func NewClient(baseURL string) *Client {
-	return &Client{
-		baseURL: strings.TrimRight(baseURL, "/"),
-		http:    &http.Client{Timeout: 5 * time.Second},
-	}
-}
-
-type factionListing struct {
-	Factions []string `json:"factions"`
-}
-
-// ListPlayerFactions は指定プレイヤーの所持ファクション一覧を取得します。
-func (c *Client) ListPlayerFactions(ctx context.Context, playerID string) ([]string, error) {
-	endpoint := fmt.Sprintf("%s/internal/v1/players/%s/factions", c.baseURL, url.PathEscape(playerID))
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+// NewClient は baseURL の account サービスに接続する Client を生成します。
+func NewClient(baseURL string) (*Client, error) {
+	api, err := apiaccount.NewClientWithResponses(baseURL,
+		apiaccount.WithHTTPClient(&http.Client{Timeout: requestTimeout}),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("build account request: %w", err)
+		return nil, fmt.Errorf("new account client: %w", err)
 	}
+	return &Client{api: api}, nil
+}
 
-	resp, err := c.http.Do(req)
+// ListPlayerFactions は指定プレイヤーが所持する陣営の一覧を取得します。
+func (c *Client) ListPlayerFactions(ctx context.Context, playerID string) ([]string, error) {
+	resp, err := c.api.ListPlayerFactionsWithResponse(ctx, playerID)
 	if err != nil {
 		return nil, fmt.Errorf("call account: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("account returned status %d for player factions", resp.StatusCode)
+	if resp.StatusCode() != http.StatusOK {
+		return nil, fmt.Errorf("account returned status %d for player factions", resp.StatusCode())
 	}
-
-	var body factionListing
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		return nil, fmt.Errorf("decode player factions: %w", err)
+	if resp.JSON200 == nil {
+		return nil, fmt.Errorf("account returned status %d without a JSON body (content type %q) for player factions", resp.StatusCode(), resp.ContentType())
 	}
-	return body.Factions, nil
+	return resp.JSON200.Factions, nil
 }

@@ -1,33 +1,24 @@
 #!/usr/bin/env python3
-"""Generate product data outputs from the YAML product / initiative definitions.
+"""YAML のプロダクト定義と施策定義から、配布用 JSON・初期投入 SQL・プロダクト一覧文書を生成する。
 
-Inputs (SSoT, edited by humans):
-  - data/products.yaml      (products only)
-  - data/initiatives.yaml   (initiatives, referencing products by product_id)
-
-Outputs:
-  - data/cache/products_gen.json     (Go embedded via data/cache/embed.go)
-  - data/cache/initiatives_gen.json  (Go embedded via data/cache/embed.go)
-  - db/seed/products_seed.sql        (PostgreSQL UPSERT seed: products)
-  - db/seed/initiatives_seed.sql     (PostgreSQL UPSERT seed: initiatives)
-  - docs/PRODUCTS.md                 (human-readable product list)
-
-Usage:
     python3 scripts/generate_products.py
 """
 
-import json
 import re
 import sys
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:
-    print("ERROR: pyyaml is required. Install with: pip install pyyaml", file=sys.stderr)
-    sys.exit(1)
+from generation_io import (
+    exit_with_error,
+    exit_with_validation_errors,
+    format_sql_boolean,
+    load_yaml_file,
+    quote_sql_jsonb,
+    quote_sql_string,
+    write_json_file,
+    write_lines_file,
+)
 
-# ─── Paths ──────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parent.parent
 PRODUCTS_YAML_PATH = ROOT / "data" / "products.yaml"
 INITIATIVES_YAML_PATH = ROOT / "data" / "initiatives.yaml"
@@ -37,42 +28,38 @@ PRODUCTS_SEED_OUT = ROOT / "db" / "seed" / "products_seed.sql"
 INITIATIVES_SEED_OUT = ROOT / "db" / "seed" / "initiatives_seed.sql"
 MD_OUT = ROOT / "docs" / "PRODUCTS.md"
 
-# ─── Constants ──────────────────────────────────────────
-# collectible な陣営は少なくとも 1 つのプロダクトを持つ (陣営:プロダクト = 1:N)。
 COLLECTIBLE_FACTIONS = {"SHE", "Tenki", "Sugar", "Tuners"}
-
-# 各プロダクトは区分ごとに 1 つ以上の施策を持つ (ルーチン / スペシャル)。
 INITIATIVE_KINDS = ["routine", "special"]
-
 KIND_DISPLAY = {"routine": "ルーチン（1ターン1回）", "special": "スペシャル（1ゲーム1回）"}
+IS_ACTIVE_WHEN_OMITTED = True
 
 
-# ─── Load ───────────────────────────────────────────────
-def _load_yaml(path, key):
-    """Load a top-level list from a YAML file."""
-    if not path.exists():
-        print(f"ERROR: {path} not found", file=sys.stderr)
-        sys.exit(1)
-    with open(path, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-    return data.get(key, [])
+def _load_top_level_list(path, key):
+    return load_yaml_file(path).get(key, [])
 
 
 def load_products():
-    """Load products from data/products.yaml."""
-    return _load_yaml(PRODUCTS_YAML_PATH, "products")
+    """プロダクト定義を読み込む。
+
+    Raises:
+        FileNotFoundError: プロダクト定義のファイルが無いとき。
+    """
+    return _load_top_level_list(PRODUCTS_YAML_PATH, "products")
 
 
 def load_initiatives():
-    """Load initiatives from data/initiatives.yaml."""
-    return _load_yaml(INITIATIVES_YAML_PATH, "initiatives")
+    """施策定義を読み込む。
+
+    Raises:
+        FileNotFoundError: 施策定義のファイルが無いとき。
+    """
+    return _load_top_level_list(INITIATIVES_YAML_PATH, "initiatives")
 
 
-# ─── Validate ──────────────────────────────────────────
 def _validate_initiative(initiative, label, product_ids, errors):
-    for field in ("initiative_id", "product_id", "kind", "name", "insight_cost", "effect_text", "effect"):
-        if field not in initiative:
-            errors.append(f"{label}: missing required field '{field}'")
+    for field_name in ("initiative_id", "product_id", "kind", "name", "insight_cost", "effect_text", "effect"):
+        if field_name not in initiative:
+            errors.append(f"{label}: missing required field '{field_name}'")
             return
 
     initiative_id = initiative["initiative_id"]
@@ -95,8 +82,8 @@ def _validate_initiative(initiative, label, product_ids, errors):
         errors.append(f"{label}: is_active must be a boolean")
 
 
-def validate(products, initiatives):
-    """Run all validation checks. Returns list of error strings."""
+def validate_products_and_initiatives(products, initiatives):
+    """プロダクト定義と施策定義を検証し、誤りの文字列のリストを返す。"""
     errors = []
     seen_factions = {}
     seen_product_ids = {}
@@ -106,9 +93,9 @@ def validate(products, initiatives):
         product_id = product.get("product_id", "???")
         label = f"{product_id} {product.get('product_name', '???')}"
 
-        for field in ("product_id", "faction", "product_name"):
-            if field not in product:
-                errors.append(f"{label}: missing required field '{field}'")
+        for field_name in ("product_id", "faction", "product_name"):
+            if field_name not in product:
+                errors.append(f"{label}: missing required field '{field_name}'")
 
         if not re.match(r"^PD-\d{4}$", product_id):
             errors.append(f"{label}: product_id '{product_id}' must match PD-NNNN format")
@@ -116,7 +103,7 @@ def validate(products, initiatives):
             errors.append(f"{label}: duplicate product_id")
         seen_product_ids[product_id] = True
 
-        # 陣営はプロダクトを複数持てる (1:N)。重複は許容し、faction → product の存在のみ追跡する。
+        # 陣営は複数のプロダクトを持てるため、陣営の重複は誤りにしない
         faction = product.get("faction", "")
         if faction not in COLLECTIBLE_FACTIONS:
             errors.append(f"{label}: invalid faction '{faction}'")
@@ -125,20 +112,22 @@ def validate(products, initiatives):
         if "is_active" in product and not isinstance(product["is_active"], bool):
             errors.append(f"{label}: is_active must be a boolean")
 
-    kinds_by_product = {pid: set() for pid in seen_product_ids}
+    kinds_by_product = {product_id: set() for product_id in seen_product_ids}
     for initiative in initiatives:
-        iid = initiative.get("initiative_id")
-        ilabel = f"{initiative.get('product_id', '???')} / {initiative.get('name', '???')}"
-        _validate_initiative(initiative, ilabel, seen_product_ids, errors)
-        if iid is not None:
-            if iid in seen_initiative_ids:
-                errors.append(f"{ilabel}: duplicate initiative_id '{iid}' (also used by {seen_initiative_ids[iid]})")
-            seen_initiative_ids[iid] = initiative.get("product_id")
-        pid = initiative.get("product_id")
-        if pid in kinds_by_product:
-            kinds_by_product[pid].add(initiative.get("kind"))
+        initiative_id = initiative.get("initiative_id")
+        initiative_label = f"{initiative.get('product_id', '???')} / {initiative.get('name', '???')}"
+        _validate_initiative(initiative, initiative_label, seen_product_ids, errors)
+        if initiative_id is not None:
+            if initiative_id in seen_initiative_ids:
+                errors.append(
+                    f"{initiative_label}: duplicate initiative_id '{initiative_id}' "
+                    f"(also used by {seen_initiative_ids[initiative_id]})"
+                )
+            seen_initiative_ids[initiative_id] = initiative.get("product_id")
+        referenced_product_id = initiative.get("product_id")
+        if referenced_product_id in kinds_by_product:
+            kinds_by_product[referenced_product_id].add(initiative.get("kind"))
 
-    # 各プロダクトはルーチン・スペシャルをそれぞれ 1 つ以上持つ (数は区分ごとに異なってよい)。
     for product_id, kinds in kinds_by_product.items():
         for required_kind in INITIATIVE_KINDS:
             if required_kind not in kinds:
@@ -151,81 +140,66 @@ def validate(products, initiatives):
     return errors
 
 
-# ─── Assemble ──────────────────────────────────────────
-def assemble(products, initiatives):
-    """Attach each product's initiatives (in file order) under an 'initiatives' key."""
-    by_product = {}
+def _attach_initiatives_to_products(products, initiatives):
+    initiatives_by_product = {product["product_id"]: [] for product in products}
     for initiative in initiatives:
-        by_product.setdefault(initiative["product_id"], []).append(initiative)
+        initiatives_by_product[initiative["product_id"]].append(initiative)
 
-    assembled = []
-    for product in products:
-        assembled.append({**product, "initiatives": by_product.get(product["product_id"], [])})
-    return assembled
-
-
-# ─── Generate JSON ─────────────────────────────────────
-def _write_json(out_path, output):
-    out = Path(out_path)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    with open(out, "w", encoding="utf-8") as f:
-        json.dump(output, f, ensure_ascii=False, indent=2)
-        f.write("\n")
+    return [
+        {**product, "initiatives": initiatives_by_product[product["product_id"]]}
+        for product in products
+    ]
 
 
 def generate_products_json(products, *, out_path):
-    """Generate products_gen.json (flat products)."""
+    """プロダクトの配布用 JSON を product_id の順に書き出す。
+
+    Returns:
+        書き出したプロダクトの件数。
+    """
     output = [
         {
-            "product_id": p["product_id"],
-            "faction": p["faction"],
-            "product_name": p["product_name"],
-            "is_active": p.get("is_active", True),
+            "product_id": product["product_id"],
+            "faction": product["faction"],
+            "product_name": product["product_name"],
+            "is_active": product.get("is_active", IS_ACTIVE_WHEN_OMITTED),
         }
-        for p in sorted(products, key=lambda p: p["product_id"])
+        for product in sorted(products, key=lambda product: product["product_id"])
     ]
-    _write_json(out_path, output)
+    write_json_file(out_path, output)
     return len(output)
 
 
 def generate_initiatives_json(initiatives, *, out_path):
-    """Generate initiatives_gen.json (flat initiatives)."""
+    """施策の配布用 JSON を initiative_id の順に書き出す。
+
+    Returns:
+        書き出した施策の件数。
+    """
     output = [
         {
-            "initiative_id": i["initiative_id"],
-            "product_id": i["product_id"],
-            "kind": i["kind"],
-            "name": i["name"],
-            "insight_cost": i["insight_cost"],
-            "effect_text": i["effect_text"],
-            "effect": i["effect"],
-            "is_active": i.get("is_active", True),
+            "initiative_id": initiative["initiative_id"],
+            "product_id": initiative["product_id"],
+            "kind": initiative["kind"],
+            "name": initiative["name"],
+            "insight_cost": initiative["insight_cost"],
+            "effect_text": initiative["effect_text"],
+            "effect": initiative["effect"],
+            "is_active": initiative.get("is_active", IS_ACTIVE_WHEN_OMITTED),
         }
-        for i in sorted(initiatives, key=lambda i: i["initiative_id"])
+        for initiative in sorted(initiatives, key=lambda initiative: initiative["initiative_id"])
     ]
-    _write_json(out_path, output)
+    write_json_file(out_path, output)
     return len(output)
 
 
-# ─── Generate Seed SQL ─────────────────────────────────
-def _sql_escape(s):
-    """Escape a string for a PostgreSQL single-quoted literal."""
-    if s is None:
-        return "NULL"
-    return "'" + s.replace("'", "''") + "'"
-
-
-def _write_sql(out_path, lines):
-    out = Path(out_path)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    with open(out, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines))
-        f.write("\n")
-
-
 def generate_products_seed_sql(products, *, out_path):
-    """Generate db/seed/products_seed.sql with UPSERT statements for products."""
-    sorted_products = sorted(products, key=lambda p: p["product_id"])
+    """プロダクトの初期投入 SQL を product_id の順に書き出す。
+
+    Returns:
+        書き出したプロダクトの件数。
+    """
+    sorted_products = sorted(products, key=lambda product: product["product_id"])
 
     lines = []
     lines.append("-- Auto-generated by scripts/generate_products.py. DO NOT EDIT.")
@@ -233,9 +207,10 @@ def generate_products_seed_sql(products, *, out_path):
     lines.append("INSERT INTO card.products (product_id, faction, product_name, is_active)")
     lines.append("VALUES")
     product_rows = [
-        f"  ({_sql_escape(p['product_id'])}, {_sql_escape(p['faction'])}, {_sql_escape(p['product_name'])}, "
-        f"{'true' if p.get('is_active', True) else 'false'})"
-        for p in sorted_products
+        f"  ({quote_sql_string(product['product_id'])}, {quote_sql_string(product['faction'])}, "
+        f"{quote_sql_string(product['product_name'])}, "
+        f"{format_sql_boolean(product.get('is_active', IS_ACTIVE_WHEN_OMITTED))})"
+        for product in sorted_products
     ]
     lines.append(",\n".join(product_rows))
     lines.append("ON CONFLICT (product_id) DO UPDATE SET")
@@ -245,16 +220,17 @@ def generate_products_seed_sql(products, *, out_path):
     lines.append("  updated_at   = now();")
     lines.append("")
 
-    _write_sql(out_path, lines)
+    write_lines_file(out_path, lines)
     return len(sorted_products)
 
 
 def generate_initiatives_seed_sql(initiatives, *, out_path):
-    """Generate db/seed/initiatives_seed.sql with UPSERT statements for initiatives.
+    """施策の初期投入 SQL を initiative_id の順に書き出す。
 
-    initiatives は products への FK を持つため products_seed.sql を先に適用すること。
+    Returns:
+        書き出した施策の件数。
     """
-    sorted_initiatives = sorted(initiatives, key=lambda i: i["initiative_id"])
+    sorted_initiatives = sorted(initiatives, key=lambda initiative: initiative["initiative_id"])
 
     lines = []
     lines.append("-- Auto-generated by scripts/generate_products.py. DO NOT EDIT.")
@@ -266,13 +242,13 @@ def generate_initiatives_seed_sql(initiatives, *, out_path):
 
     rows = []
     for initiative in sorted_initiatives:
-        effect_json = _sql_escape(json.dumps(initiative["effect"], ensure_ascii=False)) + "::jsonb"
-        is_active = "true" if initiative.get("is_active", True) else "false"
+        effect_sql = quote_sql_jsonb(initiative["effect"])
+        is_active = format_sql_boolean(initiative.get("is_active", IS_ACTIVE_WHEN_OMITTED))
         rows.append(
-            f"  ({_sql_escape(initiative['initiative_id'])}, {_sql_escape(initiative['product_id'])}, "
-            f"{_sql_escape(initiative['kind'])}, {_sql_escape(initiative['name'])}, "
-            f"{initiative['insight_cost']}, {_sql_escape(initiative['effect_text'])},\n"
-            f"   {effect_json}, {is_active})"
+            f"  ({quote_sql_string(initiative['initiative_id'])}, {quote_sql_string(initiative['product_id'])}, "
+            f"{quote_sql_string(initiative['kind'])}, {quote_sql_string(initiative['name'])}, "
+            f"{initiative['insight_cost']}, {quote_sql_string(initiative['effect_text'])},\n"
+            f"   {effect_sql}, {is_active})"
         )
     lines.append(",\n".join(rows))
     lines.append("ON CONFLICT (initiative_id) DO UPDATE SET")
@@ -286,59 +262,63 @@ def generate_initiatives_seed_sql(initiatives, *, out_path):
     lines.append("  updated_at   = now();")
     lines.append("")
 
-    _write_sql(out_path, lines)
+    write_lines_file(out_path, lines)
     return len(sorted_initiatives)
 
 
-# ─── Generate PRODUCTS.md ──────────────────────────────
-def generate_md(products, *, out_path):
-    """Generate docs/PRODUCTS.md."""
+def generate_products_md(products, initiatives, *, out_path):
+    """プロダクト一覧文書を書き出す。
+
+    Args:
+        products: 検証済みのプロダクト定義。
+        initiatives: 検証済みの施策定義。各プロダクトの節に、そのプロダクトの施策が載る。
+        out_path: 書き出す場所。
+
+    Returns:
+        書き出したプロダクトの件数。
+    """
     lines = []
     lines.append("<!-- This file is auto-generated by scripts/generate_products.py. DO NOT EDIT. -->")
     lines.append("")
-    lines.append("# Overload Party — Product List")
+    lines.append("# Overload Party Product List")
     lines.append("")
 
-    for product in sorted(products, key=lambda p: p["product_id"]):
-        lines.append(f"## {product['product_name']}（{product['faction']}）— {product['product_id']}")
+    attached_products = _attach_initiatives_to_products(products, initiatives)
+    for product in sorted(attached_products, key=lambda product: product["product_id"]):
+        lines.append(f"## {product['product_name']}（{product['faction']}、{product['product_id']}）")
         lines.append("")
-        lines.append("| ID | 区分 | 施策 | Insight コスト | 効果 |")
+        lines.append("| ID | 区分 | 施策 | 使用コスト | 効果 |")
         lines.append("|------|------|------|------|------|")
         for kind in INITIATIVE_KINDS:
-            for initiative in [i for i in product["initiatives"] if i["kind"] == kind]:
+            kind_initiatives = [
+                initiative for initiative in product["initiatives"] if initiative["kind"] == kind
+            ]
+            for initiative in kind_initiatives:
                 lines.append(
                     f"| {initiative['initiative_id']} | {KIND_DISPLAY[kind]} | {initiative['name']} "
                     f"| {initiative['insight_cost']} | {initiative['effect_text']} |"
                 )
         lines.append("")
 
-    out = Path(out_path)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    with open(out, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines))
-        f.write("\n")
+    write_lines_file(out_path, lines)
     return len(products)
 
 
-# ─── Main ──────────────────────────────────────────────
 def main():
-    products = load_products()
-    initiatives = load_initiatives()
+    """プロダクト定義と施策定義を検証し、配布用 JSON・初期投入 SQL・プロダクト一覧文書を生成する。"""
+    try:
+        products = load_products()
+        initiatives = load_initiatives()
+    except FileNotFoundError as err:
+        exit_with_error(f"{err.filename} not found")
     if not products:
-        print("ERROR: No products loaded from YAML", file=sys.stderr)
-        sys.exit(1)
+        exit_with_error("No products loaded from YAML")
     if not initiatives:
-        print("ERROR: No initiatives loaded from YAML", file=sys.stderr)
-        sys.exit(1)
+        exit_with_error("No initiatives loaded from YAML")
 
-    errors = validate(products, initiatives)
+    errors = validate_products_and_initiatives(products, initiatives)
     if errors:
-        print(f"Validation failed with {len(errors)} error(s):", file=sys.stderr)
-        for err in errors:
-            print(f"  - {err}", file=sys.stderr)
-        sys.exit(1)
-
-    assembled = assemble(products, initiatives)
+        exit_with_validation_errors(errors)
 
     count = generate_products_json(products, out_path=PRODUCTS_JSON_OUT)
     print(f"Generated {count} products → {PRODUCTS_JSON_OUT.relative_to(ROOT)}", file=sys.stderr)
@@ -352,7 +332,7 @@ def main():
     count = generate_initiatives_seed_sql(initiatives, out_path=INITIATIVES_SEED_OUT)
     print(f"Generated {count} initiatives → {INITIATIVES_SEED_OUT.relative_to(ROOT)}", file=sys.stderr)
 
-    count = generate_md(assembled, out_path=MD_OUT)
+    count = generate_products_md(products, initiatives, out_path=MD_OUT)
     print(f"Generated {count} products → {MD_OUT.relative_to(ROOT)}", file=sys.stderr)
 
 

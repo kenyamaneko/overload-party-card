@@ -1,11 +1,8 @@
-# NOTE: origin fields are for internal development reference only.
-# These values MUST NOT be displayed to end users.
+# origin 項目は開発内部の参照用であり、エンドユーザーに表示してはならない。
 
 faction: Tenki
 display_name: "天気使い"
 cards:
-  # ── コンピュート系リソース (5枚) ──────────────────────────────
-
   - card_no: 23
     card_id: "TK-0001"
     card_name: "ソラ"
@@ -161,11 +158,6 @@ cards:
       maintenance_cost: 0
     effect_text: "—"
 
-  # ── AI/ML系リソース (1枚) ────────────────────────────────────
-  # (card #27 above)
-
-  # ── DB系リソース (4枚) ───────────────────────────────────────
-
   - card_no: 29
     card_id: "TK-0007"
     card_name: "シグレ"
@@ -296,8 +288,6 @@ cards:
       maintenance_cost: 100
     effect_text: "—"
 
-  # ── プラットフォーム (3枚) ───────────────────────────────────
-
   - card_no: 34
     card_id: "TK-0012"
     card_name: "天気使い DevOps"
@@ -364,8 +354,6 @@ cards:
               card_id: [NT-0013, NT-0014]
         ops:
           - cancel_action: {}
-
-  # ── アタッチメント (5枚) ─────────────────────────────────────
 
   - card_no: 38
     card_id: "TK-0015"
@@ -484,8 +472,6 @@ cards:
               amount: 200
               duration: while_on_field
 
-  # ── ストラテジー (3枚) ───────────────────────────────────────
-
   - card_no: 42
     card_id: "TK-0020"
     card_name: "天気使い Template"
@@ -548,8 +534,6 @@ cards:
               buff: incident_block
               amount: 1
               duration: this_turn
-
-  # ── リアクティブ (3枚) ───────────────────────────────────────
 
   - card_no: 45
     card_id: "TK-0023"

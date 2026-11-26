@@ -2,69 +2,102 @@ package presenter
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
 	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 )
 
-// ToCardDefinition は domain.Card を REST wire の CardDefinition に詰め替えます。
-func ToCardDefinition(c *domain.Card) *apicard.CardDefinition {
-	return &apicard.CardDefinition{
-		CardID:        c.CardID,
-		CardName:      c.CardName,
-		ResourceLabel: c.ResourceLabel,
-		Faction:       c.Faction,
-		CardType:      c.CardType,
-		Subtype:       c.Subtype,
-		Resizable:     c.Resizable,
-		Elastic:       c.Elastic,
-		Stats:         c.Stats,
-		EffectText:    c.EffectText,
-		Effects:       normalizeRawMessage(c.Effects),
-		Restriction:   c.Restriction,
-		IsActive:      c.IsActive,
-		CreatedAt:     c.CreatedAt,
-		UpdatedAt:     c.UpdatedAt,
-	}
+// cardStatsBody はカード定義の応答に含めるステータスの JSON の形式です。
+type cardStatsBody struct {
+	Availability    *int64 `json:"availability,omitempty"`
+	MaintenanceCost *int64 `json:"maintenance_cost,omitempty"`
+	SLAPenalty      *int64 `json:"sla_penalty,omitempty"`
+	Throughput      *int64 `json:"throughput,omitempty"`
+	ThroughputMax   *int64 `json:"throughput_max,omitempty"`
+	Yield           *int64 `json:"yield,omitempty"`
+	YieldMax        *int64 `json:"yield_max,omitempty"`
 }
 
-// ToCardDefinitions は domain.Card slice を CardDefinition slice に詰め替えます。
-func ToCardDefinitions(cards []*domain.Card) []*apicard.CardDefinition {
-	result := make([]*apicard.CardDefinition, len(cards))
-	for i, c := range cards {
-		result[i] = ToCardDefinition(c)
+// ToCardsWithOwnership は所持状態つきのカード定義の一覧を API の応答の型に変換します。
+func ToCardsWithOwnership(cardsWithOwnership []domain.CardWithOwnership) ([]*apicard.CardWithOwnership, error) {
+	result := make([]*apicard.CardWithOwnership, len(cardsWithOwnership))
+	for i, cardWithOwnership := range cardsWithOwnership {
+		card := cardWithOwnership.Card
+		stats, err := toStatsBody(card.Stats)
+		if err != nil {
+			return nil, err
+		}
+		effects, err := toEffectsBody(card.Effects)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = &apicard.CardWithOwnership{
+			CardID:        card.CardID,
+			CardName:      card.CardName,
+			ResourceLabel: card.ResourceLabel,
+			Faction:       card.Faction,
+			CardType:      card.CardType,
+			Subtype:       card.Subtype,
+			Resizable:     card.IsResizable,
+			Elastic:       card.IsElastic,
+			Stats:         stats,
+			EffectText:    card.EffectText,
+			Effects:       effects,
+			Restriction:   card.Restriction,
+			IsActive:      card.IsActive,
+			CreatedAt:     card.CreatedAt,
+			UpdatedAt:     card.UpdatedAt,
+			IsOwned:       cardWithOwnership.IsOwned,
+		}
 	}
-	return result
+	return result, nil
 }
 
-// ToCardWithOwnership は domain.Card と所持フラグから wire の CardWithOwnership を組み立てます。
-func ToCardWithOwnership(c *domain.Card, isOwned bool) *apicard.CardWithOwnership {
-	return &apicard.CardWithOwnership{
-		CardID:        c.CardID,
-		CardName:      c.CardName,
-		ResourceLabel: c.ResourceLabel,
-		Faction:       c.Faction,
-		CardType:      c.CardType,
-		Subtype:       c.Subtype,
-		Resizable:     c.Resizable,
-		Elastic:       c.Elastic,
-		Stats:         c.Stats,
-		EffectText:    c.EffectText,
-		Effects:       normalizeRawMessage(c.Effects),
-		Restriction:   c.Restriction,
-		IsActive:      c.IsActive,
-		CreatedAt:     c.CreatedAt,
-		UpdatedAt:     c.UpdatedAt,
-		IsOwned:       isOwned,
+// ToPlayerCardsWithDefinition はカード定義つきの所持カードの一覧を API の応答の型に変換します。
+func ToPlayerCardsWithDefinition(playerCards []domain.PlayerCardWithDefinition) ([]*apicard.PlayerCardWithDef, error) {
+	result := make([]*apicard.PlayerCardWithDef, len(playerCards))
+	for i, playerCard := range playerCards {
+		stats, err := toStatsBody(playerCard.Card.Stats)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = &apicard.PlayerCardWithDef{
+			CardID:        playerCard.PlayerCard.CardID,
+			ArtNo:         playerCard.PlayerCard.ArtNo,
+			Count:         playerCard.PlayerCard.Count,
+			CardName:      playerCard.Card.CardName,
+			ResourceLabel: playerCard.Card.ResourceLabel,
+			Faction:       playerCard.Card.Faction,
+			CardType:      playerCard.Card.CardType,
+			Subtype:       playerCard.Card.Subtype,
+			Resizable:     playerCard.Card.IsResizable,
+			Elastic:       playerCard.Card.IsElastic,
+			Stats:         stats,
+			EffectText:    playerCard.Card.EffectText,
+			Restriction:   playerCard.Card.Restriction,
+		}
 	}
+	return result, nil
 }
 
-// normalizeRawMessage は空 (nil または長さ 0) の RawMessage を nil ポインタに正規化します。
-// oapi-codegen 生成型は optional な JSON object フィールドを *json.RawMessage として
-// 出力するため、空値時に omitempty を効かせるにはポインタを nil にする必要があります。
-func normalizeRawMessage(b json.RawMessage) *json.RawMessage {
-	if len(b) == 0 {
-		return nil
+func toStatsBody(stats domain.CardStats) (json.RawMessage, error) {
+	body, err := json.Marshal(cardStatsBody(stats))
+	if err != nil {
+		return nil, fmt.Errorf("marshal card stats: %w", err)
 	}
-	return &b
+	return body, nil
+}
+
+// toEffectsBody は効果定義を応答の形式に変換します。効果定義が未設定のときは nil を返し、応答に含めません。
+func toEffectsBody(effects []map[string]any) (*json.RawMessage, error) {
+	if effects == nil {
+		return nil, nil
+	}
+	body, err := json.Marshal(effects)
+	if err != nil {
+		return nil, fmt.Errorf("marshal card effects: %w", err)
+	}
+	raw := json.RawMessage(body)
+	return &raw, nil
 }

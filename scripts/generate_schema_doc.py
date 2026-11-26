@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-"""schema doc 生成。doc-tools パッケージを呼び出す。"""
+"""db/schema.sql からスキーマ定義書 (docs/DATA_DESIGN.md) の生成部を更新する。"""
 import sys
 from pathlib import Path
 

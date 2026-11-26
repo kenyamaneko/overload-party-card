@@ -11,8 +11,6 @@ ON CONFLICT (pack_id) DO UPDATE SET
   description = EXCLUDED.description,
   is_active   = EXCLUDED.is_active;
 
--- Replace the entire card_pack_cards rows for the listed packs:
--- delete current rows for those packs, then INSERT the seed rows.
 DELETE FROM card.card_pack_cards WHERE pack_id IN ('basic', 'faction_set_she', 'faction_set_tenki', 'faction_set_sugar', 'faction_set_tuners');
 
 INSERT INTO card.card_pack_cards (pack_id, card_id, copies)

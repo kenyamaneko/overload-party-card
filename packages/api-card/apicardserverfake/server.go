@@ -1,16 +1,17 @@
-// Package apicardserverfake は card サービスの HTTP 契約を実装する
-// httptest.Server ラッパー。consumer (gateway 等) が cardclient を使う
-// handler テストで、実 card サービスを起動せずに REST 呼び出しを検証するための
-// テストダブルを提供する。
+// Package apicardserverfake は card サービスの HTTP 契約を実装するテスト用サーバーを提供する。
+// 利用側 (gateway など) が apicardclient を使うハンドラのテストで、実際の card サービスを起動せずに
+// REST 呼び出しを確かめるために使う。
 //
-// 各 endpoint は Fn field (func callback) で status + response body を制御する。
-// Fn が nil の endpoint は既定値を返す (happy-path を仮定した最低限の応答)。
+// 各エンドポイントの応答 (ステータスと本文) は、対応する Fn フィールドに設定した関数で決める。
+// Fn が nil のエンドポイントは、成功を表す最小限の既定の応答を返す。
 //
-// JSON request / response shape は cardclient が送受する形式に合わせる。
+// 要求と応答の JSON の形は apicardclient が送受信する形式に合わせる。
 package apicardserverfake
 
 import (
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -18,7 +19,7 @@ import (
 	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 )
 
-// Server は card HTTP 契約を実装する httptest.Server wrapper。
+// Server は card サービスの HTTP 契約を実装するテスト用サーバーです。
 type Server struct {
 	mu                sync.Mutex
 	srv               *httptest.Server
@@ -26,9 +27,6 @@ type Server struct {
 
 	// GetHealthFn は GET /health の応答を決定する。
 	GetHealthFn func() (int, any)
-
-	// ListAllCardsFn は GET /internal/v1/cards (master 配信) の応答を決定する。
-	ListAllCardsFn func() (int, any)
 
 	// ListCardsWithOwnershipFn は GET /api/v1/cards/cards/with-ownership の応答を決定する。
 	ListCardsWithOwnershipFn func() (int, any)
@@ -55,12 +53,11 @@ type Server struct {
 	ValidateDeckForBattleFn func(deckID string) (int, any)
 }
 
-// NewServer は起動済み Server を返す。テスト終了時に Close() すること。
+// NewServer は起動済みの Server を返す。テストの終了時に Close を呼ぶこと。
 func NewServer() *Server {
 	s := &Server{}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", s.handleGetHealth)
-	mux.HandleFunc("GET /internal/v1/cards", s.handleListAllCards)
 	mux.HandleFunc("GET /api/v1/cards/cards/with-ownership", s.handleListCardsWithOwnership)
 	mux.HandleFunc("GET /api/v1/cards/cards", s.handleListPlayerCards)
 	mux.HandleFunc("GET /api/v1/cards/decks", s.handleListDecks)
@@ -102,18 +99,6 @@ func (s *Server) handleGetHealth(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Unlock()
 	if fn == nil {
 		writeJSON(w, http.StatusOK, apicard.HealthResponse{Status: "ok"})
-		return
-	}
-	status, body := fn()
-	writeJSON(w, status, body)
-}
-
-func (s *Server) handleListAllCards(w http.ResponseWriter, _ *http.Request) {
-	s.mu.Lock()
-	fn := s.ListAllCardsFn
-	s.mu.Unlock()
-	if fn == nil {
-		writeJSON(w, http.StatusOK, []*apicard.CardDefinition{})
 		return
 	}
 	status, body := fn()
@@ -171,7 +156,10 @@ func (s *Server) handleGetDeck(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCreateDeck(w http.ResponseWriter, r *http.Request) {
 	var req apicard.DeckCreateRequest
-	_ = json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, fmt.Sprintf("decode request body: %v", err), http.StatusBadRequest)
+		return
+	}
 
 	s.mu.Lock()
 	fn := s.CreateDeckFn
@@ -186,7 +174,10 @@ func (s *Server) handleCreateDeck(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleUpdateDeck(w http.ResponseWriter, r *http.Request) {
 	var req apicard.DeckUpdateRequest
-	_ = json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, fmt.Sprintf("decode request body: %v", err), http.StatusBadRequest)
+		return
+	}
 
 	s.mu.Lock()
 	fn := s.UpdateDeckFn
@@ -226,15 +217,21 @@ func (s *Server) handleValidateDeckForBattle(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, status, body)
 }
 
-// writeJSON は status code を書き、body が非 nil なら Content-Type: application/json
-// で JSON encode して送る。body が nil の場合は body 無しでレスポンスを終わる
-// (cardclient は 4xx/5xx のエラー body を一部しか読まないため、body=nil でも応答は成立する)。
+// writeJSON はステータスを返し、body があれば JSON にして本文として返す。
+// body が nil のときは本文を付けない。body を JSON にできないときは、500 で原因を返す。
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	if body == nil {
 		w.WriteHeader(status)
 		return
 	}
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("encode response body: %v", err), http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(body)
+	if _, err := w.Write(encoded); err != nil {
+		slog.Error("apicardserverfake: write response body failed", "error", err)
+	}
 }

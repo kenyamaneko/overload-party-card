@@ -1,10 +1,10 @@
 # card スキーマ - データ設計
 
-> **DDL の SSoT:** `db/schema.sql`
+> **DDL の SSoT**：`db/schema.sql`
 
 ## 設計概要
 
-card スキーマはカードマスターデータ・プレイヤーの所持カード・デッキ構築を管理する。battle サービスはカードマスターを直接 SELECT せず、card サービスの内部 REST API `GET /internal/v1/cards` でインメモリキャッシュに取得する。
+card スキーマはカードマスターデータ・プロダクト・施策・プレイヤーの所持カード・デッキ・カードパックを管理する。battle サービスはカードマスターを直接 SELECT せず、`publish-master-data.yaml` が環境ごとのバケットへ公開するカード定義 (`cards.json`) と施策定義 (`initiatives.json`) を起動時に読み込む。
 
 ---
 
@@ -12,11 +12,11 @@ card スキーマはカードマスターデータ・プレイヤーの所持カ
 
 ### card_definitions
 
-カードマスター。全 126 枚のカード定義を格納する。
+カードマスター。全てのカード定義を格納する。
 
-- **PK:** `card_id` (VARCHAR(10))
-- **INDEX:** `idx_cards_faction` ON `(faction, card_type)`, `idx_cards_type` ON `(card_type)`
-- **TRIGGER:** `updated_at` 自動更新
+- **PK**：`card_id` (VARCHAR(10))
+- **INDEX**：`idx_cards_faction` ON `(faction, card_type)`, `idx_cards_type` ON `(card_type)`
+- **TRIGGER**：`updated_at` 自動更新
 
 <!-- BEGIN GENERATED: card_definitions -->
 | カラム名 | 型 | Nullable | 説明 |
@@ -25,10 +25,10 @@ card スキーマはカードマスターデータ・プレイヤーの所持カ
 | `card_name` | VARCHAR(100) | No | カード名 |
 | `resource_label` | VARCHAR(30) | No | リソースラベル |
 | `faction` | VARCHAR(20) | No | 陣営（SHE / Tenki / Sugar / Tuners / Neutral） |
-| `card_type` | VARCHAR(30) | No | カードタイプ（Resource / Support） |
-| `subtype` | VARCHAR(30) | Yes | サブタイプ（Compute/Data カテゴリのみ設定: VM/Container/Database 等） |
-| `resizable` | BOOLEAN | No | Resizable 属性 |
-| `elastic` | BOOLEAN | No | Elastic 属性 |
+| `card_type` | VARCHAR(30) | No | カードタイプ（Compute / DataResource / Platform / Attachment / Strategy / Reactive / Incident） |
+| `subtype` | VARCHAR(30) | Yes | サブタイプ（Compute / DataResource のカードにのみ設定: VM / Container / Database 等） |
+| `resizable` | BOOLEAN | No | リサイザブル属性 |
+| `elastic` | BOOLEAN | No | エラスティック属性 |
 | `stats` | JSONB | No | ステータス定義 |
 | `effect_text` | VARCHAR(500) | Yes | 効果テキスト（表示用） |
 | `effects` | JSONB | Yes | 効果定義（JSON 配列） |
@@ -38,9 +38,9 @@ card スキーマはカードマスターデータ・プレイヤーの所持カ
 | `updated_at` | TIMESTAMPTZ | No | 更新日時 |
 <!-- END GENERATED: card_definitions -->
 
-**`stats` JSON の構造:**
+**`stats` JSON の構造**：
 
-コンピュート系リソース:
+Compute系リソース:
 ```json
 {
   "throughput": 300,
@@ -52,7 +52,7 @@ card スキーマはカードマスターデータ・プレイヤーの所持カ
 }
 ```
 
-DB系・オブジェクトストレージ:
+Data系リソース:
 ```json
 {
   "yield": 200,
@@ -70,9 +70,9 @@ Platform / Attachment / Strategy / Incident / Reactive には `stats` フィー�
 
 陣営に属するプロダクトマスター。陣営:プロダクト = 1:N。
 
-- **PK:** `product_id` (VARCHAR(10))
-- **INDEX:** `idx_products_faction` ON `(faction)`
-- **TRIGGER:** `updated_at` 自動更新
+- **PK**：`product_id` (VARCHAR(10))
+- **INDEX**：`idx_products_faction` ON `(faction)`
+- **TRIGGER**：`updated_at` 自動更新
 
 <!-- BEGIN GENERATED: products -->
 | カラム名 | 型 | Nullable | 説明 |
@@ -89,10 +89,10 @@ Platform / Attachment / Strategy / Incident / Reactive には `stats` フィー�
 
 プロダクトの施策マスター。プロダクト:施策 = 1:N。`kind` で routine（1ターン1回）/ special（1ゲーム1回）を区別する。
 
-- **PK:** `initiative_id` (VARCHAR(10))
-- **FK:** `product_id` → `card.products(product_id)` ON DELETE CASCADE
-- **INDEX:** `idx_initiatives_product` ON `(product_id)`
-- **TRIGGER:** `updated_at` 自動更新
+- **PK**：`initiative_id` (VARCHAR(10))
+- **FK**：`product_id` → `card.products(product_id)` ON DELETE CASCADE
+- **INDEX**：`idx_initiatives_product` ON `(product_id)`
+- **TRIGGER**：`updated_at` 自動更新
 
 <!-- BEGIN GENERATED: initiatives -->
 | カラム名 | 型 | Nullable | 説明 |
@@ -101,7 +101,7 @@ Platform / Attachment / Strategy / Incident / Reactive には `stats` フィー�
 | `product_id` | VARCHAR(10) | No | 親プロダクト識別子 |
 | `kind` | VARCHAR(10) | No | 区分（routine: 1ターン1回 / special: 1ゲーム1回） |
 | `name` | VARCHAR(100) | No | 施策名 |
-| `insight_cost` | BIGINT | No | 発動 Insight コスト |
+| `insight_cost` | BIGINT | No | 発動インサイトコスト |
 | `effect_text` | VARCHAR(500) | No | 効果テキスト（表示用） |
 | `effect` | JSONB | No | 効果定義（DSL） |
 | `is_active` | BOOLEAN | No | 有効フラグ（論理削除） |
@@ -113,13 +113,13 @@ Platform / Attachment / Strategy / Incident / Reactive には `stats` フィー�
 
 プレイヤーの所持カード。
 
-- **PK:** `(player_id, card_id, art_no)`
+- **PK**：`(player_id, card_id, art_no)`
 - `player_id` は `account.players` へのクロススキーマ参照（FK 無し、アプリ層整合性）
 
 <!-- BEGIN GENERATED: player_cards -->
 | カラム名 | 型 | Nullable | 説明 |
 |---|---|---|---|
-| `player_id` | UUID | No | 所有プレイヤー (cross-schema reference to account.players; app-level integrity, not enforced by FK) |
+| `player_id` | UUID | No | 所有プレイヤー (account.players への参照。FK は張らずアプリ層で整合性を担保する) |
 | `card_id` | VARCHAR(10) | No | カード識別子 |
 | `art_no` | BIGINT | No | アート番号 |
 | `count` | INT | No | 所持枚数 |
@@ -129,15 +129,15 @@ Platform / Attachment / Strategy / Incident / Reactive には `stats` フィー�
 
 デッキヘッダー。
 
-- **PK:** `(player_id, deck_id)`
-- **INDEX:** `idx_decks_player` ON `(player_id, updated_at DESC)`
-- **TRIGGER:** `updated_at` 自動更新
+- **PK**：`(player_id, deck_id)`
+- **INDEX**：`idx_decks_player` ON `(player_id, updated_at DESC)`
+- **TRIGGER**：`updated_at` 自動更新
 - `player_id` は `account.players` へのクロススキーマ参照（FK 無し）
 
 <!-- BEGIN GENERATED: decks -->
 | カラム名 | 型 | Nullable | 説明 |
 |---|---|---|---|
-| `player_id` | UUID | No | 所有プレイヤー (cross-schema reference to account.players; app-level integrity, not enforced by FK) |
+| `player_id` | UUID | No | 所有プレイヤー (account.players への参照。FK は張らずアプリ層で整合性を担保する) |
 | `deck_id` | BIGINT (IDENTITY) | No | デッキID（自動採番） |
 | `deck_name` | VARCHAR(50) | No | デッキ名 |
 | `faction` | VARCHAR(20) | No | 宣言陣営（SHE / Tenki / Sugar / Tuners） |
@@ -150,7 +150,7 @@ Platform / Attachment / Strategy / Incident / Reactive には `stats` フィー�
 | `updated_at` | TIMESTAMPTZ | No | 更新日時 |
 <!-- END GENERATED: decks -->
 
-**設計判断:**
+**設計判断**：
 - `is_valid` カラムは意図的に持たない。所持カード変更や制限改定に追従するため、API レスポンス時にサービス層が都度算出する
 - `playmat_no` / `sleeve_no` をデッキに直接持たせているのは、対戦開始時にデッキ情報と合わせて 1 クエリで取得するため
 
@@ -158,8 +158,8 @@ Platform / Attachment / Strategy / Incident / Reactive には `stats` フィー�
 
 デッキ内カード構成。
 
-- **PK:** `(player_id, deck_id, card_id, art_no)`
-- **FK:** `(player_id, deck_id)` → `decks` (CASCADE)
+- **PK**：`(player_id, deck_id, card_id, art_no)`
+- **FK**：`(player_id, deck_id)` → `decks` (CASCADE)
 
 <!-- BEGIN GENERATED: deck_cards -->
 | カラム名 | 型 | Nullable | 説明 |
@@ -173,10 +173,11 @@ Platform / Attachment / Strategy / Incident / Reactive には `stats` フィー�
 
 ### card_pack
 
-配布パック (どのカードを何枚配るか) のマスター。shop からは `shop.product_card_pack_refs.card_pack_id` で論理参照される (FK なし)。
+配布パック (どのカードを何枚配るか) のマスター。shop からは `shop.product_card_pack.card_pack_id` で論理参照される (FK なし)。
 
-- **PK:** `pack_id` (VARCHAR(50))
-- **TRIGGER:** `updated_at` 自動更新
+- **PK**：`pack_id` (VARCHAR(50))
+- **TRIGGER**：`updated_at` 自動更新
+- **初期投入**：`data/card_packs.yaml` が SSoT で、`db/seed/card_packs_seed.sql` は `scripts/generate_card_packs.py` が生成する。全プレイヤー共通の基本パックの `pack_id` は `basic`、陣営ごとのパックの `pack_id` は `faction_set_` に陣営 ID の小文字を続けた値
 
 <!-- BEGIN GENERATED: card_pack -->
 | カラム名 | 型 | Nullable | 説明 |
@@ -188,15 +189,17 @@ Platform / Attachment / Strategy / Incident / Reactive には `stats` フィー�
 | `updated_at` | TIMESTAMPTZ | No | 更新日時 |
 <!-- END GENERATED: card_pack -->
 
-**設計判断:**
-- 配布のたびに DB を都度参照し、`card_definitions` と同じ起動時キャッシュ戦略は採らない (設計判断は common の ADR に記録する)
+**設計判断**：
+- 配布のたびに DB を都度参照する。起動時にロードしたスナップショットでは、どの時点の定義で配布したかを後から再現できず、ローリング再起動中に新旧のインスタンスで配布結果が食い違うため ([ADR-076](https://github.com/kenyamaneko/overload-party-common/blob/main/docs/adr/076-card-pack-master-no-startup-cache.md))
 
 ### card_pack_cards
 
 パックの配布対象カードと枚数を正規化した子テーブル。
 
-- **PK:** `(pack_id, card_id)`
-- **FK:** `pack_id` → `card.card_pack(pack_id)` ON DELETE CASCADE
+- **PK**：`(pack_id, card_id)`
+- **FK**：`pack_id` → `card.card_pack(pack_id)` ON DELETE CASCADE
+- **CHECK**：`copies > 0`
+- `card_id` は `card_definitions` への論理参照 (FK なし)
 
 <!-- BEGIN GENERATED: card_pack_cards -->
 | カラム名 | 型 | Nullable | 説明 |
@@ -208,20 +211,23 @@ Platform / Attachment / Strategy / Incident / Reactive には `stats` フィー�
 
 ### processed_events
 
-Pub/Sub subscriber の冪等性を保証するテーブル。
+Pub/Sub イベントを処理済みかどうかを記録し、再配信された同じイベントの二重処理を防ぐテーブル。
 
-- **PK:** `event_id` (UUID)
+- **PK**：`event_id` (UUID)
 
 <!-- BEGIN GENERATED: processed_events -->
 | カラム名 | 型 | Nullable | 説明 |
 |---|---|---|---|
-| `event_id` | UUID | No | Pub/Sub EventID (publisher 生成の UUIDv4) |
+| `event_id` | UUID | No | Pub/Sub のイベント ID (発行側が生成する UUIDv4) |
 | `event_type` | TEXT | No | イベント種別 (card_pack_purchased / player_onboarded) |
 | `processed_at` | TIMESTAMPTZ | No | 処理日時 |
 <!-- END GENERATED: processed_events -->
 
-**設計判断:**
-- card は `card-pack-purchased` / `player-onboarded` イベントを subscribe し、shop 購入時・オンボーディング完了時に `card_pack` マスター定義に従ってカードを `player_cards` に付与する
+**設計判断**：
+- card は、shop が発行する `card_pack_purchased` イベントと、scenario が発行する `player_onboarded` イベントを購読し、`card_pack` マスターの定義に従ってカードを `player_cards` に配布する
+- `card_pack_purchased` では、イベントの `card_pack_id` のパックを配布する
+- `player_onboarded` では、`basic` パックと、選んだ陣営のパック (`faction_set_` に陣営 ID の小文字を続けた `pack_id`) を配布する
+- 配布に失敗したイベントは再配信で配布し直す。`player_onboarded` の途中で失敗しても、配布済みの `basic` パックは再度配布しない
 
 ---
 
@@ -235,7 +241,7 @@ products (PK: product_id)
   └── 1:N ── initiatives (FK: product_id → products, CASCADE)
   （decks.product_id / routine_id / special_id が参照するが FK は張らない — アプリ層整合性）
 
-[account.players] ─ ─ ─ (cross-schema, app-level)
+[account.players] ─ ─ ─ (他スキーマ、アプリ層で整合性を担保)
   │
   ├── 1:N ── player_cards (PK: player_id, card_id, art_no)
   └── 1:N ── decks        (PK: player_id, deck_id)
@@ -244,6 +250,7 @@ products (PK: product_id)
 
 card_pack (PK: pack_id)
   └── 1:N ── card_pack_cards (FK: pack_id → card_pack, CASCADE)
+  （card_pack_cards.card_id が card_definitions を参照するが FK は張らない）
 
 processed_events (独立、FK なし)
 ```

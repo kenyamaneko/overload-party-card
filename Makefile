@@ -9,7 +9,7 @@ build: ## Build Docker image
 test: ## Run unit tests
 	go test ./... -count=1 -race
 
-test-integration: ## Run unit + integration tests (Testcontainers で Postgres を起動するので Docker 必須)
+test-integration: ## 単体テストと結合テストを実行する (Testcontainers で Postgres を起動するので Docker 必須)
 	go test -tags=integration ./... -count=1 -race
 
 vet: ## Run go vet
@@ -21,10 +21,10 @@ tidy: ## Tidy dependencies
 fmt: ## Format code
 	gofmt -s -w .
 
-run: ## Run card server locally (ENV=dev inline; PORT / DATABASE_CONN / DATABASE_IAM_AUTH_ENABLED=false / INTERNAL_AUTH_SECRET / ACCOUNT_SERVICE_URL must be exported)
+run: ## カードサービスをローカルで起動する (ENV=dev は指定済み。PORT / DATABASE_CONN / DATABASE_IAM_AUTH_ENABLED=false / INTERNAL_AUTH_PUBLIC_KEY / ACCOUNT_SERVICE_URL を export しておく)
 	ENV=dev go run ./cmd/server
 
-generate: ## Regenerate all SSoT-derived outputs (契約型 / schema doc / カード / プロダクト・施策 / カードパック)。oapi-codegen / openapi-typescript / NSwag が必要
+generate: ## SSoT から生成する全ての成果物を再生成する (契約の型 / スキーマのドキュメント / カード / プロダクト・施策 / カードパック)。oapi-codegen / openapi-typescript / NSwag が必要
 	scripts/generate_types.sh
 	python3 scripts/generate_schema_doc.py
 	python3 scripts/generate_cards.py

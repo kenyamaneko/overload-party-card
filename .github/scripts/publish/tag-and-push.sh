@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tag-and-push.sh — 算出済みタグを git に打って push する。
+# 算出済みタグを git で打ち、リモートへプッシュする。
 # 入力: TAG (env)
 set -euo pipefail
 

@@ -21,40 +21,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/internal/v1/cards": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 全カード定義を返す (battle / gateway 起動時キャッシュロード用) */
-        get: operations["listCards"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/v1/initiatives": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 全施策定義を返す (battle 起動時キャッシュロード用) */
-        get: operations["listInitiatives"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/internal/v1/pubsub/player-onboarded": {
         parameters: {
             query?: never;
@@ -64,7 +30,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** player-onboarded-card-sub の Cloud Pub/Sub push 配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM) */
+        /** player-onboarded-card-sub の Cloud Pub/Sub のプッシュ配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM) */
         post: operations["pubsubPlayerOnboarded"];
         delete?: never;
         options?: never;
@@ -81,7 +47,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** card-pack-purchased-card-sub の Cloud Pub/Sub push 配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM) */
+        /** card-pack-purchased-card-sub の Cloud Pub/Sub のプッシュ配信を受け取る (到達制御は呼び出し元の Cloud Run 呼び出し IAM) */
         post: operations["pubsubCardPackPurchased"];
         delete?: never;
         options?: never;
@@ -202,21 +168,22 @@ export interface components {
             /** @example ok */
             status: string;
         };
-        /** @description Cloud Pub/Sub push subscription が送るリクエスト本文の envelope。 */
+        /** @description Cloud Pub/Sub のプッシュサブスクリプションが送るリクエスト本文。 */
         PubSubPushEnvelope: {
             message: {
                 /**
                  * Format: byte
-                 * @description base64 エンコードされたイベント payload。
+                 * @description base64 エンコードされたイベントのペイロード。
                  */
                 data: string;
             };
         };
+        /** @description マスターデータの JSON (cards.json) の 1 件分。どのエンドポイントからも参照されないが、battle がバケット上の JSON を読み込む型として使うため残す。 */
         CardDefinition: {
             card_id: string;
             card_name: string;
             resource_label: string;
-            /** @description ファクション (`SHE` / `Tenki` / `Sugar` / `Tuners` / `Neutral`) */
+            /** @description 陣営 (`SHE` / `Tenki` / `Sugar` / `Tuners` / `Neutral`) */
             faction: string;
             /** @description カード種別 */
             card_type: string;
@@ -227,9 +194,9 @@ export interface components {
              * @description デプロイターン数 (0=即時)
              */
             deploy_turns: number;
-            /** @description 手動スケール可能か */
+            /** @description リサイザブル属性か (手動でランクアップできる) */
             resizable: boolean;
-            /** @description 自動スケール対応か */
+            /** @description エラスティック属性か (自動でスケーリングする) */
             elastic: boolean;
             /** Format: int64 */
             elastic_increment?: number;
@@ -237,15 +204,15 @@ export interface components {
             free_tier?: number;
             /** Format: int64 */
             cost_per_request?: number;
-            /** @description スタッツ (ComputeStats または DataStats) */
+            /** @description ステータス (ComputeStats または DataStats) */
             stats: {
                 [key: string]: unknown;
             };
             effect_text?: string;
-            /** @description エフェクト定義 JSON */
+            /** @description 効果定義 JSON */
             effects?: {
                 [key: string]: unknown;
-            };
+            }[];
             passive_effects?: components["schemas"]["PassiveEffect"][];
             platform_effects?: components["schemas"]["PlatformEffect"][];
             attachment_effects?: components["schemas"]["AttachmentEffect"][];
@@ -281,7 +248,7 @@ export interface components {
             effect_text?: string;
             effects?: {
                 [key: string]: unknown;
-            };
+            }[];
             passive_effects?: components["schemas"]["PassiveEffect"][];
             platform_effects?: components["schemas"]["PlatformEffect"][];
             attachment_effects?: components["schemas"]["AttachmentEffect"][];
@@ -293,7 +260,7 @@ export interface components {
             updated_at: string;
             is_owned: boolean;
         };
-        /** @description プレイヤー所持カードにカード定義フィールドを付加した API レスポンス型。 */
+        /** @description プレイヤー所持カードにカード定義の項目を付加した、API の応答の型。 */
         PlayerCardWithDef: {
             card_id: string;
             /** Format: int64 */
@@ -315,7 +282,7 @@ export interface components {
             effect_text?: string;
             restriction: string;
         };
-        /** @description Compute / Container / Orchestrator / Serverless / AI/ML カード用スタッツ。 */
+        /** @description Compute / Container / Orchestrator / Serverless / AI/ML のカード用ステータス。 */
         ComputeStats: {
             /** Format: int64 */
             throughput: number;
@@ -328,7 +295,7 @@ export interface components {
             /** Format: int64 */
             sla_penalty: number;
         };
-        /** @description Database / ObjectStorage / CacheDB カード用スタッツ。 */
+        /** @description Database / ObjectStorage / CacheDB のカード用ステータス。 */
         DataStats: {
             /** Format: int64 */
             yield: number;
@@ -394,7 +361,7 @@ export interface components {
          * @enum {string}
          */
         InitiativeKind: "routine" | "special";
-        /** @description プレイヤーのデッキ (カード構成オプショナル)。 */
+        /** @description プレイヤーのデッキ。カード構成は含まれないことがある。 */
         Deck: {
             player_id: string;
             /**
@@ -421,7 +388,7 @@ export interface components {
             created_at: string;
             /** Format: date-time */
             updated_at: string;
-            /** @description デッキのカード構成 (API レスポンス時に populate) */
+            /** @description デッキのカード構成 (API の応答を組み立てるときに設定する) */
             deck_cards?: components["schemas"]["DeckCard"][];
         };
         DeckCard: {
@@ -473,17 +440,17 @@ export interface components {
             sleeve_no?: number;
         };
         /**
-         * @description パッシブエフェクトの種別。
+         * @description パッシブ効果の種別。
          * @enum {string}
          */
         PassiveEffectType: "tp_per_backend_db" | "tp_per_backend_data" | "tp_if_card_type_on_field" | "dv_per_other_db" | "dv_if_card_on_field" | "av_bonus" | "scale_cost_free";
         /**
-         * @description プラットフォームエフェクトの種別。
+         * @description プラットフォームの効果の種別。
          * @enum {string}
          */
         PlatformEffectType: "tp_bonus" | "yield_bonus" | "av_bonus";
         /**
-         * @description アタッチメントエフェクトの種別。
+         * @description アタッチメントの効果の種別。
          * @enum {string}
          */
         AttachmentEffectType: "stat_bonus";
@@ -518,53 +485,6 @@ export interface operations {
             };
         };
     };
-    listCards: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description カード定義一覧 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CardDefinition"][];
-                };
-            };
-            /** @description DB 接続エラー */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    listInitiatives: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 施策定義一覧 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Initiative"][];
-                };
-            };
-        };
-    };
     pubsubPlayerOnboarded: {
         parameters: {
             query?: never;
@@ -585,7 +505,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description envelope または base64 データが不正 */
+            /** @description リクエストボディまたは base64 データが不正 */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -621,7 +541,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description envelope または base64 データが不正 */
+            /** @description リクエストボディまたは base64 データが不正 */
             400: {
                 headers: {
                     [name: string]: unknown;

@@ -2,9 +2,8 @@ package domain
 
 import "time"
 
-// Deck は decks テーブル 1 行に対応する domain 表現。
-// IsValid (バトル可否) と DeckCards (構成カード) は API 応答時に組み立てる派生情報なので
-// ここには持たない。
+// Deck はプレイヤーのデッキを表します。
+// カード構成 (DeckCard) とバトルで使えるか (is_valid) は、デッキとは別に取得・算出するため持ちません。
 type Deck struct {
 	PlayerID  string
 	DeckID    int64
@@ -19,7 +18,26 @@ type Deck struct {
 	UpdatedAt time.Time
 }
 
-// DeckCard は deck_cards テーブル 1 行に対応する domain 表現。
+// DeckDetail はデッキと、そのカード構成、バトルで使えるかの判定をまとめたものです。
+type DeckDetail struct {
+	Deck    Deck
+	Cards   []DeckCard
+	IsValid bool
+}
+
+// DeckDraft はデッキの作成・更新で利用者が指定する内容です。
+type DeckDraft struct {
+	DeckName  string
+	Faction   string
+	ProductID string
+	RoutineID string
+	SpecialID string
+	PlaymatNo *int64
+	SleeveNo  *int64
+	Cards     []DeckCardEntry
+}
+
+// DeckCard はデッキに含まれるカード 1 種類 (アート番号ごと) とその枚数を表します。
 type DeckCard struct {
 	PlayerID string
 	DeckID   int64
@@ -28,18 +46,16 @@ type DeckCard struct {
 	Count    int
 }
 
-// DeckCardEntry はデッキ作成・更新リクエストのカード指定 1 件分。
-// PlayerID / DeckID は呼び出し側コンテキストで決まるため含めない。
+// DeckCardEntry はデッキの作成・更新で指定するカード 1 種類 (アート番号ごと) とその枚数です。
+// プレイヤー ID とデッキ ID は呼び出し側の文脈で決まるため含めません。
 type DeckCardEntry struct {
 	CardID string
 	ArtNo  int64
 	Count  int
 }
 
-// ToEntry は永続化済みの DeckCard を Entry 形式 (PlayerID/DeckID 抜き) に正規化します。
-// バトル前バリデーション等、入力経路 (リクエスト / DB) を問わず同じ検証ロジックに
-// 流すための共通正規化です。
-func (d DeckCard) ToEntry() DeckCardEntry {
+// DeckCardEntry はデッキに含まれるカードを、デッキの作成・更新の指定形式に変換します。
+func (d DeckCard) DeckCardEntry() DeckCardEntry {
 	return DeckCardEntry{
 		CardID: d.CardID,
 		ArtNo:  d.ArtNo,
@@ -47,11 +63,11 @@ func (d DeckCard) ToEntry() DeckCardEntry {
 	}
 }
 
-// DeckCardEntriesFromCards は DeckCard slice を Entry slice に変換します。
-func DeckCardEntriesFromCards(cards []DeckCard) []DeckCardEntry {
+// ToDeckCardEntries はデッキに含まれるカードの一覧を、デッキの作成・更新の指定形式の一覧に変換します。
+func ToDeckCardEntries(cards []DeckCard) []DeckCardEntry {
 	entries := make([]DeckCardEntry, len(cards))
-	for i, c := range cards {
-		entries[i] = c.ToEntry()
+	for i, card := range cards {
+		entries[i] = card.DeckCardEntry()
 	}
 	return entries
 }

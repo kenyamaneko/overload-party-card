@@ -7,8 +7,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// dbtx は pgxpool.Pool と pgx.Tx の共通インターフェースです。
-// デッキ作成・更新でのアトミック操作に使用します。
+// dbtx は pgxpool.Pool と pgx.Tx に共通する操作です。
+// 同じ処理をトランザクションの内外で使うために用います。
 type dbtx interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)

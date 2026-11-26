@@ -6,52 +6,52 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/kenyamaneko/overload-party-card/internal/handler/rest"
+	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
 
 	internalauth "github.com/kenyamaneko/overload-party-gateway/packages/internalauth-go"
 )
 
+const healthStatusOK = "ok"
+
 // New は card サービスの HTTP ルーターを構築します。
 func New(
-	cardH *rest.CardHandler,
-	deckH *rest.DeckHandler,
-	playerCardH *rest.PlayerCardHandler,
-	productH *rest.ProductHandler,
-	initiativeH *rest.InitiativeHandler,
-	pubsubPushH *rest.PubSubPushHandler,
+	cardHandler *rest.CardHandler,
+	deckHandler *rest.DeckHandler,
+	playerCardHandler *rest.PlayerCardHandler,
+	productHandler *rest.ProductHandler,
+	pubSubPushHandler *rest.PubSubPushHandler,
 	authVerifier internalauth.Verifier,
 ) *gin.Engine {
 	r := gin.New()
-	r.Use(gin.Recovery())
+	r.Use(gin.Recovery(), rest.LogInternalErrors())
 
 	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		c.JSON(http.StatusOK, apicard.HealthResponse{Status: healthStatusOK})
 	})
 
-	// 内部 master 配信 (battle / gateway 起動時のキャッシュロード用) と
-	// Cloud Pub/Sub push 受け口。到達制御は Cloud Run の呼び出し IAM が担うため、
-	// アプリ層では認証なしで開放する。
+	// 到達制御は Cloud Run の呼び出し IAM が担うため、Pub/Sub の push 受け口はアプリ層では認証なしで開放する。
 	internal := r.Group("/internal/v1")
 	{
-		internal.GET("/cards", cardH.ListAllRaw)
-		internal.GET("/initiatives", initiativeH.ListAll)
-		internal.POST("/pubsub/player-onboarded", pubsubPushH.HandlePlayerOnboarded)
-		internal.POST("/pubsub/card-pack-purchased", pubsubPushH.HandleCardPackPurchased)
+		internal.POST("/pubsub/player-onboarded", pubSubPushHandler.ReceivePlayerOnboarded)
+		internal.POST("/pubsub/card-pack-purchased", pubSubPushHandler.ReceiveCardPackPurchased)
 	}
 
-	// gateway 経由の player-scoped API。internalauth middleware が JWT 検証して
-	// sub クレームを context に注入し、handler は context 経由で player_id を取る。
 	api := r.Group("/api/v1/cards")
 	api.Use(internalauth.VerifyInternalAuth(authVerifier))
 	{
-		api.GET("/cards", playerCardH.GetPlayerCards)
-		api.GET("/cards/with-ownership", cardH.ListForPlayer)
-		api.GET("/products", productH.ListAll)
-		api.GET("/decks", deckH.GetDecks)
-		api.GET("/decks/:deckId", deckH.GetDeck)
-		api.POST("/decks", deckH.CreateDeck)
-		api.PUT("/decks/:deckId", deckH.UpdateDeck)
-		api.DELETE("/decks/:deckId", deckH.DeleteDeck)
-		api.POST("/decks/:deckId/validate-for-battle", deckH.ValidateDeckForBattle)
+		api.GET("/cards", playerCardHandler.GetPlayerCards)
+		api.GET("/cards/with-ownership", cardHandler.ListForPlayer)
+		api.GET("/products", productHandler.ListAll)
+
+		decks := api.Group("/decks")
+		decks.GET("", deckHandler.GetDecks)
+		decks.POST("", deckHandler.CreateDeck)
+
+		deck := decks.Group("/:deckId", rest.ParseDeckID())
+		deck.GET("", deckHandler.GetDeck)
+		deck.PUT("", deckHandler.UpdateDeck)
+		deck.DELETE("", deckHandler.DeleteDeck)
+		deck.POST("/validate-for-battle", deckHandler.ValidateDeckForBattle)
 	}
 	return r
 }

@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <PackageId>OverloadParty.ApiCard</PackageId>
     <Version>0.0.0</Version>
-    <Description>Overload Party card service の REST 契約 (.NET client + DTO)。data/openapi.yaml から NSwag で生成。battle が internal/v1/cards のカード定義ロードに使用する。</Description>
+    <Description>Overload Party の card サービスの REST 契約 (.NET のクライアントと DTO)。data/openapi.yaml から NSwag で生成する。battle がマスターデータの JSON (カード定義・施策定義) を読み込む型として使う。</Description>
     <RepositoryUrl>https://github.com/kenyamaneko/overload-party-card</RepositoryUrl>
   </PropertyGroup>
 </Project>

@@ -1,3 +1,2 @@
-// Package port は usecase 層が依存する interface 群 (永続化リポジトリ・
-// Pub/Sub subscriber 等) と共有エラーセンチネルを定義する。
+// Package port は usecase が依存するインターフェース (永続化・トランザクション・マスターデータの参照・他サービスの呼び出し・時刻) と、共有のエラー値を定義する。
 package port

@@ -1,5 +1,4 @@
-# NOTE: origin fields are for internal development reference only.
-# These values MUST NOT be displayed to end users.
+# origin 項目は開発内部の参照用であり、エンドユーザーに表示してはならない。
 
 faction: SHE
 display_name: "SHE（Smile Horizon Express）"

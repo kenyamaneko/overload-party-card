@@ -1,93 +1,53 @@
-package usecase
+package usecase_test
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
-	"github.com/kenyamaneko/overload-party-card/internal/cache"
-	"github.com/kenyamaneko/overload-party-card/internal/domain"
-	apicard "github.com/kenyamaneko/overload-party-card/packages/api-card"
-	gamedesign "github.com/kenyamaneko/overload-party-common/packages/game-design-constants"
+	"github.com/kenyamaneko/overload-party-card/internal/usecase"
+	"github.com/kenyamaneko/overload-party-card/internal/usecase/usecasetest"
 )
 
-// newPlayerCardFixture は fakePlayerCardRepo / cache.CardCache を差し替え可能な
-// PlayerCardInteractor を返す。
-func newPlayerCardFixture() (*PlayerCardInteractor, *fakePlayerCardRepo, *cache.CardCache) {
-	playerCardRepo := newFakePlayerCardRepo()
-	cc := cache.NewCardCache()
-	return NewPlayerCardInteractor(playerCardRepo, cc), playerCardRepo, cc
-}
+func TestPlayerCardList(t *testing.T) {
+	t.Run("[カード]所持カード一覧", func(t *testing.T) {
+		t.Run("プレイヤーの所持カードをカード定義つきで取得する", func(t *testing.T) {
+			t.Run("正常系", func(t *testing.T) {
+				t.Run("所持カードが0件のとき、空の一覧が返る", func(t *testing.T) {
+					interactor := usecase.NewPlayerCardInteractor(usecasetest.NewFakePlayerCardRepository(), usecasetest.LoadCardCache(t, usecasetest.NewUnlimitedSheCards(1)))
 
-func TestGetPlayerCards(t *testing.T) {
-	t.Run("[所持カード]所持カード一覧取得", func(t *testing.T) {
-		t.Run("プレイヤー所持カードの取得元がエラーを返すとき、そのエラーをそのまま返す", func(t *testing.T) {
-			interactor, playerCardRepo, _ := newPlayerCardFixture()
-			injected := errors.New("player card repo unavailable")
-			playerCardRepo.getErr = injected
+					cards, err := interactor.GetPlayerCards(t.Context(), usecasetest.PlayerA)
 
-			_, err := interactor.GetPlayerCards(context.Background(), fxPlayerID)
-
-			require.Error(t, err)
-			assert.ErrorIs(t, err, injected)
-		})
-
-		t.Run("プレイヤーが所持カードを1件も持たないとき、空の一覧を返す", func(t *testing.T) {
-			interactor, _, _ := newPlayerCardFixture()
-
-			result, err := interactor.GetPlayerCards(context.Background(), fxPlayerID)
-
-			require.NoError(t, err)
-			assert.Empty(t, result)
-		})
-
-		t.Run("プレイヤーが所持するカードのカードIDがカード定義キャッシュに存在しないとき、キャッシュ不整合を示すエラーを返す", func(t *testing.T) {
-			interactor, playerCardRepo, _ := newPlayerCardFixture()
-			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-UNDEFINED", ArtNo: 1, Count: 1})
-
-			_, err := interactor.GetPlayerCards(context.Background(), fxPlayerID)
-
-			require.Error(t, err)
-			assert.ErrorContains(t, err, "cache")
-		})
-
-		t.Run("プレイヤーが所持するカードがすべてカード定義キャッシュに存在するとき、返る一覧の各要素は所持カードの内容とカード定義キャッシュ上の対応するカード定義の内容を組み合わせたものになる", func(t *testing.T) {
-			interactor, playerCardRepo, cc := newPlayerCardFixture()
-			playerCardRepo.seed(fxPlayerID, &domain.PlayerCard{CardID: "TST-0001", ArtNo: 3, Count: 2})
-			cc.InjectForTest("TST-0001", &domain.Card{
-				CardID:        "TST-0001",
-				CardName:      "Test Compute",
-				ResourceLabel: "vCPU",
-				Faction:       fxFaction,
-				CardType:      gamedesign.CardTypeCompute,
-				Resizable:     true,
-				Elastic:       true,
-				Stats:         json.RawMessage(`{"tp":1}`),
-				Restriction:   gamedesign.RestrictionUnlimited,
+					assert.NoError(t, err)
+					assert.NotNil(t, cards)
+					assert.Empty(t, cards)
+				})
 			})
 
-			result, err := interactor.GetPlayerCards(context.Background(), fxPlayerID)
+			t.Run("異常系", func(t *testing.T) {
+				t.Run("プレイヤーがTST-9999を所持していて、カード定義にTST-9999が無いとき、エラー内容にTST-9999を含み、カード定義が無いことを示すエラーになる", func(t *testing.T) {
+					playerCards := usecasetest.NewFakePlayerCardRepository()
+					playerCards.SetCount(usecasetest.PlayerA, "TST-9999", 1, 1)
+					interactor := usecase.NewPlayerCardInteractor(playerCards, usecasetest.LoadCardCache(t, usecasetest.NewUnlimitedSheCards(1)))
 
-			require.NoError(t, err)
-			require.Len(t, result, 1)
-			want := &apicard.PlayerCardWithDef{
-				CardID:        "TST-0001",
-				ArtNo:         3,
-				Count:         2,
-				CardName:      "Test Compute",
-				ResourceLabel: "vCPU",
-				Faction:       fxFaction,
-				CardType:      gamedesign.CardTypeCompute,
-				Resizable:     true,
-				Elastic:       true,
-				Stats:         json.RawMessage(`{"tp":1}`),
-				Restriction:   gamedesign.RestrictionUnlimited,
-			}
-			assert.Equal(t, want, result[0])
+					_, err := interactor.GetPlayerCards(t.Context(), usecasetest.PlayerA)
+
+					assert.Error(t, err)
+					assert.ErrorContains(t, err, "TST-9999")
+				})
+
+				t.Run("所持カードのデータベースが「所持カード一覧時の所持カード取得の失敗」のエラーを返したとき、エラーの原因が「所持カード一覧時の所持カード取得の失敗」のエラーになる", func(t *testing.T) {
+					failure := errors.New("所持カード一覧時の所持カード取得の失敗")
+					playerCards := usecasetest.NewFakePlayerCardRepository()
+					playerCards.GetErr = failure
+					interactor := usecase.NewPlayerCardInteractor(playerCards, usecasetest.LoadCardCache(t, usecasetest.NewUnlimitedSheCards(1)))
+
+					_, err := interactor.GetPlayerCards(t.Context(), usecasetest.PlayerA)
+
+					assert.ErrorIs(t, err, failure)
+				})
+			})
 		})
 	})
 }

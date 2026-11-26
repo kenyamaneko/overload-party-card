@@ -1,5 +1,3 @@
-// Package rest は card の REST 配信層と Cloud Pub/Sub push 受け口を提供する。
-// gin handler、usecase の sentinel エラーを HTTP ステータスへ変換する責務、
-// push 配信された Pub/Sub イベントをデコードして internal/adapter/pubsub の
-// port.MessageHandler へ渡す責務を持つ。
+// Package rest は card の REST エンドポイントと Cloud Pub/Sub の push 配信の受け口を提供する。
+// usecase のエラーを HTTP ステータスに変換し、push 配信のメッセージを購読へ渡す。
 package rest

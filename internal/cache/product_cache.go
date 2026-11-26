@@ -2,13 +2,14 @@ package cache
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 
 	"github.com/kenyamaneko/overload-party-card/internal/domain"
 	"github.com/kenyamaneko/overload-party-card/internal/port"
 )
+
+var _ port.ProductCache = (*ProductCache)(nil)
 
 // ProductCache はプロダクト定義のインメモリキャッシュです。
 type ProductCache struct {
@@ -20,46 +21,33 @@ func NewProductCache() *ProductCache {
 	return &ProductCache{}
 }
 
-// Load は ProductRepo から全プロダクト定義を読み込みキャッシュに格納します。
-func (c *ProductCache) Load(ctx context.Context, repo port.ProductRepo) error {
-	products, err := repo.FindAll(ctx)
+// Load は ProductRepository から全プロダクト定義を読み込みキャッシュに格納します。
+func (c *ProductCache) Load(ctx context.Context, repository port.ProductRepository) error {
+	products, err := repository.FindAll(ctx)
 	if err != nil {
 		return fmt.Errorf("load product cache: %w", err)
 	}
 	if len(products) == 0 {
-		return fmt.Errorf("product cache: 0 products loaded, check products table or YAML seed")
+		return fmt.Errorf("load product cache: %w: 0 products loaded, check products table", ErrNoProductDefinitions)
 	}
 
 	c.products = make([]domain.Product, len(products))
-	for i, p := range products {
-		c.products[i] = *p
+	for i, product := range products {
+		c.products[i] = *product
 	}
 
 	slog.Info("product cache loaded", "products", len(c.products))
 	return nil
 }
 
-// LoadFromBytes は JSON バイト列からプロダクト定義をロードします。
-func (c *ProductCache) LoadFromBytes(data []byte) error {
-	var products []domain.Product
-	if err := json.Unmarshal(data, &products); err != nil {
-		return fmt.Errorf("parse product data: %w", err)
-	}
-	if len(products) == 0 {
-		return fmt.Errorf("product cache: 0 products loaded, check products_gen.json")
-	}
-	c.products = products
-	return nil
-}
-
-// All は全プロダクト定義のスナップショットを返します。
-func (c *ProductCache) All() []domain.Product {
+// FindAll は全プロダクト定義のスナップショットを返します。
+func (c *ProductCache) FindAll() []domain.Product {
 	snapshot := make([]domain.Product, len(c.products))
 	copy(snapshot, c.products)
 	return snapshot
 }
 
-// FindByID は指定 ID のプロダクトを返します。
+// FindByID は指定プロダクト ID のプロダクト定義を返します。存在しなければ nil を返します。
 func (c *ProductCache) FindByID(productID string) *domain.Product {
 	for i := range c.products {
 		if c.products[i].ProductID == productID {

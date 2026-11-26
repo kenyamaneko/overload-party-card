@@ -112,14 +112,14 @@ func (e PlatformEffectType) Valid() bool {
 type AttachmentEffect struct {
 	Params map[string]interface{} `json:"params"`
 
-	// Type アタッチメントエフェクトの種別。
+	// Type アタッチメントの効果の種別。
 	Type AttachmentEffectType `json:"type"`
 }
 
-// AttachmentEffectType アタッチメントエフェクトの種別。
+// AttachmentEffectType アタッチメントの効果の種別。
 type AttachmentEffectType string
 
-// CardDefinition defines model for CardDefinition.
+// CardDefinition マスターデータの JSON (cards.json) の 1 件分。どのエンドポイントからも参照されないが、battle がバケット上の JSON を読み込む型として使うため残す。
 type CardDefinition struct {
 	AttachmentEffects *[]AttachmentEffect `json:"attachment_effects,omitempty"`
 	CardID            string              `json:"card_id"`
@@ -134,28 +134,28 @@ type CardDefinition struct {
 	DeployTurns int64   `json:"deploy_turns"`
 	EffectText  *string `json:"effect_text,omitempty"`
 
-	// Effects エフェクト定義 JSON
+	// Effects 効果定義 JSON
 	Effects *json.RawMessage `json:"effects,omitempty"`
 
-	// Elastic 自動スケール対応か
+	// Elastic エラスティック属性か (自動でスケーリングする)
 	Elastic          bool   `json:"elastic"`
 	ElasticIncrement *int64 `json:"elastic_increment,omitempty"`
 
-	// Faction ファクション (`SHE` / `Tenki` / `Sugar` / `Tuners` / `Neutral`)
+	// Faction 陣営 (`SHE` / `Tenki` / `Sugar` / `Tuners` / `Neutral`)
 	Faction         string            `json:"faction"`
 	FreeTier        *int64            `json:"free_tier,omitempty"`
 	IsActive        bool              `json:"is_active"`
 	PassiveEffects  *[]PassiveEffect  `json:"passive_effects,omitempty"`
 	PlatformEffects *[]PlatformEffect `json:"platform_effects,omitempty"`
 
-	// Resizable 手動スケール可能か
+	// Resizable リサイザブル属性か (手動でランクアップできる)
 	Resizable     bool   `json:"resizable"`
 	ResourceLabel string `json:"resource_label"`
 
 	// Restriction 制限区分 (`unlimited` / `semi_limited` / `limited` / `forbidden`)
 	Restriction string `json:"restriction"`
 
-	// Stats スタッツ (ComputeStats または DataStats)
+	// Stats ステータス (ComputeStats または DataStats)
 	Stats json.RawMessage `json:"stats"`
 
 	// Subtype サブタイプ (Compute/DataResource 配下のみ)
@@ -190,7 +190,7 @@ type CardWithOwnership struct {
 	UpdatedAt         time.Time           `json:"updated_at"`
 }
 
-// ComputeStats Compute / Container / Orchestrator / Serverless / AI/ML カード用スタッツ。
+// ComputeStats Compute / Container / Orchestrator / Serverless / AI/ML のカード用ステータス。
 type ComputeStats struct {
 	Availability    int64  `json:"availability"`
 	MaintenanceCost int64  `json:"maintenance_cost"`
@@ -199,7 +199,7 @@ type ComputeStats struct {
 	ThroughputMax   *int64 `json:"throughput_max,omitempty"`
 }
 
-// DataStats Database / ObjectStorage / CacheDB カード用スタッツ。
+// DataStats Database / ObjectStorage / CacheDB のカード用ステータス。
 type DataStats struct {
 	Availability    int64  `json:"availability"`
 	MaintenanceCost int64  `json:"maintenance_cost"`
@@ -208,11 +208,11 @@ type DataStats struct {
 	YieldMax        *int64 `json:"yield_max,omitempty"`
 }
 
-// Deck プレイヤーのデッキ (カード構成オプショナル)。
+// Deck プレイヤーのデッキ。カード構成は含まれないことがある。
 type Deck struct {
 	CreatedAt time.Time `json:"created_at"`
 
-	// DeckCards デッキのカード構成 (API レスポンス時に populate)
+	// DeckCards デッキのカード構成 (API の応答を組み立てるときに設定する)
 	DeckCards *[]DeckCard `json:"deck_cards,omitempty"`
 
 	// DeckID デッキ ID (自動採番)
@@ -330,25 +330,25 @@ type InitiativeKind string
 type PassiveEffect struct {
 	Params map[string]interface{} `json:"params"`
 
-	// Type パッシブエフェクトの種別。
+	// Type パッシブ効果の種別。
 	Type PassiveEffectType `json:"type"`
 }
 
-// PassiveEffectType パッシブエフェクトの種別。
+// PassiveEffectType パッシブ効果の種別。
 type PassiveEffectType string
 
 // PlatformEffect defines model for PlatformEffect.
 type PlatformEffect struct {
 	Params map[string]interface{} `json:"params"`
 
-	// Type プラットフォームエフェクトの種別。
+	// Type プラットフォームの効果の種別。
 	Type PlatformEffectType `json:"type"`
 }
 
-// PlatformEffectType プラットフォームエフェクトの種別。
+// PlatformEffectType プラットフォームの効果の種別。
 type PlatformEffectType string
 
-// PlayerCardWithDef プレイヤー所持カードにカード定義フィールドを付加した API レスポンス型。
+// PlayerCardWithDef プレイヤー所持カードにカード定義の項目を付加した、API の応答の型。
 type PlayerCardWithDef struct {
 	ArtNo    int64  `json:"art_no"`
 	CardID   string `json:"card_id"`
@@ -382,10 +382,10 @@ type Product struct {
 	ProductName string `json:"product_name"`
 }
 
-// PubSubPushEnvelope Cloud Pub/Sub push subscription が送るリクエスト本文の envelope。
+// PubSubPushEnvelope Cloud Pub/Sub のプッシュサブスクリプションが送るリクエスト本文。
 type PubSubPushEnvelope struct {
 	Message struct {
-		// Data base64 エンコードされたイベント payload。
+		// Data base64 エンコードされたイベントのペイロード。
 		Data []byte `json:"data"`
 	} `json:"message"`
 }
@@ -514,12 +514,6 @@ type ClientInterface interface {
 
 	// GetHealth request
 	GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// ListCards request
-	ListCards(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// ListInitiatives request
-	ListInitiatives(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PubsubCardPackPurchasedWithBody request with any body
 	PubsubCardPackPurchasedWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -666,30 +660,6 @@ func (c *Client) ListProductsForPlayer(ctx context.Context, reqEditors ...Reques
 
 func (c *Client) GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetHealthRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ListCards(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListCardsRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ListInitiatives(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListInitiativesRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -1072,60 +1042,6 @@ func NewGetHealthRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
-// NewListCardsRequest generates requests for ListCards
-func NewListCardsRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/internal/v1/cards")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewListInitiativesRequest generates requests for ListInitiatives
-func NewListInitiativesRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/internal/v1/initiatives")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
 // NewPubsubCardPackPurchasedRequest calls the generic PubsubCardPackPurchased builder with application/json body
 func NewPubsubCardPackPurchasedRequest(server string, body PubsubCardPackPurchasedJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -1282,12 +1198,6 @@ type ClientWithResponsesInterface interface {
 
 	// GetHealthWithResponse request
 	GetHealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetHealthResponse, error)
-
-	// ListCardsWithResponse request
-	ListCardsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCardsResponse, error)
-
-	// ListInitiativesWithResponse request
-	ListInitiativesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListInitiativesResponse, error)
 
 	// PubsubCardPackPurchasedWithBodyWithResponse request with any body
 	PubsubCardPackPurchasedWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PubsubCardPackPurchasedResponse, error)
@@ -1598,66 +1508,6 @@ func (r GetHealthResponse) ContentType() string {
 	return ""
 }
 
-type ListCardsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *[]CardDefinition
-}
-
-// Status returns HTTPResponse.Status
-func (r ListCardsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListCardsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ListCardsResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type ListInitiativesResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *[]Initiative
-}
-
-// Status returns HTTPResponse.Status
-func (r ListInitiativesResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListInitiativesResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ListInitiativesResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
 type PubsubCardPackPurchasedResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1820,24 +1670,6 @@ func (c *ClientWithResponses) GetHealthWithResponse(ctx context.Context, reqEdit
 		return nil, err
 	}
 	return ParseGetHealthResponse(rsp)
-}
-
-// ListCardsWithResponse request returning *ListCardsResponse
-func (c *ClientWithResponses) ListCardsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCardsResponse, error) {
-	rsp, err := c.ListCards(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListCardsResponse(rsp)
-}
-
-// ListInitiativesWithResponse request returning *ListInitiativesResponse
-func (c *ClientWithResponses) ListInitiativesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListInitiativesResponse, error) {
-	rsp, err := c.ListInitiatives(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListInitiativesResponse(rsp)
 }
 
 // PubsubCardPackPurchasedWithBodyWithResponse request with arbitrary body returning *PubsubCardPackPurchasedResponse
@@ -2104,58 +1936,6 @@ func ParseGetHealthResponse(rsp *http.Response) (*GetHealthResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest HealthResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseListCardsResponse parses an HTTP response from a ListCardsWithResponse call
-func ParseListCardsResponse(rsp *http.Response) (*ListCardsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ListCardsResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []CardDefinition
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseListInitiativesResponse parses an HTTP response from a ListInitiativesWithResponse call
-func ParseListInitiativesResponse(rsp *http.Response) (*ListInitiativesResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ListInitiativesResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []Initiative
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
